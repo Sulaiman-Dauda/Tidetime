@@ -64,7 +64,7 @@ export default async function BookingDetailPage({ params }: Props) {
   const when = formatRange(booking.startTime, booking.endTime, user.timeZone);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <Link
           href="/dashboard/bookings"

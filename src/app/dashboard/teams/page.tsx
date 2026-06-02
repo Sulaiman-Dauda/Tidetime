@@ -22,7 +22,7 @@ export default async function TeamsPage() {
     .where(eq(memberships.userId, user.id));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Teams</h1>

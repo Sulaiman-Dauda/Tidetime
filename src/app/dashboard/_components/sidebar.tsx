@@ -23,9 +23,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { logoutAction } from "@/app/(auth)/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const NAV_GROUPS = [
   {
+    label: "Main",
     items: [
       { href: "/dashboard", label: "Event Types", icon: LayoutGrid },
       { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
@@ -33,6 +35,7 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Manage",
     items: [
       { href: "/dashboard/availability", label: "Availability", icon: Clock },
       { href: "/dashboard/links", label: "Booking Links", icon: LinkIcon },
@@ -40,6 +43,7 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Insights",
     items: [
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/reviews", label: "Reviews", icon: Star },
@@ -51,18 +55,20 @@ const NAV_GROUPS = [
 ] as const;
 
 const ADMIN_GROUP = {
+  label: "Admin",
   items: [{ href: "/dashboard/blocked-periods", label: "Blocked Periods", icon: CalendarOff }],
 } as const;
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
-export function Sidebar({
-  user,
-}: {
+interface SidebarProps {
   user: { name: string | null; username: string; avatarUrl: string | null; isAdmin: boolean };
-}) {
-  const pathname = usePathname();
+  onNavigate?: () => void;
+  pendingBookings?: number;
+}
 
+export function SidebarContent({ user, onNavigate, pendingBookings = 0 }: SidebarProps) {
+  const pathname = usePathname();
   const groups = user.isAdmin ? [...NAV_GROUPS, ADMIN_GROUP] : NAV_GROUPS;
 
   function isActive(href: string) {
@@ -70,8 +76,8 @@ export function Sidebar({
   }
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col bg-sidebar border-r border-sidebar-border md:flex">
-      {/* Logo / Wordmark */}
+    <div className="flex h-full flex-col">
+      {/* Logo */}
       <div className="flex h-14 items-center gap-2.5 px-5">
         <TideLogo />
         <span className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
@@ -84,13 +90,19 @@ export function Sidebar({
         {groups.map((group, gi) => (
           <div key={gi}>
             {gi > 0 && <div className="mx-2 my-1 border-t border-sidebar-border/60" />}
-            <div className="space-y-0.5 py-1">
+            <div className="px-3 pt-2.5 pb-0.5">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                {group.label}
+              </span>
+            </div>
+            <div className="space-y-0.5 py-0.5">
               {(group.items as readonly NavItem[]).map(({ href, label, icon: Icon }) => {
                 const active = isActive(href);
                 return (
                   <Link
                     key={href}
                     href={href as Route}
+                    onClick={onNavigate}
                     className={cn(
                       "group flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13.5px] transition-colors",
                       active
@@ -106,7 +118,12 @@ export function Sidebar({
                           : "text-muted-foreground/70 group-hover:text-foreground",
                       )}
                     />
-                    {label}
+                    <span className="flex-1">{label}</span>
+                    {label === "Bookings" && pendingBookings > 0 && (
+                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
+                        {pendingBookings}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -131,17 +148,26 @@ export function Sidebar({
           <div className="flex items-center gap-0.5">
             <ThemeToggle />
             <form action={logoutAction}>
-              <button
-                type="submit"
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                title="Log out"
-              >
-                <LogOut className="h-[15px] w-[15px]" />
-              </button>
+              <Tooltip content="Log out">
+                <button
+                  type="submit"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <LogOut className="h-[15px] w-[15px]" />
+                </button>
+              </Tooltip>
             </form>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function Sidebar({ user, pendingBookings = 0 }: SidebarProps) {
+  return (
+    <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col bg-sidebar border-r border-sidebar-border md:flex">
+      <SidebarContent user={user} pendingBookings={pendingBookings} />
     </aside>
   );
 }

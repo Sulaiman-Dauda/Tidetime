@@ -5,7 +5,7 @@ import { teams, memberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { TeamMembers } from "./members";
 
-export const metadata = { title: "Team · Tidetime" };
+export const metadata = { title: "Team" };
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -42,7 +42,7 @@ export default async function TeamDetailPage({ params }: Props) {
     .where(eq(memberships.teamId, teamId));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">{team.name}</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">

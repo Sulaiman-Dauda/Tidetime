@@ -25,7 +25,7 @@ export default async function ReviewsPage() {
   const [reviews, stats] = await Promise.all([listReviews(user.id), reviewStats(user.id)]);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Reviews</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">

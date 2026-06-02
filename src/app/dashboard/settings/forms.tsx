@@ -109,8 +109,8 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
               />
             </div>
           </div>
-          <Button type="submit" disabled={profilePending}>
-            {profilePending ? "Saving…" : "Save changes"}
+          <Button type="submit" loading={profilePending}>
+            Save changes
           </Button>
         </form>
       </Card>
@@ -133,8 +133,8 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
             <Label htmlFor="next">New password</Label>
             <Input id="next" name="next" type="password" autoComplete="new-password" required minLength={8} />
           </div>
-          <Button type="submit" variant="outline" disabled={pwPending}>
-            {pwPending ? "Updating…" : "Update password"}
+          <Button type="submit" variant="outline" loading={pwPending}>
+            Update password
           </Button>
         </form>
       </Card>
@@ -175,8 +175,8 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
               options={[4, 5].map((n) => ({ value: String(n), label: `${n}+ stars` }))}
             />
           </div>
-          <Button type="submit" disabled={reviewPending}>
-            {reviewPending ? "Saving…" : "Save review settings"}
+          <Button type="submit" loading={reviewPending}>
+            Save review settings
           </Button>
         </form>
       </Card>

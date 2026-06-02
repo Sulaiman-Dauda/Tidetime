@@ -44,7 +44,7 @@ export default async function AnalyticsPage({
   const maxUtil = utilization.length ? Math.max(...utilization.map(([, n]) => n)) : 0;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

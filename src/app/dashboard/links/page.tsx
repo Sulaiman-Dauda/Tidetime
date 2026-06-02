@@ -3,7 +3,7 @@ import { listBookingLinks, userEventTypesForLinks } from "@/server/booking-links
 import { LinkManager } from "./link-manager";
 import { LinkIcon } from "lucide-react";
 
-export const metadata = { title: "Booking Links · Tidetime" };
+export const metadata = { title: "Booking Links" };
 
 export default async function LinksPage() {
   const user = await requireUser();
@@ -13,7 +13,7 @@ export default async function LinksPage() {
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Booking Links</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">

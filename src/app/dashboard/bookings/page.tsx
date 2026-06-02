@@ -4,10 +4,9 @@ import { db } from "@/db";
 import { bookings, attendees } from "@/db/schema";
 import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { decideBookingAction, cancelByHostAction } from "./actions";
-import { CalendarX2, Check, Clock, MapPin, User, X } from "lucide-react";
+import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
+import { CalendarX2, Clock, MapPin, User, X } from "lucide-react";
 
 type Filter = "upcoming" | "pending" | "past" | "cancelled";
 
@@ -98,7 +97,7 @@ export default async function BookingsPage({ searchParams }: Props) {
   const rows = await loadBookings(user.id, active);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Bookings</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
@@ -157,7 +156,7 @@ function BookingRow({
   const when = formatRange(booking.startTime, booking.endTime, userTz);
 
   return (
-    <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <a
@@ -167,13 +166,22 @@ function BookingRow({
             {booking.title}
           </a>
           {booking.status === "pending" && (
-            <Badge variant="pending">Pending</Badge>
+            <Badge variant="pending" className="gap-1">
+              <Clock className="h-2.5 w-2.5" />
+              Pending
+            </Badge>
           )}
           {booking.status === "cancelled" && (
-            <Badge variant="destructive">Cancelled</Badge>
+            <Badge variant="destructive" className="gap-1">
+              <X className="h-2.5 w-2.5" />
+              Cancelled
+            </Badge>
           )}
           {booking.status === "rejected" && (
-            <Badge variant="destructive">Rejected</Badge>
+            <Badge variant="destructive" className="gap-1">
+              <X className="h-2.5 w-2.5" />
+              Rejected
+            </Badge>
           )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
@@ -209,37 +217,13 @@ function BookingRow({
 
       {filter === "pending" && (
         <div className="flex shrink-0 items-center gap-2">
-          <form action={decideBookingAction}>
-            <input type="hidden" name="uid" value={booking.uid} />
-            <input type="hidden" name="decision" value="rejected" />
-            <Button type="submit" variant="outline" size="sm">
-              <X className="h-3.5 w-3.5" />
-              Decline
-            </Button>
-          </form>
-          <form action={decideBookingAction}>
-            <input type="hidden" name="uid" value={booking.uid} />
-            <input type="hidden" name="decision" value="accepted" />
-            <Button type="submit" size="sm">
-              <Check className="h-3.5 w-3.5" />
-              Accept
-            </Button>
-          </form>
+          <DeclineButton uid={booking.uid} />
+          <AcceptButton uid={booking.uid} />
         </div>
       )}
 
       {filter === "upcoming" && (
-        <form action={cancelByHostAction} className="shrink-0">
-          <input type="hidden" name="uid" value={booking.uid} />
-          <Button
-            type="submit"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-destructive"
-          >
-            Cancel
-          </Button>
-        </form>
+        <CancelBookingButton uid={booking.uid} />
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { listBlockedPeriods } from "@/server/blocked-periods";
 import { BlockedPeriodsManager } from "./blocked-periods-manager";
 
-export const metadata = { title: "Blocked Periods · Tidetime" };
+export const metadata = { title: "Blocked Periods" };
 
 export default async function BlockedPeriodsPage() {
   const user = await getCurrentUser();
@@ -13,7 +13,7 @@ export default async function BlockedPeriodsPage() {
   const periods = await listBlockedPeriods();
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Blocked Periods</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">

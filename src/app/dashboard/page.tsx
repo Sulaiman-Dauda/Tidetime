@@ -1,14 +1,13 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Clock, Copy, ExternalLink, EyeOff, Plus, Settings2, Zap } from "lucide-react";
+import { Clock, Copy, ExternalLink, EyeOff, Settings2, Zap } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import {
   listEventTypes,
-  createEventTypeAction,
   duplicateEventTypeAction,
   toggleHiddenAction,
 } from "./event-types/actions";
-import { Button } from "@/components/ui/button";
+import { NewEventTypeButton } from "./_components/new-event-type-button";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration } from "@/lib/format";
 import { env } from "@/lib/env";
@@ -19,7 +18,7 @@ export default async function DashboardPage() {
   const items = await listEventTypes(user.id);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -28,12 +27,7 @@ export default async function DashboardPage() {
             Create events for people to book time with you.
           </p>
         </div>
-        <form action={createEventTypeAction}>
-          <Button type="submit" size="sm">
-            <Plus className="h-3.5 w-3.5" />
-            New event type
-          </Button>
-        </form>
+        <NewEventTypeButton />
       </div>
 
       {/* List */}
@@ -151,12 +145,9 @@ function EmptyState() {
       <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
         Event types let people book specific kinds of meetings with you — like a 30-minute intro call.
       </p>
-      <form action={createEventTypeAction} className="mt-5">
-        <Button type="submit" size="sm">
-          <Plus className="h-3.5 w-3.5" />
-          New event type
-        </Button>
-      </form>
+      <div className="mt-5">
+        <NewEventTypeButton />
+      </div>
     </div>
   );
 }

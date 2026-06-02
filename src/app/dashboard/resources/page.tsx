@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { listResources, eventTypeUsageCounts } from "@/server/resources";
 import { ResourceManager } from "./resource-manager";
 
-export const metadata = { title: "Resources · Tidetime" };
+export const metadata = { title: "Resources" };
 
 export default async function ResourcesPage() {
   const user = await requireUser();
@@ -10,7 +10,7 @@ export default async function ResourcesPage() {
   const usage = await eventTypeUsageCounts(resources.map((r) => r.id));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Resources</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">

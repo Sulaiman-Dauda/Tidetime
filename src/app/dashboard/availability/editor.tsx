@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -97,14 +98,14 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Availability</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Set the hours people can book you.</p>
         </div>
-        <Button onClick={save} disabled={pending}>
-          {pending ? "Saving…" : <><Check className="h-4 w-4" /> Save</>}
+        <Button onClick={save} loading={pending}>
+          <Check className="h-4 w-4" /> Save
         </Button>
       </div>
 
@@ -139,21 +140,27 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                             className="w-28"
                             onChange={(e) => updateInterval(rule.day, i, "end", e.target.value)}
                           />
-                          <Button variant="ghost" size="icon" onClick={() => removeInterval(rule.day, i)}>
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <Tooltip content="Remove">
+                            <Button variant="ghost" size="icon" onClick={() => removeInterval(rule.day, i)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
                         </div>
                       ))
                     )}
                   </div>
                   {enabled && (
                     <div className="flex shrink-0 items-center gap-1 pt-0.5">
-                      <Button variant="ghost" size="icon" title="Add interval" onClick={() => addInterval(rule.day)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Copy to all days" onClick={() => copyToAll(rule.day)}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                      <Tooltip content="Add interval">
+                        <Button variant="ghost" size="icon" onClick={() => addInterval(rule.day)}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="Copy to all days">
+                        <Button variant="ghost" size="icon" onClick={() => copyToAll(rule.day)}>
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
                     </div>
                   )}
                 </div>
@@ -202,6 +209,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                 <div key={ov.date} className="rounded-md border border-border bg-secondary/30 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium">{ov.date}</span>
+                  <Tooltip content="Remove override">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -209,6 +217,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                  </Tooltip>
                   </div>
                   {ov.intervals.length === 0 ? (
                     <span className="text-sm text-muted-foreground">Unavailable</span>

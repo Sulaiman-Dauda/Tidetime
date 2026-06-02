@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
-export const metadata = { title: "Settings · Tidetime" };
+export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -18,7 +18,7 @@ export default async function SettingsPage() {
     .orderBy(desc(apiKeys.createdAt));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">Manage your profile, preferences, and security.</p>

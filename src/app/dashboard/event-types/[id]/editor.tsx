@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { LOCATION_OPTIONS } from "@/lib/locations";
 import { updateEventTypeAction } from "../actions";
@@ -35,7 +36,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
   const { toast } = useToast();
   const [pending, start] = useTransition();
 
-  const [form, setForm] = useState({
+  const initialForm = {
     title: eventType.title,
     slug: eventType.slug,
     description: eventType.description ?? "",
@@ -59,10 +60,16 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
     price: eventType.price,
     currency: eventType.currency,
     successRedirectUrl: eventType.successRedirectUrl ?? "",
-  });
+  };
+
+  const [form, setForm] = useState(initialForm);
   const [locations, setLocations] = useState<EventLocation[]>(eventType.locations ?? []);
   const [fields, setFields] = useState<BookingField[]>(eventType.bookingFields ?? []);
   const [resourceIds, setResourceIds] = useState<number[]>(selectedResourceIds);
+
+  // Track whether the form is dirty (different from initial)
+  const initial = JSON.stringify({ form: initialForm, locations: eventType.locations ?? [], fields: eventType.bookingFields ?? [], resourceIds: selectedResourceIds });
+  const dirty = JSON.stringify({ form, locations, fields, resourceIds }) !== initial;
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -95,7 +102,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
       } catch (error) {
         toast({
           variant: "destructive",
-          title: "Couldn’t save",
+          title: "Couldn't save",
           description:
             error instanceof Error ? error.message : "Please check your inputs and try again.",
         });
@@ -104,14 +111,17 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
   }
 
   return (
-    <div className="space-y-6">
+    <div className="animate-fade-in space-y-6 pb-20">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
+          <Tooltip content="Back to event types">
+            <Button asChild variant="ghost" size="icon">
+              <Link href="/dashboard">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+          </Tooltip>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">{form.title}</h1>
             <p className="text-sm text-muted-foreground">
@@ -119,8 +129,8 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
             </p>
           </div>
         </div>
-        <Button onClick={save} disabled={pending}>
-          {pending ? "Saving…" : <><Check className="h-4 w-4" /> Save</>}
+        <Button onClick={save} loading={pending}>
+          <Check className="h-4 w-4" /> Save
         </Button>
       </div>
 
@@ -223,9 +233,11 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                       }
                     />
                   )}
-                  <Button variant="ghost" size="icon" onClick={() => setLocations((ls) => ls.filter((_, j) => j !== i))}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <Tooltip content="Remove location">
+                    <Button variant="ghost" size="icon" onClick={() => setLocations((ls) => ls.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </Tooltip>
                 </div>
               ))}
               <Button
@@ -399,9 +411,11 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                         Required
                       </label>
                       {!f.system && (
-                        <Button variant="ghost" size="icon" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Tooltip content="Remove question">
+                          <Button variant="ghost" size="icon" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </Tooltip>
                       )}
                     </div>
 
@@ -578,7 +592,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                   return (
                     <label
                       key={r.id}
-                      className="flex items-center justify-between rounded-md border p-3 text-sm"
+                      className="flex items-center justify-between rounded-md border p-3 text-sm cursor-pointer"
                     >
                       <span>
                         <span className="font-medium">{r.name}</span>{" "}
@@ -602,6 +616,26 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
           ) : null}
         </TabsContent>
       </Tabs>
+
+      {/* Sticky save bar */}
+      {dirty && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 border-t border-border bg-card/95 px-6 py-3 backdrop-blur-sm md:left-[220px]">
+          <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => {
+              setForm(initialForm);
+              setLocations(eventType.locations ?? []);
+              setFields(eventType.bookingFields ?? []);
+              setResourceIds(selectedResourceIds);
+            }}>
+              Discard
+            </Button>
+            <Button size="sm" onClick={save} loading={pending}>
+              <Check className="h-4 w-4" /> Save changes
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

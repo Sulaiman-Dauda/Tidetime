@@ -100,7 +100,7 @@ export default async function IntegrationsPage() {
   const installedTypes = new Set(installed.map((row) => row.type));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Integrations</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
@@ -115,7 +115,7 @@ export default async function IntegrationsPage() {
           return (
             <div
               key={type}
-              className="flex items-center gap-5 px-5 py-4"
+              className="flex items-center gap-5 px-5 py-4 transition-colors hover:bg-secondary/30"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-secondary text-foreground">
                 <Icon className="h-4 w-4" />

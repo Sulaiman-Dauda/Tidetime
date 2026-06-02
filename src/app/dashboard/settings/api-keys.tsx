@@ -1,10 +1,22 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { createApiKeyAction, revokeApiKeyAction, type ApiKeyState } from "./api-keys-actions";
 import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
@@ -49,8 +61,8 @@ export function ApiKeys({ keys }: { keys: KeyRow[] }) {
             <Label htmlFor="note">Label</Label>
             <Input id="note" name="note" placeholder="e.g. Zapier" />
           </div>
-          <Button type="submit" disabled={pending}>
-            {pending ? "Creating…" : "Create"}
+          <Button type="submit" loading={pending}>
+            Create
           </Button>
           <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
             Cancel
@@ -95,16 +107,56 @@ export function ApiKeys({ keys }: { keys: KeyRow[] }) {
                   </p>
                 </div>
               </div>
-              <form action={revokeApiKeyAction}>
-                <input type="hidden" name="id" value={k.id} />
-                <Button type="submit" size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </form>
+              <RevokeKeyButton id={k.id} />
             </div>
           ))
         )}
       </div>
     </Card>
+  );
+}
+
+function RevokeKeyButton({ id }: { id: number }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Revoke this API key?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Any service using this key will immediately lose access. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <form
+            action={async (formData) => {
+              start(async () => {
+                await revokeApiKeyAction(formData);
+                setOpen(false);
+                router.refresh();
+              });
+            }}
+          >
+            <input type="hidden" name="id" value={id} />
+            <AlertDialogAction
+              type="submit"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+              disabled={pending}
+            >
+              {pending ? "Revoking…" : "Revoke key"}
+            </AlertDialogAction>
+          </form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
