@@ -10,11 +10,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   createResourceAction,
-  deleteResourceAction,
   type ResourceState,
 } from "./actions";
+import { DeleteResourceButton } from "./delete-resource-button";
 import type { Resource } from "@/db/schema";
-import { Loader2, Plus, Trash2, Box } from "lucide-react";
+import { Loader2, Plus, Box } from "lucide-react";
 
 const TYPES = ["room", "studio", "equipment", "vehicle", "desk", "other"] as const;
 
@@ -130,17 +130,7 @@ export function ResourceManager({
                 ) : (
                   <Badge variant="outline">Inactive</Badge>
                 )}
-                <form action={deleteResourceAction}>
-                  <input type="hidden" name="id" value={r.id} />
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Delete resource"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </form>
+                <DeleteResourceButton id={r.id} name={r.name} />
               </div>
             </Card>
           ))

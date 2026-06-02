@@ -6,6 +6,8 @@ import { formatRange } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CancelBooking } from "./cancel";
 import { CalendarCheck, Clock, MapPin, User, AlertCircle, CalendarClock, XCircle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { initials } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Your booking · Tidetime" };
 
@@ -39,6 +41,18 @@ export default async function BookingDetailPage({ params }: Props) {
     <main className="min-h-screen bg-grid">
       <div className="mx-auto flex max-w-lg flex-col px-4 py-16">
         <div className="rounded-2xl border bg-card p-8 shadow-sm">
+          {/* Host info */}
+          {host && (
+            <div className="flex items-center justify-center gap-3 mb-5">
+              <Avatar className="h-10 w-10 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
+                {host.avatarUrl && <AvatarImage src={host.avatarUrl} alt="" />}
+                <AvatarFallback className="text-xs font-semibold bg-primary/15 text-primary">
+                  {initials(host.name ?? host.username)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium text-foreground">{host.name ?? host.username}</span>
+            </div>
+          )}
           <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${status.ring}`}>
             <StatusIcon className="h-7 w-7" />
           </div>

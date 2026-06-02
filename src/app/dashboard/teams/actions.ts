@@ -221,3 +221,21 @@ export async function bulkImportMembersAction(_prev: ImportState, formData: Form
   revalidatePath("/dashboard/teams");
   return { ok: true, added, errors: rowErrors };
 }
+
+export async function deleteTeamAction(formData: FormData): Promise<void> {
+  "use server";
+  const user = await requireUser();
+  const teamId = Number(formData.get("teamId"));
+
+  const [membership] = await db
+    .select({ role: memberships.role })
+    .from(memberships)
+    .where(and(eq(memberships.teamId, teamId), eq(memberships.userId, user.id)));
+
+  if (!membership || membership.role !== "owner") {
+    throw new Error("Only the team owner can delete the team");
+  }
+
+  await db.delete(teams).where(eq(teams.id, teamId));
+  revalidatePath("/dashboard/teams");
+}

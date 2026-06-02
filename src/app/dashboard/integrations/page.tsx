@@ -109,7 +109,7 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
-      <div className="divide-y divide-border rounded-lg border border-border bg-card">
+      <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
         {CATALOG.map(({ type, name, description, icon: Icon }) => {
           const status = getStatus(type, installedTypes);
           return (
@@ -117,7 +117,7 @@ export default async function IntegrationsPage() {
               key={type}
               className="flex items-center gap-5 px-5 py-4 transition-colors hover:bg-secondary/30"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-secondary text-foreground">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-secondary text-foreground">
                 <Icon className="h-4 w-4" />
               </span>
 

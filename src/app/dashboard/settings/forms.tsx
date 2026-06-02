@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { AvatarUpload } from "./avatar-upload";
 import { Switch } from "@/components/ui/switch";
 import {
   updateProfileAction,
@@ -28,6 +29,7 @@ interface UserView {
   username: string;
   email: string;
   bio: string | null;
+  avatarUrl: string | null;
   timeZone: string;
   timeFormat: number;
   weekStart: number;
@@ -69,6 +71,9 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
     <div className="space-y-6">
       <Card className="p-6">
         <h2 className="text-base font-semibold">Profile</h2>
+        <div className="mt-5">
+          <AvatarUpload currentUrl={user.avatarUrl} name={user.name ?? user.username} />
+        </div>
         <form action={profileAction} className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">

@@ -64,6 +64,7 @@ export async function createEventTypeAction(formData: FormData) {
     .returning({ id: eventTypes.id });
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/event-types");
   redirect(`/dashboard/event-types/${created.id}`);
 }
 
@@ -161,6 +162,7 @@ export async function updateEventTypeAction(input: UpdateEventTypeInput): Promis
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/event-types");
   revalidatePath(`/dashboard/event-types/${data.id}`);
   return { ok: true };
 }
@@ -170,6 +172,7 @@ export async function deleteEventTypeAction(formData: FormData) {
   const id = Number(formData.get("id"));
   await db.delete(eventTypes).where(and(eq(eventTypes.id, id), eq(eventTypes.userId, user.id)));
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/event-types");
 }
 
 export async function toggleHiddenAction(formData: FormData) {
@@ -181,6 +184,7 @@ export async function toggleHiddenAction(formData: FormData) {
     .set({ hidden: !hidden })
     .where(and(eq(eventTypes.id, id), eq(eventTypes.userId, user.id)));
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/event-types");
 }
 
 export async function duplicateEventTypeAction(formData: FormData) {
@@ -209,6 +213,7 @@ export async function duplicateEventTypeAction(formData: FormData) {
   const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = orig;
   await db.insert(eventTypes).values({ ...rest, slug, title: `${orig.title} (copy)` });
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/event-types");
 }
 
 export async function listEventTypes(userId: number) {

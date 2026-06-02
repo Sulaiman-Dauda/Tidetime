@@ -160,11 +160,11 @@ export function BookingFlow({ username, slug, rescheduleUid, bookingLinkToken, t
           {/* Left rail: event details */}
           <aside className="border-b p-6 md:border-b-0 md:border-r">
             {rescheduleUid ? (
-              <div className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+              <div className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
                 Rescheduling your existing booking
               </div>
             ) : null}
-            <Avatar className="h-11 w-11 ring-1 ring-border">
+            <Avatar className="h-11 w-11 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
               {host.avatarUrl ? <AvatarImage src={host.avatarUrl} alt={hostName} /> : null}
               <AvatarFallback>{initials(hostName)}</AvatarFallback>
             </Avatar>
@@ -224,8 +224,8 @@ export function BookingFlow({ username, slug, rescheduleUid, bookingLinkToken, t
                     <button
                       key={d}
                       onClick={() => setDuration(d)}
-                      className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        d === duration ? "border-brand bg-brand text-brand-foreground" : "hover:bg-muted"
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
+                        d === duration ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
                       }`}
                     >
                       {formatDuration(d)}
@@ -291,11 +291,11 @@ export function BookingFlow({ username, slug, rescheduleUid, bookingLinkToken, t
                             setSelectedDay(key);
                             setSelectedSlot(null);
                           }}
-                          className={`aspect-square rounded-lg text-sm font-medium transition-colors ${
+                          className={`aspect-square rounded-xl text-sm font-medium transition-all duration-150 ${
                             isSelected
-                              ? "bg-brand text-brand-foreground shadow-brand"
+                              ? "bg-primary text-primary-foreground shadow-brand scale-[1.05]"
                               : has && !isPast
-                                ? "bg-muted/60 text-foreground hover:bg-muted"
+                                ? "bg-muted/60 text-foreground hover:bg-primary/15 hover:text-primary"
                                 : "text-muted-foreground/40"
                           }`}
                         >
@@ -334,7 +334,7 @@ export function BookingFlow({ username, slug, rescheduleUid, bookingLinkToken, t
                         <button
                           key={s.time}
                           onClick={() => pickSlot(s.time)}
-                          className="w-full rounded-lg border py-2.5 text-sm font-medium transition-colors hover:border-brand hover:bg-brand/5 hover:text-brand"
+                          className="w-full rounded-xl border border-border/60 py-3 text-sm font-medium transition-all duration-150 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-sm active:scale-[0.98]"
                         >
                           {new Date(s.time).toLocaleTimeString(undefined, {
                             hour: "numeric",
@@ -441,7 +441,7 @@ function BookingForm({
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
-      <div className="mb-6 rounded-lg border bg-muted/40 px-4 py-3 text-sm">
+      <div className="mb-6 rounded-xl border bg-muted/40 px-4 py-3 text-sm">
         <span className="font-medium">
           {new Date(slot).toLocaleString(undefined, {
             weekday: "long",

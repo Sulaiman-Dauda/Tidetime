@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip } from "@/components/ui/tooltip";
+import { DeleteEventButton } from "../../_components/delete-event-button";
 import { useToast } from "@/hooks/use-toast";
 import { LOCATION_OPTIONS } from "@/lib/locations";
 import { updateEventTypeAction } from "../actions";
@@ -134,8 +135,12 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
         </Button>
       </div>
 
+      <div className="flex items-center gap-2">
+        <DeleteEventButton id={eventType.id} label={form.title} />
+      </div>
+
       <Tabs defaultValue="setup">
-        <TabsList>
+        <TabsList className="mb-6">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="limits">Limits</TabsTrigger>
           <TabsTrigger value="questions">Questions</TabsTrigger>
@@ -642,7 +647,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-2xl border border-border/60 bg-card p-5">
       <h3 className="font-medium">{title}</h3>
       {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
       <div className="mt-4 space-y-4">{children}</div>

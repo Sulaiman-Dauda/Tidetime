@@ -146,6 +146,12 @@ export async function listReviews(userId: number, limit = 100): Promise<ReviewLi
     .limit(limit);
 }
 
+export async function deleteReview(id: number, userId: number): Promise<void> {
+  await db
+    .delete(reviews)
+    .where(and(eq(reviews.id, id), eq(reviews.userId, userId)));
+}
+
 export async function reviewStats(userId: number): Promise<{
   count: number;
   average: number;

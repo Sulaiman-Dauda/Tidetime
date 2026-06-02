@@ -71,7 +71,7 @@ export function ApiKeys({ keys }: { keys: KeyRow[] }) {
       ) : null}
 
       {created ? (
-        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
           <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
             Copy your key now — it won&apos;t be shown again.
           </p>

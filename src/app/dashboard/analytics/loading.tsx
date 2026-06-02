@@ -9,7 +9,7 @@ export default function Loading() {
         <Skeleton className="h-9 w-28 rounded-md" />
       </div>
       <StatGridSkeleton />
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="rounded-2xl border border-border/60 bg-card p-5">
         <Skeleton className="h-4 w-40" />
         <Skeleton className="h-3 w-48 mt-1" />
         <div className="mt-5 space-y-3">

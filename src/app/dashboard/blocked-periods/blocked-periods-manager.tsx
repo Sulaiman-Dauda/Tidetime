@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, CalendarOff } from "lucide-react";
+import { Loader2, Plus, CalendarOff } from "lucide-react";
 import {
   createBlockedPeriodAction,
-  deleteBlockedPeriodAction,
   type BlockedPeriodState,
 } from "./actions";
+import { DeleteBlockedPeriodButton } from "./delete-blocked-period-button";
 
 type Period = { id: number; start: string; end: string; reason: string | null };
 
@@ -84,12 +84,7 @@ export function BlockedPeriodsManager({ periods }: { periods: Period[] }) {
                   <p className="truncate text-sm font-medium">{formatRange(p.start, p.end)}</p>
                   {p.reason && <p className="truncate text-xs text-muted-foreground">{p.reason}</p>}
                 </div>
-                <form action={deleteBlockedPeriodAction}>
-                  <input type="hidden" name="id" value={p.id} />
-                  <Button type="submit" variant="ghost" size="icon" title="Delete">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </form>
+                <DeleteBlockedPeriodButton id={p.id} />
               </li>
             ))}
           </ul>

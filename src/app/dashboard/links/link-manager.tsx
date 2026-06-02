@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { CopyLinkButton } from "@/app/dashboard/_components/copy-link-button";
-import { createLinkAction, revokeLinkAction, type LinkState } from "./actions";
+import { createLinkAction, type LinkState } from "./actions";
+import { RevokeLinkButton } from "./revoke-link-button";
 import type { BookingLinkRow } from "@/server/booking-links";
-import { Loader2, Plus, Ban } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 type Kind = "one_time" | "expiring" | "limited" | "invite";
 
@@ -142,12 +143,7 @@ export function LinkManager({
                   <CopyLinkButton url={`/i/${link.token}`} label={`/i/${link.token.slice(0, 8)}…`} />
                 )}
                 {!link.revoked && (
-                  <form action={revokeLinkAction}>
-                    <input type="hidden" name="id" value={link.id} />
-                    <Button type="submit" variant="ghost" size="icon" title="Revoke link">
-                      <Ban className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </form>
+                  <RevokeLinkButton id={link.id} />
                 )}
               </div>
             </Card>

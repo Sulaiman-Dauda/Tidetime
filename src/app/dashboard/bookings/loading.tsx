@@ -11,7 +11,7 @@ export default function Loading() {
         <Skeleton className="h-9 w-20 rounded-md" />
         <Skeleton className="h-9 w-20 rounded-md" />
       </div>
-      <div className="divide-y divide-border rounded-lg border border-border bg-card">
+      <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center justify-between px-5 py-4">
             <div className="space-y-2">

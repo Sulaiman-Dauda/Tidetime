@@ -89,7 +89,7 @@ export default async function BookingDetailPage({ params }: Props) {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
-        <section className="space-y-4 rounded-lg border border-border bg-card p-5">
+        <section className="space-y-4 rounded-2xl border border-border/60 bg-card p-5">
           <h2 className="text-sm font-medium text-foreground">Details</h2>
           <dl className="space-y-3 text-[13px]">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -125,7 +125,7 @@ export default async function BookingDetailPage({ params }: Props) {
           </dl>
         </section>
 
-        <section className="space-y-4 rounded-lg border border-border bg-card p-5">
+        <section className="space-y-4 rounded-2xl border border-border/60 bg-card p-5">
           <h2 className="text-sm font-medium text-foreground">Activity</h2>
           {activity.length === 0 ? (
             <p className="text-xs text-muted-foreground">No activity recorded yet.</p>

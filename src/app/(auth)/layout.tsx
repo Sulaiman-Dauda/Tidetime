@@ -39,8 +39,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
               "Open-source, self-hostable",
             ].map((item) => (
               <li key={item} className="flex items-center gap-2.5">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand/15">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                 </span>
                 {item}
               </li>
@@ -75,7 +75,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
 function TideLogo() {
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground shadow-sm">
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
       <svg width="15" height="11" viewBox="0 0 15 11" fill="none" aria-hidden>
         <path
           d="M1 8.5C2.5 6.167 4 6.167 5.5 8.5S8.5 10.833 10 8.5s3-2.333 4.5 0"

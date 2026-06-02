@@ -113,7 +113,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
           <Button asChild variant="outline" size="sm">
             <Link href={`/dashboard/calendar?month=${thisMonth}` as Route}>Today</Link>
           </Button>
-          <div className="flex items-center rounded-lg border bg-card shadow-sm">
+          <div className="flex items-center rounded-xl border bg-card shadow-sm">
             <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-r-none">
               <Link href={`/dashboard/calendar?month=${prev}` as Route} aria-label="Previous month">
                 <ChevronLeft className="h-4 w-4" />
@@ -131,8 +131,8 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         {/* Month grid */}
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-xs font-medium text-muted-foreground">
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+          <div className="grid grid-cols-7 border-b border-border/50 bg-muted/30 text-center text-xs font-semibold text-foreground/60">
             {WEEKDAY_SHORT.map((d) => (
               <div key={d} className="py-2.5">
                 {d}
@@ -141,7 +141,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
           </div>
           <div className="grid grid-cols-7">
             {rows.flat().map((date, i) => {
-              if (!date) return <div key={i} className="min-h-[104px] border-b border-r bg-muted/20" />;
+              if (!date) return <div key={i} className="min-h-[104px] border-b border-r border-border/50 bg-muted/10" />;
               const key = localDayKey(date);
               const dayEvents = byDay.get(key) ?? [];
               const isToday = key === todayKey;
@@ -151,17 +151,17 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
                   key={i}
                   onClick={() => setSelected(key)}
                   className={cn(
-                    "group min-h-[104px] border-b border-r p-1.5 text-left align-top transition-colors last:border-r-0 hover:bg-accent/40",
-                    isSelected && "bg-accent/60",
+                    "group min-h-[104px] border-b border-r border-border/50 p-1.5 text-left align-top transition-all last:border-r-0 hover:bg-primary/8",
+                    isSelected && "bg-primary/12 ring-1 ring-inset ring-primary/20",
                     (i + 1) % 7 === 0 && "border-r-0",
                   )}
                 >
                   <span
                     className={cn(
-                      "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                      "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
                       isToday
-                        ? "bg-brand text-brand-foreground shadow-brand"
-                        : "text-muted-foreground group-hover:text-foreground",
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-foreground/70 group-hover:text-foreground",
                     )}
                   >
                     {date.getDate()}
@@ -171,10 +171,10 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
                       <div
                         key={e.uid}
                         className={cn(
-                          "truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-tight",
+                          "truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight",
                           e.status === "pending"
-                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                            : "bg-brand/10 text-brand dark:text-brand",
+                            ? "bg-amber-500/20 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200"
+                            : "bg-primary/20 text-foreground dark:bg-primary/25 dark:text-foreground",
                         )}
                         title={e.title}
                       >
@@ -183,7 +183,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
                       </div>
                     ))}
                     {dayEvents.length > 3 ? (
-                      <div className="px-1.5 text-[11px] font-medium text-muted-foreground">
+                      <div className="px-1.5 text-[11px] font-semibold text-foreground/50">
                         +{dayEvents.length - 3} more
                       </div>
                     ) : null}
@@ -195,7 +195,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
         </div>
 
         {/* Day detail rail */}
-        <aside className="rounded-lg border border-border bg-card p-4">
+        <aside className="rounded-2xl border border-border/60 bg-card p-4">
           <h2 className="text-sm font-semibold">{selectedLabel ?? "Select a day"}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {selectedEvents.length === 0
@@ -205,21 +205,22 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
 
           <div className="mt-4 space-y-2">
             {selectedEvents.length === 0 ? (
-              <div className="flex flex-col items-center rounded-lg border border-dashed border-border py-10 text-center">
-                <CalendarX2 className="h-6 w-6 text-muted-foreground" />
-                <p className="mt-2 text-xs text-muted-foreground">Nothing scheduled.</p>
+              <div className="flex flex-col items-center rounded-xl border border-dashed border-border/60 py-10 text-center">
+                <CalendarX2 className="h-6 w-6 text-foreground/25" />
+                <p className="mt-2 text-xs text-foreground/40">Nothing scheduled.</p>
               </div>
             ) : (
               selectedEvents.map((e) => (
                 <Link
                   key={e.uid}
                   href={`/booking/${e.uid}` as Route}
-                  className="group block rounded-md border border-border bg-background p-3 transition-colors hover:border-brand/30 hover:bg-accent/30"
+                  className="group block rounded-lg border border-border/50 bg-card p-3 transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium leading-tight">{e.title}</p>
                     {e.status === "pending" ? (
-                      <Badge variant="secondary" className="shrink-0 text-[10px]">
+                      <Badge variant="secondary" className="shrink-0 text-[10px] gap-1">
+                        <Clock className="h-2.5 w-2.5" />
                         Pending
                       </Badge>
                     ) : null}
@@ -242,7 +243,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
                       </span>
                     ) : null}
                   </div>
-                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-brand opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
                     Open booking <ExternalLink className="h-3 w-3" />
                   </span>
                 </Link>

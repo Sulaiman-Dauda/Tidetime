@@ -30,6 +30,7 @@ export default async function SettingsPage() {
           username: user.username,
           email: user.email,
           bio: user.bio,
+          avatarUrl: user.avatarUrl,
           timeZone: user.timeZone,
           timeFormat: user.timeFormat,
           weekStart: user.weekStart,

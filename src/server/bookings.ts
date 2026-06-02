@@ -703,10 +703,10 @@ export async function getBookingByUid(uid: string) {
   const [b] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!b) return null;
   const ats = await db.select().from(attendees).where(eq(attendees.bookingId, b.id));
-  let host: { username: string; name: string | null } | null = null;
+  let host: { username: string; name: string | null; avatarUrl: string | null } | null = null;
   let slug: string | null = null;
   if (b.userId) {
-    const [u] = await db.select({ username: users.username, name: users.name }).from(users).where(eq(users.id, b.userId)).limit(1);
+    const [u] = await db.select({ username: users.username, name: users.name, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, b.userId)).limit(1);
     host = u ?? null;
   }
   if (b.eventTypeId) {

@@ -91,3 +91,11 @@ export async function createScheduleAction(formData: FormData) {
   await db.insert(schedules).values({ userId: user.id, name, timeZone: user.timeZone });
   revalidatePath("/dashboard/availability");
 }
+
+export async function deleteScheduleAction(formData: FormData) {
+  "use server";
+  const user = await requireUser();
+  const id = Number(formData.get("scheduleId"));
+  await db.delete(schedules).where(and(eq(schedules.id, id), eq(schedules.userId, user.id)));
+  revalidatePath("/dashboard/availability");
+}

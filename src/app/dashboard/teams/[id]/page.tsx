@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { teams, memberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { TeamMembers } from "./members";
+import { DeleteTeamButton } from "./delete-team-button";
+import { TeamLogoUpload } from "./team-logo-upload";
 
 export const metadata = { title: "Team" };
 
@@ -50,6 +52,13 @@ export default async function TeamDetailPage({ params }: Props) {
         </p>
       </div>
 
+      {self.role === "owner" && (
+        <div className="rounded-2xl border border-border/60 bg-card p-5">
+          <h3 className="mb-4 text-sm font-semibold">Team logo</h3>
+          <TeamLogoUpload teamId={teamId} currentUrl={team.logoUrl} teamName={team.name} />
+        </div>
+      )}
+
       <TeamMembers
         teamId={teamId}
         viewerRole={self.role}
@@ -61,6 +70,12 @@ export default async function TeamDetailPage({ params }: Props) {
           email: m.email,
         }))}
       />
+
+      {self.role === "owner" && (
+        <div className="border-t border-border/40 pt-6">
+          <DeleteTeamButton teamId={teamId} teamName={team.name} />
+        </div>
+      )}
     </div>
   );
 }

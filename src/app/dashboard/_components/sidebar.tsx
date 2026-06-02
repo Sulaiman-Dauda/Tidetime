@@ -17,6 +17,7 @@ import {
   CalendarOff,
   CalendarRange,
   Plug2,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -29,7 +30,8 @@ const NAV_GROUPS = [
   {
     label: "Main",
     items: [
-      { href: "/dashboard", label: "Event Types", icon: LayoutGrid },
+      { href: "/dashboard", label: "Overview", icon: LayoutGrid },
+      { href: "/dashboard/event-types", label: "Events", icon: Zap },
       { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarRange },
     ],
@@ -64,10 +66,9 @@ type NavItem = { href: string; label: string; icon: React.ComponentType<{ classN
 interface SidebarProps {
   user: { name: string | null; username: string; avatarUrl: string | null; isAdmin: boolean };
   onNavigate?: () => void;
-  pendingBookings?: number;
 }
 
-export function SidebarContent({ user, onNavigate, pendingBookings = 0 }: SidebarProps) {
+export function SidebarContent({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const groups = user.isAdmin ? [...NAV_GROUPS, ADMIN_GROUP] : NAV_GROUPS;
 
@@ -104,9 +105,9 @@ export function SidebarContent({ user, onNavigate, pendingBookings = 0 }: Sideba
                     href={href as Route}
                     onClick={onNavigate}
                     className={cn(
-                      "group flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13.5px] transition-colors",
+                      "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13.5px] transition-all duration-150",
                       active
-                        ? "bg-accent text-brand font-medium"
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                         : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground font-[450]",
                     )}
                   >
@@ -114,16 +115,11 @@ export function SidebarContent({ user, onNavigate, pendingBookings = 0 }: Sideba
                       className={cn(
                         "h-[15px] w-[15px] shrink-0 transition-colors",
                         active
-                          ? "text-brand"
+                          ? "text-primary-foreground"
                           : "text-muted-foreground/70 group-hover:text-foreground",
                       )}
                     />
                     <span className="flex-1">{label}</span>
-                    {label === "Bookings" && pendingBookings > 0 && (
-                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
-                        {pendingBookings}
-                      </span>
-                    )}
                   </Link>
                 );
               })}
@@ -135,9 +131,9 @@ export function SidebarContent({ user, onNavigate, pendingBookings = 0 }: Sideba
       {/* User section */}
       <div className="border-t border-sidebar-border/60 p-2">
         <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-          <Avatar className="h-7 w-7 shrink-0 ring-1 ring-border">
+          <Avatar className="h-7 w-7 shrink-0 ring-2 ring-primary/30 ring-offset-1 ring-offset-sidebar">
             {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-            <AvatarFallback className="text-[11px] font-medium">
+            <AvatarFallback className="text-[11px] font-semibold bg-primary/15 text-primary">
               {initials(user.name ?? user.username)}
             </AvatarFallback>
           </Avatar>
@@ -164,17 +160,17 @@ export function SidebarContent({ user, onNavigate, pendingBookings = 0 }: Sideba
   );
 }
 
-export function Sidebar({ user, pendingBookings = 0 }: SidebarProps) {
+export function Sidebar({ user }: SidebarProps) {
   return (
     <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col bg-sidebar border-r border-sidebar-border md:flex">
-      <SidebarContent user={user} pendingBookings={pendingBookings} />
+      <SidebarContent user={user} />
     </aside>
   );
 }
 
 function TideLogo() {
   return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground shadow-sm">
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
       <svg
         width="15"
         height="11"

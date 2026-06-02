@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { DeleteScheduleButton } from "./delete-schedule-button";
 import { weekdayLabel } from "@/lib/format";
 import { listTimeZones } from "@/lib/timezones";
 import { saveScheduleAction } from "./actions";
@@ -110,7 +111,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="rounded-lg border border-border bg-card p-5">
+        <div className="rounded-2xl border border-border/60 bg-card p-5">
           <h3 className="mb-4 text-sm font-semibold">Weekly hours</h3>
           <div className="space-y-1">
             {weekly.map((rule) => {
@@ -170,7 +171,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-lg border border-border bg-card p-5">
+          <div className="rounded-2xl border border-border/60 bg-card p-5">
             <h3 className="mb-3 text-sm font-semibold">Schedule</h3>
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -193,9 +194,12 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                 </Select>
               </div>
             </div>
+            <div className="mt-4 border-t border-border/40 pt-3">
+              <DeleteScheduleButton scheduleId={schedule.id} scheduleName={name} />
+            </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-5">
+          <div className="rounded-2xl border border-border/60 bg-card p-5">
             <h3 className="mb-1 text-sm font-semibold">Date overrides</h3>
             <p className="mb-3 text-sm text-muted-foreground">Add hours or block specific dates.</p>
             <div className="flex items-center gap-2">

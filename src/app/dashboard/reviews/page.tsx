@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { listReviews, reviewStats } from "@/server/reviews";
 import { Badge } from "@/components/ui/badge";
+import { DeleteReviewButton } from "./delete-review-button";
 import { Star, MessageSquare } from "lucide-react";
 
 export const metadata = { title: "Reviews" };
@@ -35,7 +36,7 @@ export default async function ReviewsPage() {
       </div>
 
       {stats.count > 0 && (
-        <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-[13px] text-muted-foreground">
+        <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-[13px] text-muted-foreground">
           <span className="font-medium text-foreground">{stats.publicCount}</span> happy attendee
           {stats.publicCount === 1 ? " was" : "s were"} sent to your public review page, while{" "}
           <span className="font-medium text-foreground">{stats.privateCount}</span> piece
@@ -45,7 +46,7 @@ export default async function ReviewsPage() {
       )}
 
       {/* Stats strip */}
-      <div className="grid gap-px rounded-lg border border-border bg-border sm:grid-cols-3">
+      <div className="grid gap-px rounded-xl border border-border bg-border sm:grid-cols-3">
         <div className="bg-card p-5 sm:rounded-l-lg">
           <p className="text-xs font-medium text-muted-foreground">Average rating</p>
           <p className="mt-2 tabular-stat text-3xl font-semibold text-foreground">
@@ -85,7 +86,7 @@ export default async function ReviewsPage() {
 
       {/* Review list */}
       {reviews.length === 0 ? (
-        <div className="flex flex-col items-center rounded-lg border border-dashed border-border py-20 text-center">
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-border py-20 text-center">
           <MessageSquare className="h-7 w-7 text-muted-foreground/50" />
           <p className="mt-3 text-sm font-medium text-foreground">No reviews yet</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -93,7 +94,7 @@ export default async function ReviewsPage() {
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-border rounded-lg border border-border bg-card">
+        <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
           {reviews.map((r) => (
             <div key={r.id} className="px-5 py-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -108,9 +109,12 @@ export default async function ReviewsPage() {
                     </Badge>
                   )}
                 </div>
-                <span className="text-[12px] text-muted-foreground">
-                  {new Date(r.createdAt).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] text-muted-foreground">
+                    {new Date(r.createdAt).toLocaleDateString()}
+                  </span>
+                  <DeleteReviewButton id={r.id} />
+                </div>
               </div>
               {r.feedback && (
                 <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">

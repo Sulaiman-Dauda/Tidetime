@@ -20,7 +20,7 @@ export default async function HomePage() {
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       {/* Ambient brand glow */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-brand-aura"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-primary-aura"
         aria-hidden
       />
       {/* Dot grid */}
@@ -62,7 +62,7 @@ export default async function HomePage() {
         {/* ── Hero ── */}
         <section className="mx-auto max-w-4xl px-6 pb-20 pt-24 text-center">
           <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
-            <Sparkles className="h-3 w-3 text-brand" />
+            <Sparkles className="h-3 w-3 text-primary" />
             Open-source · Self-hostable · 2026
           </div>
 
@@ -183,7 +183,7 @@ function Feature({
         first ? "sm:rounded-tl-xl" : ""
       } ${last ? "sm:rounded-br-xl" : ""} ${lastInRow ? "sm:rounded-tr-xl lg:rounded-none" : ""}`}
     >
-      <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-secondary text-foreground">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-secondary text-foreground">
         {icon}
       </div>
       <div>
@@ -198,7 +198,7 @@ function TideLogo({ small }: { small?: boolean }) {
   const size = small ? 22 : 28;
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-md bg-brand text-brand-foreground shadow-sm"
+      className="flex shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm"
       style={{ width: size, height: size }}
     >
       <svg

@@ -17,6 +17,7 @@ import {
   Settings2,
   CalendarOff,
   Search,
+  Zap,
 } from "lucide-react";
 import {
   Command,
@@ -30,10 +31,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 
 const PAGES = [
-  { href: "/dashboard", label: "Event Types", icon: LayoutGrid, group: "Main" },
+  { href: "/dashboard", label: "Overview", icon: LayoutGrid, group: "Main" },
+  { href: "/dashboard/event-types", label: "Events", icon: Zap, group: "Main" },
   { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays, group: "Main" },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarRange, group: "Main" },
   { href: "/dashboard/availability", label: "Availability", icon: Clock, group: "Manage" },
@@ -47,16 +50,26 @@ const PAGES = [
   { href: "/dashboard/blocked-periods", label: "Blocked Periods", icon: CalendarOff, group: "Admin" },
 ];
 
-export function CommandPalette() {
+export function CommandPalette({
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
+}: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // Use external control if provided, otherwise internal state
+  const open = externalOpen ?? internalOpen;
+  const setOpen = externalOnOpenChange ?? setInternalOpen;
 
   const down = useCallback((e: KeyboardEvent) => {
     if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      setOpen((open) => !open);
+      setOpen(!open);
     }
-  }, []);
+  }, [open, setOpen]);
 
   useEffect(() => {
     document.addEventListener("keydown", down);
@@ -68,6 +81,7 @@ export function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="overflow-hidden p-0 shadow-lg sm:max-w-lg [&>button]:hidden">
+        <DialogTitle className="sr-only">Search pages</DialogTitle>
         <Command>
           <CommandInput placeholder="Search pages..." />
           <CommandList>

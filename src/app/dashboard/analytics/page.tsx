@@ -54,7 +54,7 @@ export default async function AnalyticsPage({
             <span className="font-medium text-foreground">{rate}%</span>
           </p>
         </div>
-        <div className="flex items-center rounded-md border border-border bg-card p-0.5">
+        <div className="flex items-center rounded-full border border-border bg-card p-0.5">
           {(Object.entries(RANGES) as [string, number][]).map(([label, val]) => (
             <a
               key={label}
@@ -72,7 +72,7 @@ export default async function AnalyticsPage({
       </div>
 
       {/* Stat grid */}
-      <div className="grid gap-px rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-px rounded-2xl border border-border/60 bg-border sm:grid-cols-2 lg:grid-cols-3">
         {stats.map(({ label, value, icon: Icon }) => (
           <div key={label} className="flex flex-col gap-3 bg-card p-5 first:rounded-tl-lg last:rounded-br-lg sm:first:rounded-tl-lg sm:last:rounded-br-lg [&:nth-child(2)]:sm:rounded-tr-lg [&:nth-child(4)]:lg:rounded-none [&:nth-child(5)]:lg:rounded-none">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -87,7 +87,7 @@ export default async function AnalyticsPage({
       </div>
 
       {/* Utilization chart */}
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="rounded-2xl border border-border/60 bg-card p-5">
         <h2 className="text-sm font-semibold text-foreground">Provider utilization</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">Bookings per host in this period</p>
         {utilization.length === 0 ? (
@@ -101,7 +101,7 @@ export default async function AnalyticsPage({
                 </span>
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
                   <div
-                    className="h-full rounded-full bg-brand transition-all"
+                    className="h-full rounded-full bg-primary transition-all"
                     style={{ width: `${maxUtil ? (count / maxUtil) * 100 : 0}%` }}
                   />
                 </div>

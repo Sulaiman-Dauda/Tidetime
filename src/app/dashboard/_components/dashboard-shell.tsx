@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 import { Menu, Search, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent } from "./sidebar";
 import { CommandPalette } from "@/components/command-palette";
 import { initials } from "@/lib/format";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
-  "/dashboard": "Event Types",
+  "/dashboard": "Overview",
+  "/dashboard/event-types": "Events",
   "/dashboard/bookings": "Bookings",
   "/dashboard/calendar": "Calendar",
   "/dashboard/availability": "Availability",
@@ -37,15 +38,14 @@ export function DashboardShell({
   user,
   children,
   copyLinkEl,
-  pendingBookings = 0,
 }: {
   user: User;
   children: React.ReactNode;
   copyLinkEl: React.ReactNode;
-  pendingBookings?: number;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
 
   function getBreadcrumb() {
     if (BREADCRUMB_LABELS[pathname]) return BREADCRUMB_LABELS[pathname];
@@ -59,7 +59,7 @@ export function DashboardShell({
 
   function openCommand() {
     setMobileOpen(false);
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+    setCmdOpen(true);
   }
 
   const breadcrumb = getBreadcrumb();
@@ -68,7 +68,7 @@ export function DashboardShell({
     <TooltipProvider delayDuration={300}>
       <div className="flex min-h-screen bg-background">
         {/* Desktop Sidebar */}
-        <Sidebar user={user} pendingBookings={pendingBookings} />
+        <Sidebar user={user} />
 
         {/* Mobile header */}
         <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 backdrop-blur-sm md:hidden">
@@ -79,7 +79,8 @@ export function DashboardShell({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[260px] p-0">
-              <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} pendingBookings={pendingBookings} />
+              <SheetTitle className="sr-only">Navigation</SheetTitle>
+              <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
           <span className="text-[15px] font-semibold tracking-[-0.01em]">Tidetime</span>
@@ -124,9 +125,9 @@ export function DashboardShell({
               </button>
             </Tooltip>
             <Tooltip content={user.name ?? user.username}>
-              <Avatar className="h-7 w-7 ring-1 ring-border">
+              <Avatar className="h-7 w-7 ring-2 ring-primary/40 ring-offset-1 ring-offset-background">
                 {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-                <AvatarFallback className="text-[11px] font-medium">
+                <AvatarFallback className="text-[11px] font-semibold bg-primary/15 text-primary">
                   {initials(user.name ?? user.username)}
                 </AvatarFallback>
               </Avatar>
@@ -143,7 +144,7 @@ export function DashboardShell({
       </div>
 
       {/* Command palette (⌘K) */}
-      <CommandPalette />
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </TooltipProvider>
   );
 }

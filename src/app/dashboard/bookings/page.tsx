@@ -118,7 +118,7 @@ export default async function BookingsPage({ searchParams }: Props) {
           {rows.length === 0 ? (
             <EmptyState filter={active} />
           ) : (
-            <div className="divide-y divide-border rounded-lg border border-border bg-card">
+            <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
               {rows.map((b) => (
                 <BookingRow key={b.uid} booking={b} filter={active} userTz={user.timeZone} />
               ))}
@@ -132,7 +132,7 @@ export default async function BookingsPage({ searchParams }: Props) {
 
 function EmptyState({ filter }: { filter: Filter }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-20 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20 text-center">
       <CalendarX2 className="h-8 w-8 text-muted-foreground/50" />
       <p className="mt-3 text-sm font-medium text-foreground">No {filter} bookings</p>
       <p className="mt-1 text-xs text-muted-foreground">
