@@ -9,7 +9,6 @@ import {
   LinkIcon,
   Settings2,
   LayoutGrid,
-  LogOut,
   Users,
   BarChart3,
   Box,
@@ -18,59 +17,77 @@ import {
   CalendarRange,
   Plug2,
   Zap,
+  Building2,
+  Tags,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { initials } from "@/lib/format";
-import { logoutAction } from "@/app/(auth)/actions";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Tooltip } from "@/components/ui/tooltip";
+import { can } from "@/lib/rbac";
+import type { MembershipRole } from "@/db/schema";
+import { UserMenu } from "./user-menu";
 
 const NAV_GROUPS = [
   {
     label: "Main",
     items: [
       { href: "/dashboard", label: "Overview", icon: LayoutGrid },
-      { href: "/dashboard/event-types", label: "Events", icon: Zap },
-      { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarRange },
+      { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+      { href: "/dashboard/customers", label: "Customers", icon: Users },
     ],
   },
   {
-    label: "Manage",
+    label: "Catalog",
     items: [
+      { href: "/dashboard/event-types", label: "Services", icon: Zap },
+      { href: "/dashboard/categories", label: "Categories", icon: Tags },
       { href: "/dashboard/availability", label: "Availability", icon: Clock },
-      { href: "/dashboard/links", label: "Booking Links", icon: LinkIcon },
       { href: "/dashboard/resources", label: "Resources", icon: Box },
+      { href: "/dashboard/links", label: "Booking Links", icon: LinkIcon },
     ],
   },
   {
-    label: "Insights",
+    label: "Grow",
     items: [
       { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/dashboard/reviews", label: "Reviews", icon: Star },
-      { href: "/dashboard/teams", label: "Teams", icon: Users },
-      { href: "/dashboard/integrations", label: "Integrations", icon: Plug2 },
-      { href: "/dashboard/settings", label: "Settings", icon: Settings2 },
+      { href: "/dashboard/teams", label: "Teams", icon: Building2 },
     ],
   },
 ] as const;
 
 const ADMIN_GROUP = {
   label: "Admin",
-  items: [{ href: "/dashboard/blocked-periods", label: "Blocked Periods", icon: CalendarOff }],
+  items: [
+    { href: "/dashboard/settings", label: "Settings", icon: Settings2 },
+    { href: "/dashboard/integrations", label: "Integrations", icon: Plug2 },
+    { href: "/dashboard/blocked-periods", label: "Blocked Periods", icon: CalendarOff },
+  ],
 } as const;
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
 interface SidebarProps {
-  user: { name: string | null; username: string; avatarUrl: string | null; isAdmin: boolean };
+  user: { name: string | null; username: string; email: string; avatarUrl: string | null; isAdmin: boolean; role: string };
   onNavigate?: () => void;
 }
 
 export function SidebarContent({ user, onNavigate }: SidebarProps) {
   const pathname = usePathname();
-  const groups = user.isAdmin ? [...NAV_GROUPS, ADMIN_GROUP] : NAV_GROUPS;
+  const role = user.role as MembershipRole;
+
+  // Filter nav groups based on role permissions
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.href === "/dashboard/analytics") return can(role, "analytics.view");
+      if (item.href === "/dashboard/teams") return can(role, "team.view");
+      if (item.href === "/dashboard/availability") return can(role, "availability.manage");
+      return true;
+    }),
+  })).filter((g) => g.items.length > 0);
+
+  const adminGroup = user.isAdmin || can(role, "team.manage") ? [ADMIN_GROUP] : [];
+  const groups = [...visibleGroups, ...adminGroup];
 
   function isActive(href: string) {
     return href === "/dashboard" ? pathname === href : pathname.startsWith(href);
@@ -130,31 +147,10 @@ export function SidebarContent({ user, onNavigate }: SidebarProps) {
 
       {/* User section */}
       <div className="border-t border-sidebar-border/60 p-2">
-        <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-          <Avatar className="h-7 w-7 shrink-0 ring-2 ring-primary/30 ring-offset-1 ring-offset-sidebar">
-            {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-            <AvatarFallback className="text-[11px] font-semibold bg-primary/15 text-primary">
-              {initials(user.name ?? user.username)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium leading-none">{user.name ?? user.username}</p>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">@{user.username}</p>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <ThemeToggle />
-            <form action={logoutAction}>
-              <Tooltip content="Log out">
-                <button
-                  type="submit"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  <LogOut className="h-[15px] w-[15px]" />
-                </button>
-              </Tooltip>
-            </form>
-          </div>
-        </div>
+        <UserMenu
+          variant="panel"
+          user={{ name: user.name, username: user.username, email: user.email, avatarUrl: user.avatarUrl }}
+        />
       </div>
     </div>
   );

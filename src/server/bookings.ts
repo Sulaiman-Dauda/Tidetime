@@ -27,6 +27,7 @@ import { getTeamEventType } from "./teams-public";
 import { validateResponses as validateFieldResponses, type FieldValues } from "@/lib/booking-fields";
 import { normalizeRecurringRule, expandRecurrence } from "@/lib/recurrence";
 import { logBookingActivity } from "./activity";
+import { upsertCustomerFromBooking } from "./customers";
 import { env } from "@/lib/env";
 import { isValidTimeZone } from "@/lib/time";
 
@@ -416,6 +417,18 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     logBookingActivity(bookingId, input.rescheduleUid ? "rescheduled" : "created", {
       actor: input.name,
       message: input.rescheduleUid ? "Rescheduled to a new time" : `Booked by ${input.name}`,
+    }),
+  );
+
+  tasks.push(
+    upsertCustomerFromBooking({
+      userId: assignedUserId,
+      teamId: teamCapacity?.teamId ?? null,
+      email: input.email,
+      name: input.name,
+      phoneNumber: attendeePhone ?? null,
+      timeZone: input.timeZone,
+      bookedAt: start,
     }),
   );
 

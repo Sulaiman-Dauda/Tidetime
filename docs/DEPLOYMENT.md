@@ -8,7 +8,7 @@ This guide covers the recommended production deployment patterns for Tidetime.
 - PostgreSQL 14+
 - a stable `APP_URL`
 - a strong `AUTH_SECRET`
-- optional SMTP credentials for real email delivery
+- SMTP and Stripe configured via Settings UI (optional)
 - optional Stripe credentials for paid bookings
 
 ## Required production environment
@@ -108,16 +108,17 @@ A healthy instance returns HTTP 200 with a successful database check. If the dat
 
 ## Email delivery
 
-If SMTP variables are omitted, Tidetime logs emails to the console instead of sending them. This is useful in development, but production deployments should configure SMTP.
+## Email (SMTP)
+
+Configure SMTP via the Settings UI (navigate to Settings → Email after logging in as admin).
+Credentials are encrypted at rest in the database.
+
+If no SMTP is configured, emails are logged to the console instead of being sent.
 
 ## Stripe
 
-To enable paid bookings, configure both:
-
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-
-Do not set only one of them. Tidetime rejects partial Stripe configuration at startup.
+To enable paid bookings, configure Stripe via the Settings UI (Settings → Payments).
+Both the secret key and webhook secret are encrypted at rest.
 
 ## Backups
 
@@ -145,7 +146,7 @@ Before going live, confirm:
 - [ ] `APP_URL` matches the public HTTPS origin
 - [ ] `AUTH_SECRET` is long and unique
 - [ ] PostgreSQL backups are configured
-- [ ] SMTP works end-to-end
+- [ ] SMTP configured and tested (Settings → Email)
 - [ ] Stripe webhook delivery is verified if payments are enabled
 - [ ] the reminder worker is scheduled
 - [ ] `/api/health` is monitored

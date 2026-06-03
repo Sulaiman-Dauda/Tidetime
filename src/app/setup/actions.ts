@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { users, schedules, availabilities, appSettings } from "@/db/schema";
+import { users, schedules, availabilities, appSettings, teams, memberships } from "@/db/schema";
 import { hashPassword } from "@/lib/crypto";
 import { createSession, hasAnyUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
+import { setCompanyProfile } from "@/server/company-settings";
+import { DEFAULT_COMPANY_PROFILE } from "@/lib/company-settings";
 
 const RESERVED = new Set([
   "api", "app", "dashboard", "login", "signup", "settings", "admin", "auth", "setup",
@@ -16,6 +18,8 @@ const RESERVED = new Set([
 
 const setupSchema = z.object({
   instanceName: z.string().trim().max(128).optional(),
+  companyEmail: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).optional(),
+  companyWebsite: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).optional(),
   name: z.string().trim().min(1, "Name is required").max(128),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   username: z
@@ -37,6 +41,8 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
 
   const parsed = setupSchema.safeParse({
     instanceName: formData.get("instanceName") || undefined,
+    companyEmail: formData.get("companyEmail") || undefined,
+    companyWebsite: formData.get("companyWebsite") || undefined,
     name: formData.get("name"),
     email: formData.get("email"),
     username: formData.get("username"),
@@ -82,6 +88,23 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
       { name: "setup_completed_at", value: new Date().toISOString() },
     ])
     .onConflictDoNothing();
+
+  // Seed company branding profile from the onboarding details.
+  await setCompanyProfile({
+    ...DEFAULT_COMPANY_PROFILE,
+    name: instanceName || DEFAULT_COMPANY_PROFILE.name,
+    email: parsed.data.companyEmail || "",
+    websiteUrl: parsed.data.companyWebsite || "",
+  });
+
+  // Create default team for the organization
+  const [team] = await db
+    .insert(teams)
+    .values({ name: instanceName || "My Organization", slug: "default" })
+    .returning({ id: teams.id });
+
+  // Add the admin as owner of the team
+  await db.insert(memberships).values({ userId: user.id, teamId: team.id, role: "owner", accepted: true });
 
   await createSession(user.id);
   redirect("/dashboard");

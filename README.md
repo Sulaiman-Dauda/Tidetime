@@ -59,7 +59,7 @@ The documentation below reflects the current implementation rather than aspirati
 | **Payments**      | Stripe-backed paid bookings with webhook-confirmed lifecycle                                                                                       |
 | **Reviews**       | Post-booking feedback requests; happy ratings routed to your public review page, the rest captured privately                                       |
 | **Resources**     | Shared rooms, equipment and assets with capacity-aware double-booking prevention                                                                   |
-| **Notifications** | SMTP email delivery or console fallback, scheduled reminders                                                                                       |
+| **Notifications** | SMTP email delivery (configured in Settings → Email) or console fallback, scheduled reminders |
 | **Automation**    | REST API, booking links, HMAC-signed webhooks, health check endpoint                                                                               |
 | **Dashboard**     | Bookings, analytics, availability editor, settings, API keys, links, resources, reviews, teams                                                     |
 | **Installable**   | PWA manifest and offline-ready service worker for an app-like experience                                                                           |
@@ -141,16 +141,10 @@ Copy `.env.example` to `.env` and set the values below.
 | `NODE_ENV`                | no            | `development`                      | Runtime mode                                        |
 | `APP_URL`                 | production    | `http://localhost:3000`            | Public base URL used in emails, metadata, and links |
 | `APP_NAME`                | no            | `Tidetime`                         | Display name                                        |
-| `NEXT_TELEMETRY_DISABLED` | no            | `1`                                | Recommended in CI and production                    |
 | `DATABASE_URL`            | production    | local Postgres URL                 | PostgreSQL connection string                        |
-| `AUTH_SECRET`             | production    | dev fallback only                  | Must be **32+ characters** in production            |
-| `SMTP_HOST`               | no            | empty                              | If unset, emails are logged to the console          |
-| `SMTP_PORT`               | no            | `587`                              | SMTP port                                           |
-| `SMTP_USER`               | no            | empty                              | SMTP username                                       |
-| `SMTP_PASSWORD`           | no            | empty                              | SMTP password                                       |
-| `SMTP_FROM`               | no            | `Tidetime <no-reply@tidetime.app>` | Sender address                                      |
-| `STRIPE_SECRET_KEY`       | optional pair | empty                              | Required together with `STRIPE_WEBHOOK_SECRET`      |
-| `STRIPE_WEBHOOK_SECRET`   | optional pair | empty                              | Required together with `STRIPE_SECRET_KEY`          |
+| `AUTH_SECRET`             | production    | dev fallback only                  | Must be **32+ characters** in production. Used as encryption key for all secrets stored in the database. |
+
+> **SMTP, Stripe, and all other integrations are configured via the Settings UI** (navigate to Settings after logging in). Secrets are encrypted at rest with AES-256-GCM using `AUTH_SECRET` as the key. No `.env` edits needed for day-to-day operations.
 
 ### Environment validation
 

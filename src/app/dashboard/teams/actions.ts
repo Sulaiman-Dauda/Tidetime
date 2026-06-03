@@ -54,51 +54,6 @@ async function callerRole(userId: number, teamId: number): Promise<MembershipRol
   return m?.role ?? null;
 }
 
-const inviteSchema = z.object({
-  teamId: z.coerce.number().int().positive(),
-  email: z.string().email("Enter a valid email"),
-  role: z.enum(["admin", "manager", "provider", "receptionist", "member"]),
-});
-
-/** Invite (or attach) a user to a team. Requires member.invite + role authority. */
-export async function inviteMemberAction(_prev: TeamState, formData: FormData): Promise<TeamState> {
-  const user = await requireUser();
-  const parsed = inviteSchema.safeParse({
-    teamId: formData.get("teamId"),
-    email: formData.get("email"),
-    role: formData.get("role"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-
-  const role = await callerRole(user.id, parsed.data.teamId);
-  if (!role || !can(role, "member.invite")) return { error: "You don't have permission to invite members" };
-  if (!canAssignRole(role, parsed.data.role)) return { error: "You can't assign that role" };
-
-  const [invitee] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, parsed.data.email.toLowerCase()))
-    .limit(1);
-  if (!invitee) return { error: "No user with that email exists yet" };
-
-  const [existing] = await db
-    .select({ id: memberships.id })
-    .from(memberships)
-    .where(and(eq(memberships.userId, invitee.id), eq(memberships.teamId, parsed.data.teamId)))
-    .limit(1);
-  if (existing) return { error: "That user is already on the team" };
-
-  await db.insert(memberships).values({
-    userId: invitee.id,
-    teamId: parsed.data.teamId,
-    role: parsed.data.role,
-    accepted: false,
-  });
-
-  revalidatePath("/dashboard/teams");
-  return { ok: true };
-}
-
 const roleSchema = z.object({
   teamId: z.coerce.number().int().positive(),
   membershipId: z.coerce.number().int().positive(),

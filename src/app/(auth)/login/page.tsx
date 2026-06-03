@@ -25,15 +25,6 @@ export default function LoginPage() {
             Forgot your password?
           </Link>
         </p>
-        <p>
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Sign up
-          </Link>
-        </p>
       </div>
     </div>
   );

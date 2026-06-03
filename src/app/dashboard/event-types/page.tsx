@@ -14,7 +14,7 @@ import { formatDuration } from "@/lib/format";
 import { env } from "@/lib/env";
 import { locationLabel } from "@/lib/locations";
 
-export const metadata = { title: "Events" };
+export const metadata = { title: "Services" };
 
 export default async function EventTypesPage() {
   const user = (await getCurrentUser())!;
@@ -24,9 +24,9 @@ export default async function EventTypesPage() {
     <div className="animate-fade-in space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Events</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Services</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Create events for people to book time with you.
+            Create the services people can book with you — like a 30-minute consultation.
           </p>
         </div>
         <NewEventTypeButton />
@@ -140,9 +140,9 @@ function EmptyState() {
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card">
         <Zap className="h-5 w-5 text-muted-foreground" />
       </div>
-      <h3 className="text-sm font-medium text-foreground">Create your first event</h3>
+      <h3 className="text-sm font-medium text-foreground">Create your first service</h3>
       <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
-        Events let people book specific kinds of meetings with you — like a 30-minute intro call.
+        Services are the things people can book with you — like a 30-minute intro call or a haircut.
       </p>
       <div className="mt-5">
         <NewEventTypeButton />

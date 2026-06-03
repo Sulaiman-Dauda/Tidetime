@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getTeamEventType } from "@/server/teams-public";
 import { BookingFlow } from "../../../[username]/[slug]/booking-flow";
+import { PublicLegal } from "../../../_components/public-legal";
+import { CompanyBrandHeader } from "../../../_components/company-brand-header";
 
 interface Props {
   params: Promise<{ team: string; slug: string }>;
@@ -31,6 +33,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
 
   return (
     <main className={isEmbed ? "min-h-screen bg-background" : "min-h-screen bg-grid"}>
+      {isEmbed ? null : <CompanyBrandHeader />}
       <BookingFlow
         username={teamRow.slug}
         slug={slug}
@@ -52,6 +55,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
         }}
         host={{ name: teamRow.name, username: teamRow.slug, avatarUrl: teamRow.logoUrl }}
       />
+      {isEmbed ? null : <PublicLegal />}
     </main>
   );
 }

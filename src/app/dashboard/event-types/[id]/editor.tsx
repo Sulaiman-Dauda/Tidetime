@@ -30,9 +30,10 @@ type Props = {
   username: string;
   resources: { id: number; name: string; type: string; capacity: number }[];
   selectedResourceIds: number[];
+  categories: { id: number; name: string }[];
 };
 
-export function EventTypeEditor({ eventType, username, resources, selectedResourceIds }: Props) {
+export function EventTypeEditor({ eventType, username, resources, selectedResourceIds, categories }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -41,6 +42,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
     title: eventType.title,
     slug: eventType.slug,
     description: eventType.description ?? "",
+    categoryId: (eventType.categoryId ?? null) as number | null,
     length: eventType.length,
     durations: eventType.durations ?? [],
     hidden: eventType.hidden,
@@ -170,6 +172,22 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                 placeholder="A short description shown on the booking page."
               />
             </Field>
+            {categories.length > 0 && (
+              <Field label="Category">
+                <select
+                  value={form.categoryId ?? ""}
+                  onChange={(e) => set("categoryId", e.target.value === "" ? null : Number(e.target.value))}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">Uncategorised</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </Section>
 
           <Section title="Duration">

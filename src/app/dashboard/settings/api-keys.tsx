@@ -28,6 +28,8 @@ interface KeyRow {
   createdAt: Date;
 }
 
+export type ApiKeyRow = KeyRow;
+
 export function ApiKeys({ keys }: { keys: KeyRow[] }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);

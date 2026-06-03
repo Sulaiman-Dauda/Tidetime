@@ -19,13 +19,13 @@ import { useToast } from "@/hooks/use-toast";
 import { can, canAssignRole } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
 import {
-  inviteMemberAction,
   changeMemberRoleAction,
   removeMemberAction,
   bulkImportMembersAction,
   type TeamState,
   type ImportState,
 } from "../actions";
+import { createInviteAction, type InviteState } from "../invite-actions";
 import { Trash2, UserPlus, Upload, Loader2 } from "lucide-react";
 
 interface Member {
@@ -54,13 +54,13 @@ export function TeamMembers({
   const canManageRoles = can(viewerRole, "member.role.assign");
   const canRemove = can(viewerRole, "member.remove");
 
-  const [inviteState, invite, inviting] = useActionState<TeamState, FormData>(inviteMemberAction, null);
+  const [inviteState, invite, inviting] = useActionState<InviteState, FormData>(createInviteAction, null);
   const [importState, runImport, importing] = useActionState<ImportState, FormData>(bulkImportMembersAction, null);
   const [inviteRole, setInviteRole] = useState<MembershipRole>("provider");
 
   useEffect(() => {
     if (inviteState?.ok) {
-      toast({ title: "Member invited" });
+      toast({ title: "Invitation sent" });
       router.refresh();
     } else if (inviteState?.error) {
       toast({ title: inviteState.error, variant: "destructive" });

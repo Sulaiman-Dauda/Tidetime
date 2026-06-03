@@ -3,24 +3,36 @@ import Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { payments, bookings } from "@/db/schema";
-import { env } from "@/lib/env";
+import { getStripeConfig } from "@/server/settings";
 import { shortId } from "@/lib/crypto";
 import { computeCharge, computeRefund, mapStripeStatus } from "@/lib/payments";
 import { logBookingActivity } from "./activity";
 
 let client: Stripe | null = null;
+let clientKey = "";
 
-/** Lazily construct the Stripe client; throws only when actually used. */
-export function stripe(): Stripe {
-  if (!env.stripe.secretKey) {
-    throw new Error("Stripe is not configured (STRIPE_SECRET_KEY missing)");
+async function resolveStripe() {
+  const dbConfig = await getStripeConfig();
+  if (dbConfig?.secretKey) return dbConfig;
+  return null;
+}
+
+/** Lazily construct the Stripe client from DB settings. */
+export async function stripe(): Promise<Stripe> {
+  const config = await resolveStripe();
+  if (!config?.secretKey) {
+    throw new Error("Stripe is not configured — set your keys in Settings → Payments");
   }
-  client ??= new Stripe(env.stripe.secretKey, { apiVersion: "2026-05-27.dahlia" });
+  const key = config.secretKey.slice(0, 12);
+  if (client && clientKey === key) return client;
+  client = new Stripe(config.secretKey, { apiVersion: "2026-05-27.dahlia" });
+  clientKey = key;
   return client;
 }
 
-export function isStripeEnabled(): boolean {
-  return Boolean(env.stripe.secretKey);
+export async function isStripeEnabled(): Promise<boolean> {
+  const config = await resolveStripe();
+  return Boolean(config?.secretKey);
 }
 
 export interface CreatePaymentInput {
@@ -51,11 +63,11 @@ export async function createBookingPayment(input: CreatePaymentInput): Promise<C
   });
   if (!plan) return { ok: true }; // free — nothing to charge
 
-  if (!isStripeEnabled()) return { ok: false, error: "Payments are not configured" };
+  if (!await isStripeEnabled()) return { ok: false, error: "Payments are not configured" };
 
   const uid = shortId(12);
   try {
-    const intent = await stripe().paymentIntents.create({
+    const intent = await (await stripe()).paymentIntents.create({
       amount: plan.amount,
       currency: plan.currency,
       description: input.description,
@@ -124,7 +136,7 @@ export async function refundBookingPayment(bookingId: number, amount?: number): 
   if (refundAmount <= 0) return { ok: false, error: "Nothing to refund" };
 
   try {
-    await stripe().refunds.create({ payment_intent: pay.externalId, amount: refundAmount });
+    await (await stripe()).refunds.create({ payment_intent: pay.externalId, amount: refundAmount });
     await db
       .update(payments)
       .set({ status: "refunded", refunded: true })
@@ -136,9 +148,10 @@ export async function refundBookingPayment(bookingId: number, amount?: number): 
 }
 
 /** Verify and parse a Stripe webhook event. */
-export function constructWebhookEvent(payload: string, signature: string): Stripe.Event {
-  if (!env.stripe.webhookSecret) throw new Error("STRIPE_WEBHOOK_SECRET missing");
-  return stripe().webhooks.constructEvent(payload, signature, env.stripe.webhookSecret);
+export async function constructWebhookEvent(payload: string, signature: string): Promise<Stripe.Event> {
+  const config = await getStripeConfig();
+  if (!config?.webhookSecret) throw new Error("Stripe webhook secret is not configured");
+  return (await stripe()).webhooks.constructEvent(payload, signature, config.webhookSecret);
 }
 
 export { mapStripeStatus };

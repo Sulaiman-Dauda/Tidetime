@@ -15,7 +15,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Tooltip } from "@/components/ui/tooltip";
 import { deleteEventTypeAction } from "../event-types/actions";
 
 export function DeleteEventButton({ id, label }: { id: number; label: string }) {

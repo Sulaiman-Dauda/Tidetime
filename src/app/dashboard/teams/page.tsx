@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { db } from "@/db";
 import { teams, memberships } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,7 +13,7 @@ import { Users } from "lucide-react";
 export const metadata = { title: "Teams" };
 
 export default async function TeamsPage() {
-  const user = await requireUser();
+  const { user } = await requirePermission("team.view");
 
   const rows = await db
     .select({ team: teams, role: memberships.role })

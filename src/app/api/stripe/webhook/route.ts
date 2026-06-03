@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Stripe webhook receiver. Confirms or fails bookings based on PaymentIntent
- * lifecycle events. Signature is verified against STRIPE_WEBHOOK_SECRET.
+ * lifecycle events. Signature is verified against the configured webhook secret.
  */
 export async function POST(req: NextRequest) {
   const signature = req.headers.get("stripe-signature");
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const payload = await req.text();
   let event;
   try {
-    event = constructWebhookEvent(payload, signature);
+    event = await constructWebhookEvent(payload, signature);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid signature" },

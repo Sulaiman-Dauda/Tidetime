@@ -133,3 +133,20 @@ export function passwordResetEmail(resetUrl: string, ttlMinutes: number) {
 }
 
 export type { EmailBookingView };
+
+export function inviteEmail(params: { teamName: string; inviterName: string; inviteUrl: string }) {
+  const { teamName, inviterName, inviteUrl } = params;
+  const inner = `
+<tr><td style="padding:24px 0 8px;font-size:20px;font-weight:600;color:#1a1817;">
+  You&rsquo;ve been invited to join ${teamName}
+</td></tr>
+<tr><td style="padding:4px 0 20px;font-size:15px;line-height:1.55;color:#52525b;">
+  ${inviterName} has invited you to join their team on Tidetime.
+  Click below to create your account and get started.
+</td></tr>
+<tr><td style="padding:0 0 28px;">
+  <a href="${inviteUrl}" style="display:inline-block;padding:11px 28px;background:#e9a23b;color:#1a1817;border-radius:999px;font-size:14px;font-weight:600;text-decoration:none;">Accept invitation</a>
+</td></tr>
+<tr><td style="padding:16px 0 0;font-size:12px;color:#94a3b8;">This invitation expires in 7 days.</td></tr>`;
+  return { subject: `${inviterName} invited you to ${teamName} on Tidetime`, html: wrap(inner) };
+}

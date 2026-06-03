@@ -1,10 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { eq, or } from "drizzle-orm";
+import { eq, or, and, isNull, gt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { users, schedules, availabilities } from "@/db/schema";
+import { users, schedules, availabilities, invites, memberships } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
 import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
@@ -29,6 +29,9 @@ const signupSchema = z.object({
     .regex(/^[a-z0-9_-]+$/, "Use lowercase letters, numbers, - and _ only"),
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
   timeZone: z.string().optional(),
+  inviteToken: z.string(),
+  teamId: z.coerce.number().int(),
+  role: z.string(),
 });
 
 export type ActionResult = { error?: string; fieldErrors?: Record<string, string> };
@@ -40,16 +43,28 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
     username: formData.get("username"),
     password: formData.get("password"),
     timeZone: formData.get("timeZone"),
+    inviteToken: formData.get("inviteToken"),
+    teamId: formData.get("teamId"),
+    role: formData.get("role"),
   });
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as string] = issue.message;
     return { fieldErrors };
   }
-  const { name, email, username, password } = parsed.data;
+  const { name, email, username, password, inviteToken } = parsed.data;
   const timeZone = parsed.data.timeZone && isValidTimeZone(parsed.data.timeZone)
     ? parsed.data.timeZone
     : "UTC";
+
+  // Validate invite token
+  const [invite] = await db
+    .select({ id: invites.id, email: invites.email, teamId: invites.teamId, role: invites.role })
+    .from(invites)
+    .where(and(eq(invites.token, inviteToken), isNull(invites.acceptedAt), gt(invites.expiresAt, new Date())))
+    .limit(1);
+  if (!invite) return { error: "This invitation is invalid or has expired." };
+  if (invite.email !== email) return { error: "The email doesn't match the invitation." };
 
   if (RESERVED.has(username)) return { fieldErrors: { username: "That username is reserved" } };
 
@@ -70,7 +85,13 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
     .values({ name, email, username, passwordHash, timeZone })
     .returning({ id: users.id });
 
-  // Seed a default Mon–Fri 9–5 working-hours schedule.
+  // Auto-join the team
+  await db.insert(memberships).values({ userId: user.id, teamId: invite.teamId, role: invite.role, accepted: true });
+
+  // Mark invite as accepted
+  await db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
+
+  // Seed default schedule
   const [schedule] = await db
     .insert(schedules)
     .values({ userId: user.id, name: "Working Hours", timeZone })

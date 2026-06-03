@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { initials } from "@/lib/format";
 import { formatDuration } from "@/lib/format";
 import { Clock, Users } from "lucide-react";
+import { PublicLegal } from "../../_components/public-legal";
+import { CompanyBrandHeader } from "../../_components/company-brand-header";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,7 @@ export default async function TeamLandingPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-grid">
+      <CompanyBrandHeader />
       <div className="mx-auto max-w-2xl px-4 py-16">
         <div className="flex flex-col items-center text-center">
           <Avatar className="h-20 w-20">
@@ -70,6 +73,7 @@ export default async function TeamLandingPage({ params }: Props) {
           )}
         </div>
       </div>
+      <PublicLegal />
     </main>
   );
 }

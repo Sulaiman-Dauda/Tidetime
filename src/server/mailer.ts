@@ -1,6 +1,6 @@
 import "server-only";
 import { createTransport, type Transporter } from "nodemailer";
-import { env } from "@/lib/env";
+import { getSmtpConfig } from "@/server/settings";
 
 export interface MailAttachment {
   filename: string;
@@ -18,16 +18,24 @@ export interface SendMailArgs {
 }
 
 let cached: Transporter | null = null;
+let cachedKey = "";
 
-function transporter(): Transporter | null {
-  if (!env.smtp.host) return null;
-  if (cached) return cached;
+async function resolveSmtp() {
+  return getSmtpConfig();
+}
+
+async function transporter(): Promise<Transporter | null> {
+  const smtp = await resolveSmtp();
+  if (!smtp?.host) return null;
+  const key = `${smtp.host}:${smtp.port}:${smtp.user}`;
+  if (cached && cachedKey === key) return cached;
   cached = createTransport({
-    host: env.smtp.host,
-    port: env.smtp.port,
-    secure: env.smtp.port === 465,
-    auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.password } : undefined,
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.port === 465,
+    auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
   });
+  cachedKey = key;
   return cached;
 }
 
@@ -36,17 +44,18 @@ function transporter(): Transporter | null {
  * development still surfaces what would have been sent (no silent failures).
  */
 export async function sendMail(args: SendMailArgs): Promise<void> {
-  const t = transporter();
-  if (!t) {
+  const t = await transporter();
+  const smtp = await resolveSmtp();
+  if (!t || !smtp) {
     console.info(
-      `\n[email:dev] To: ${args.to}\n[email:dev] Subject: ${args.subject}\n[email:dev] (SMTP not configured — set SMTP_HOST to deliver)\n`,
+      `\n[email:dev] To: ${args.to}\n[email:dev] Subject: ${args.subject}\n[email:dev] (SMTP not configured — set in Settings → Email)\n`,
     );
     return;
   }
 
   try {
     await t.sendMail({
-      from: env.smtp.from,
+      from: smtp.from,
       to: args.to,
       subject: args.subject,
       html: args.html,

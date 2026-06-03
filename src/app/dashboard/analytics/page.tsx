@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { getUserAnalytics } from "@/server/analytics";
 import { completionRate } from "@/lib/analytics";
 import {
@@ -23,7 +23,7 @@ export default async function AnalyticsPage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
-  const user = await requireUser();
+  const { user } = await requirePermission("analytics.view");
   const { range } = await searchParams;
   const days = RANGES[(range as keyof typeof RANGES) ?? "90"] ?? 90;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

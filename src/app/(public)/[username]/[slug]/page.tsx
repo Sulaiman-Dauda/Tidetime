@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicEventType } from "@/server/availability";
 import { BookingFlow } from "./booking-flow";
+import { PublicLegal } from "../../_components/public-legal";
+import { CompanyBrandHeader } from "../../_components/company-brand-header";
 
 interface Props {
   params: Promise<{ username: string; slug: string }>;
@@ -30,6 +32,7 @@ export default async function BookingPage({ params, searchParams }: Props) {
 
   return (
     <main className={isEmbed ? "min-h-screen bg-background" : "min-h-screen bg-grid"}>
+      {isEmbed ? null : <CompanyBrandHeader />}
       <BookingFlow
         username={username}
         slug={slug}
@@ -53,6 +56,7 @@ export default async function BookingPage({ params, searchParams }: Props) {
         }}
         host={{ name: host.name, username: host.username, avatarUrl: host.avatarUrl }}
       />
+      {isEmbed ? null : <PublicLegal />}
     </main>
   );
 }

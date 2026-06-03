@@ -15,11 +15,9 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { AvatarUpload } from "./avatar-upload";
-import { Switch } from "@/components/ui/switch";
 import {
   updateProfileAction,
   updatePasswordAction,
-  updateReviewSettingsAction,
   type SettingsState,
 } from "./actions";
 import { WEEKDAY_SHORT } from "@/lib/format";
@@ -34,9 +32,6 @@ interface UserView {
   timeFormat: number;
   weekStart: number;
   hasPassword: boolean;
-  reviewRequestsEnabled: boolean;
-  googleReviewUrl: string | null;
-  reviewThreshold: number;
 }
 
 export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: string[] }) {
@@ -47,10 +42,6 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
     null,
   );
   const [pwState, pwAction, pwPending] = useActionState<SettingsState, FormData>(updatePasswordAction, null);
-  const [reviewState, reviewAction, reviewPending] = useActionState<SettingsState, FormData>(
-    updateReviewSettingsAction,
-    null,
-  );
 
   useEffect(() => {
     if (profileState?.ok) toast({ title: "Profile saved" });
@@ -61,11 +52,6 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
     if (pwState?.ok) toast({ title: "Password updated" });
     if (pwState?.error) toast({ title: pwState.error, variant: "destructive" });
   }, [pwState, toast]);
-
-  useEffect(() => {
-    if (reviewState?.ok) toast({ title: "Review settings saved" });
-    if (reviewState?.error) toast({ title: reviewState.error, variant: "destructive" });
-  }, [reviewState, toast]);
 
   return (
     <div className="space-y-6">
@@ -140,48 +126,6 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
           </div>
           <Button type="submit" variant="outline" loading={pwPending}>
             Update password
-          </Button>
-        </form>
-      </Card>
-
-      <Card className="p-6">
-        <h2 className="text-base font-semibold">Reviews</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Email attendees a feedback request after their booking. High ratings are sent to your
-          public review page; lower ratings stay private.
-        </p>
-        <form action={reviewAction} className="mt-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="reviewRequestsEnabled">Send review requests</Label>
-            <Switch
-              id="reviewRequestsEnabled"
-              name="reviewRequestsEnabled"
-              defaultChecked={user.reviewRequestsEnabled}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="googleReviewUrl">Public review URL</Label>
-            <Input
-              id="googleReviewUrl"
-              name="googleReviewUrl"
-              type="url"
-              placeholder="https://g.page/r/…/review"
-              defaultValue={user.googleReviewUrl ?? ""}
-            />
-            <p className="text-xs text-muted-foreground">
-              Where happy attendees are redirected (e.g. your Google review link).
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Minimum rating for public redirect</Label>
-            <SelectField
-              name="reviewThreshold"
-              defaultValue={String(user.reviewThreshold)}
-              options={[4, 5].map((n) => ({ value: String(n), label: `${n}+ stars` }))}
-            />
-          </div>
-          <Button type="submit" loading={reviewPending}>
-            Save review settings
           </Button>
         </form>
       </Card>

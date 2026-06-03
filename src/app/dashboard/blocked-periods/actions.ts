@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { createBlockedPeriod, deleteBlockedPeriod } from "@/server/blocked-periods";
 
 const createSchema = z
@@ -24,7 +24,7 @@ export async function createBlockedPeriodAction(
   _prev: BlockedPeriodState,
   formData: FormData,
 ): Promise<BlockedPeriodState> {
-  await requireAdmin();
+  await requirePermission("team.manage");
   const parsed = createSchema.safeParse({
     start: formData.get("start"),
     end: formData.get("end"),
@@ -46,7 +46,7 @@ export async function createBlockedPeriodAction(
 }
 
 export async function deleteBlockedPeriodAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requirePermission("team.manage");
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id)) return;
   await deleteBlockedPeriod(id);

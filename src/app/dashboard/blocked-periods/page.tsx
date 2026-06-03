@@ -1,14 +1,11 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { listBlockedPeriods } from "@/server/blocked-periods";
 import { BlockedPeriodsManager } from "./blocked-periods-manager";
 
 export const metadata = { title: "Blocked Periods" };
 
 export default async function BlockedPeriodsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (!user.isAdmin) redirect("/dashboard");
+  await requirePermission("team.manage");
 
   const periods = await listBlockedPeriods();
 

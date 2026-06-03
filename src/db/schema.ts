@@ -233,6 +233,25 @@ export const availabilities = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/*  Service categories (group event types / services)                          */
+/* -------------------------------------------------------------------------- */
+
+export const serviceCategories = pgTable(
+  "service_categories",
+  {
+    id: serial("id").primaryKey(),
+    /** null = instance-wide; otherwise scoped to a team */
+    teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 128 }).notNull(),
+    description: text("description"),
+    color: varchar("color", { length: 9 }),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("service_categories_team_idx").on(t.teamId)],
+);
+
+/* -------------------------------------------------------------------------- */
 /*  Event types                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -244,6 +263,10 @@ export const eventTypes = pgTable(
     userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
     teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }),
     scheduleId: integer("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+    /** optional service category for grouping on the booking page */
+    categoryId: integer("category_id").references(() => serviceCategories.id, {
+      onDelete: "set null",
+    }),
 
     title: varchar("title", { length: 128 }).notNull(),
     slug: varchar("slug", { length: 128 }).notNull(),
@@ -786,6 +809,18 @@ export const bookingActivity = pgTable(
   },
   (t) => [index("booking_activity_booking_idx").on(t.bookingId, t.createdAt)],
 );
+
+export const invites = pgTable("invites", {
+  id: serial("id").primaryKey(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull(),
+  teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }).notNull(),
+  role: membershipRole("role").notNull().default("member"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Relations                                                                 */

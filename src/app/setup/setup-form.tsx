@@ -35,9 +35,21 @@ export function SetupForm() {
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
       )}
       <div className="space-y-2">
-        <Label htmlFor="instanceName">Workspace name</Label>
+        <Label htmlFor="instanceName">Company name</Label>
         <Input id="instanceName" name="instanceName" placeholder="Acme Scheduling" />
+        <p className="text-xs text-muted-foreground">Displayed across the booking page and emails.</p>
         {state.fieldErrors?.instanceName && <FieldError msg={state.fieldErrors.instanceName} />}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="companyEmail">Company email</Label>
+        <Input id="companyEmail" name="companyEmail" type="email" placeholder="noreply@acme.com" />
+        <p className="text-xs text-muted-foreground">Reply-to address for system emails (optional).</p>
+        {state.fieldErrors?.companyEmail && <FieldError msg={state.fieldErrors.companyEmail} />}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="companyWebsite">Company website</Label>
+        <Input id="companyWebsite" name="companyWebsite" type="url" placeholder="https://acme.com" />
+        {state.fieldErrors?.companyWebsite && <FieldError msg={state.fieldErrors.companyWebsite} />}
       </div>
       <div className="space-y-2">
         <Label htmlFor="name">Your name</Label>

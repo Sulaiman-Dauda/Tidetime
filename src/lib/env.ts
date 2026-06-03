@@ -5,59 +5,27 @@ const DEFAULT_APP_URL = "http://localhost:3000";
 const DEFAULT_DATABASE_URL = "postgres://postgres:postgres@localhost:5432/tidetime";
 const DEFAULT_AUTH_SECRET = "dev-insecure-secret-change-me";
 
-const rawEnvSchema = z
-  .object({
-    APP_URL: z.string().trim().url().optional(),
-    APP_NAME: z.string().trim().min(1).max(100).optional(),
-    DATABASE_URL: z.string().trim().min(1).optional(),
-    AUTH_SECRET: z.string().optional(),
-    SMTP_HOST: z.string().trim().optional(),
-    SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
-    SMTP_USER: z.string().optional(),
-    SMTP_PASSWORD: z.string().optional(),
-    SMTP_FROM: z.string().trim().optional(),
-    STRIPE_SECRET_KEY: z.string().trim().optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().trim().optional(),
-  })
-  .superRefine((raw, ctx) => {
-    if (isProd && !raw.APP_URL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["APP_URL"],
-        message: "APP_URL is required in production",
-      });
-    }
+/**
+ * Only bootstrap config lives in .env.
+ * Everything else (SMTP, Stripe, etc.) is managed via Settings → UI and stored
+ * encrypted in the database. No ambiguity — DB always wins.
+ */
+const rawEnvSchema = z.object({
+  APP_URL: z.string().trim().url().optional(),
+  APP_NAME: z.string().trim().min(1).max(100).optional(),
+  DATABASE_URL: z.string().trim().min(1).optional(),
+  AUTH_SECRET: z.string().optional(),
+});
 
-    if (isProd && !raw.DATABASE_URL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["DATABASE_URL"],
-        message: "DATABASE_URL is required in production",
-      });
-    }
+const validated = rawEnvSchema.safeParse(process.env);
 
-    if (isProd && (!raw.AUTH_SECRET || raw.AUTH_SECRET.length < 32)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["AUTH_SECRET"],
-        message:
-          "AUTH_SECRET must be set and at least 32 characters long in production. Generate one with: openssl rand -base64 32",
-      });
-    }
+if (!validated.success && isProd) {
+  console.error("❌ Invalid environment variables:");
+  console.error(validated.error.flatten().fieldErrors);
+  process.exit(1);
+}
 
-    const hasStripeSecret = Boolean(raw.STRIPE_SECRET_KEY);
-    const hasStripeWebhook = Boolean(raw.STRIPE_WEBHOOK_SECRET);
-    if (hasStripeSecret !== hasStripeWebhook) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: hasStripeSecret ? ["STRIPE_WEBHOOK_SECRET"] : ["STRIPE_SECRET_KEY"],
-        message:
-          "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be configured together",
-      });
-    }
-  });
-
-const raw = rawEnvSchema.parse(process.env);
+const raw = validated.success ? validated.data : {};
 
 function withoutTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
@@ -68,17 +36,6 @@ export const env = {
   appName: raw.APP_NAME ?? "Tidetime",
   databaseUrl: raw.DATABASE_URL ?? DEFAULT_DATABASE_URL,
   authSecret: raw.AUTH_SECRET || DEFAULT_AUTH_SECRET,
-  smtp: {
-    host: raw.SMTP_HOST ?? "",
-    port: raw.SMTP_PORT ?? 587,
-    user: raw.SMTP_USER ?? "",
-    password: raw.SMTP_PASSWORD ?? "",
-    from: raw.SMTP_FROM ?? "Tidetime <no-reply@tidetime.app>",
-  },
-  stripe: {
-    secretKey: raw.STRIPE_SECRET_KEY ?? "",
-    webhookSecret: raw.STRIPE_WEBHOOK_SECRET ?? "",
-  },
 } as const;
 
 export { isProd };

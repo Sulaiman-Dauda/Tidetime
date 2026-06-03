@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { eventTypes } from "@/db/schema";
 import { listResources, getEventTypeResources } from "@/server/resources";
+import { listServiceCategories } from "@/server/service-categories";
 import { EventTypeEditor } from "./editor";
 
 export default async function EventTypePage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,6 +25,8 @@ export default async function EventTypePage({ params }: { params: Promise<{ id: 
     getEventTypeResources(eventTypeId),
   ]);
 
+  const categories = await listServiceCategories();
+
   return (
     <EventTypeEditor
       eventType={et}
@@ -32,6 +35,7 @@ export default async function EventTypePage({ params }: { params: Promise<{ id: 
         .filter((r) => r.active)
         .map((r) => ({ id: r.id, name: r.name, type: r.type, capacity: r.capacity }))}
       selectedResourceIds={selected.map((s) => s.resourceId)}
+      categories={categories.map((c) => ({ id: c.id, name: c.name }))}
     />
   );
 }

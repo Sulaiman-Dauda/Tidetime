@@ -3,18 +3,19 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, Search, ChevronRight } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent } from "./sidebar";
+import { UserMenu } from "./user-menu";
 import { CommandPalette } from "@/components/command-palette";
-import { initials } from "@/lib/format";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
-  "/dashboard/event-types": "Events",
+  "/dashboard/event-types": "Services",
+  "/dashboard/categories": "Categories",
   "/dashboard/bookings": "Bookings",
+  "/dashboard/customers": "Customers",
   "/dashboard/calendar": "Calendar",
   "/dashboard/availability": "Availability",
   "/dashboard/links": "Booking Links",
@@ -23,6 +24,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard/reviews": "Reviews",
   "/dashboard/teams": "Teams",
   "/dashboard/integrations": "Integrations",
+  "/dashboard/account": "Profile settings",
   "/dashboard/settings": "Settings",
   "/dashboard/blocked-periods": "Blocked Periods",
 };
@@ -30,8 +32,10 @@ const BREADCRUMB_LABELS: Record<string, string> = {
 type User = {
   name: string | null;
   username: string;
+  email: string;
   avatarUrl: string | null;
   isAdmin: boolean;
+  role: string;
 };
 
 export function DashboardShell({
@@ -89,7 +93,7 @@ export function DashboardShell({
             <span className="hidden text-sm font-medium text-foreground sm:block">{breadcrumb}</span>
           )}
           <div className="flex-1 sm:hidden" />
-          {copyLinkEl}
+          <span key="copy-mobile">{copyLinkEl}</span>
           <Tooltip content="Search (⌘K)">
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={openCommand}>
               <Search className="h-[17px] w-[17px]" />
@@ -111,7 +115,7 @@ export function DashboardShell({
               <div />
             )}
             <div className="flex-1" />
-            {copyLinkEl}
+            <span key="copy-desktop">{copyLinkEl}</span>
             <Tooltip content={`Search pages (⌘K)`}>
               <button
                 onClick={openCommand}
@@ -124,14 +128,7 @@ export function DashboardShell({
                 </kbd>
               </button>
             </Tooltip>
-            <Tooltip content={user.name ?? user.username}>
-              <Avatar className="h-7 w-7 ring-2 ring-primary/40 ring-offset-1 ring-offset-background">
-                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-                <AvatarFallback className="text-[11px] font-semibold bg-primary/15 text-primary">
-                  {initials(user.name ?? user.username)}
-                </AvatarFallback>
-              </Avatar>
-            </Tooltip>
+            <UserMenu user={user} />
           </header>
 
           {/* Content */}

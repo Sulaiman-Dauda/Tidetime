@@ -1,46 +1,49 @@
-import { requireUser } from "@/lib/auth";
-import { SettingsForms } from "./forms";
-import { ApiKeys } from "./api-keys";
+import { redirect } from "next/navigation";
+import { desc, eq } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
+import { getCompanySettings } from "@/server/company-settings";
 import { listTimeZones } from "@/lib/timezones";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { SettingsHub } from "./settings-hub";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const user = await requireUser();
-  const timeZones = listTimeZones();
-  const keys = await db
-    .select({ id: apiKeys.id, note: apiKeys.note, lastUsedAt: apiKeys.lastUsedAt, createdAt: apiKeys.createdAt })
-    .from(apiKeys)
-    .where(eq(apiKeys.userId, user.id))
-    .orderBy(desc(apiKeys.createdAt));
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  // Settings is the company-wide admin hub. Personal preferences live in /dashboard/account.
+  if (!user.isAdmin) redirect("/dashboard/account");
+
+  const [settings, timeZones, keys] = await Promise.all([
+    getCompanySettings(),
+    listTimeZones(),
+    db
+      .select({ id: apiKeys.id, note: apiKeys.note, lastUsedAt: apiKeys.lastUsedAt, createdAt: apiKeys.createdAt })
+      .from(apiKeys)
+      .where(eq(apiKeys.userId, user.id))
+      .orderBy(desc(apiKeys.createdAt)),
+  ]);
 
   return (
     <div className="animate-fade-in space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">Manage your profile, preferences, and security.</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Set up your business once — branding, booking rules, email, payments and legal pages.
+          These apply across your whole booking site.
+        </p>
       </div>
-      <SettingsForms
+      <SettingsHub
+        settings={settings}
         timeZones={timeZones}
-        user={{
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          bio: user.bio,
-          avatarUrl: user.avatarUrl,
-          timeZone: user.timeZone,
-          timeFormat: user.timeFormat,
-          weekStart: user.weekStart,
-          hasPassword: Boolean(user.passwordHash),
+        review={{
           reviewRequestsEnabled: user.reviewRequestsEnabled,
           googleReviewUrl: user.googleReviewUrl,
           reviewThreshold: user.reviewThreshold,
         }}
+        apiKeys={keys}
       />
-      <ApiKeys keys={keys} />
     </div>
   );
 }

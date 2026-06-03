@@ -39,21 +39,16 @@ Tidetime's typecheck script runs `next typegen` first, which regenerates route t
 
 ## Emails are not being delivered
 
-If booking emails appear only in logs:
-
-- confirm `SMTP_HOST` is set
-- verify `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD`
-- check spam/junk folders
-- test SMTP credentials outside the app if needed
-
-If `SMTP_HOST` is unset, Tidetime intentionally falls back to console logging in development.
+- Go to **Settings → Email** and verify your SMTP credentials are correct
+- Click **Test connection** to validate your SMTP server is reachable
+- Check spam/junk folders
+- If no SMTP is configured, emails are logged to the console instead
 
 ## Paid bookings are not working
 
-Confirm both Stripe variables are set:
-
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
+- Go to **Settings → Payments** and verify your Stripe keys are correct
+- Click **Test keys** to validate your secret key works
+- Ensure the webhook endpoint is configured in your Stripe dashboard
 
 Tidetime expects them as a pair.
 
