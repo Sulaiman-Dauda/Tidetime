@@ -86,6 +86,8 @@ describe("validateResponses", () => {
     ];
     expect(validateResponses(fields, { email: "a@b.co", count: "3" })).toEqual({});
   });
+
+
 });
 
 describe("pruneHiddenResponses", () => {
@@ -98,4 +100,6 @@ describe("pruneHiddenResponses", () => {
     const values: FieldValues = { email: "a@b.co", topic: "b", detail: "leaked" };
     expect(pruneHiddenResponses(fields, values)).toEqual({ topic: "b" });
   });
+
+
 });

@@ -13,6 +13,10 @@ import {
 } from "@/db/schema";
 import { computeSlots, type AvailabilityRule, type Interval, type Slot } from "@/lib/slots";
 import { resourceBusyIntervals } from "./resources";
+import { fetchGoogleBusyTime } from "./google-calendar";
+import { expireStalePaymentHolds } from "./payment-holds";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface ResolvedEventType extends EventType {
   hostTimeZone: string;
@@ -149,6 +153,7 @@ export interface GetSlotsArgs {
 /** Top-level: compute bookable slots for a public event type. */
 export async function getSlots({ eventType, rangeStart, rangeEnd, duration, now }: GetSlotsArgs): Promise<Slot[]> {
   if (eventType.hidden) return [];
+  await expireStalePaymentHolds();
   const rules = await loadRules(eventType);
   if (rules.length === 0) return [];
 
@@ -166,6 +171,14 @@ export async function getSlots({ eventType, rangeStart, rangeEnd, duration, now 
   // Apply instance-wide blocked periods (holidays / closures) to every event.
   const blocked = await loadBlockedPeriods(rangeStart, rangeEnd);
   if (blocked.length > 0) busy.push(...blocked);
+
+  // Fetch Google Calendar busy time for connected providers.
+  if (eventType.userId) {
+    const googleBusy = await fetchGoogleBusyTime(eventType.userId, rangeStart, rangeEnd);
+    for (const gb of googleBusy) {
+      busy.push({ start: new Date(gb.start).getTime(), end: new Date(gb.end).getTime() });
+    }
+  }
 
   return computeSlots({
     rangeStart,
@@ -202,4 +215,21 @@ export async function isSlotBookable(eventType: ResolvedEventType, startIso: str
     duration,
   });
   return slots.some((s) => s.time === start.toISOString());
+}
+
+/** First bookable slot within a bounded search window for public landing pages. */
+export async function findNextAvailableSlot(
+  eventType: ResolvedEventType,
+  opts?: { duration?: number; days?: number; now?: Date },
+): Promise<Slot | null> {
+  const now = opts?.now ?? new Date();
+  const days = opts?.days ?? 30;
+  const slots = await getSlots({
+    eventType,
+    duration: opts?.duration,
+    now,
+    rangeStart: now,
+    rangeEnd: new Date(now.getTime() + days * DAY_MS),
+  });
+  return slots[0] ?? null;
 }

@@ -10,22 +10,18 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { WEEKDAY_SHORT } from "@/lib/format";
 import type { CompanySettings } from "@/lib/company-settings";
 import { EmailSettings } from "./email-settings";
 import { PaymentSettings } from "./payment-settings";
 import { ReviewSettings, type ReviewSettingsView } from "./review-settings";
 import { ApiKeys, type ApiKeyRow } from "./api-keys";
+import { GoogleCalendarSettings } from "./google-calendar-settings";
 import {
-  updateCompanyBookingAction,
   updateCompanyLegalAction,
-  updateCompanyLocalizationAction,
   updateCompanyProfileAction,
+  updateCompanyBookingAction,
   type CompanySettingsState,
 } from "./company-actions";
-
-const SELECT_CLASS =
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
@@ -70,23 +66,21 @@ function useSavedToast(state: CompanySettingsState) {
 
 export function SettingsHub({
   settings,
-  timeZones,
   review,
   apiKeys,
 }: {
   settings: CompanySettings;
-  timeZones: string[];
   review: ReviewSettingsView;
   apiKeys: ApiKeyRow[];
 }) {
   return (
     <Tabs defaultValue="general" className="space-y-6">
       <TabsList className="flex-wrap">
-        <TabsTrigger value="general">General</TabsTrigger>
-        <TabsTrigger value="localization">Localization</TabsTrigger>
-        <TabsTrigger value="business">Booking rules</TabsTrigger>
+        <TabsTrigger value="general">Brand</TabsTrigger>
+        <TabsTrigger value="booking">Booking</TabsTrigger>
         <TabsTrigger value="email">Email</TabsTrigger>
-        <TabsTrigger value="payments">Payments</TabsTrigger>
+        <TabsTrigger value="calendar">Calendar</TabsTrigger>
+        <TabsTrigger value="payments">Stripe</TabsTrigger>
         <TabsTrigger value="reviews">Reviews</TabsTrigger>
         <TabsTrigger value="api">API keys</TabsTrigger>
         <TabsTrigger value="legal">Legal</TabsTrigger>
@@ -95,14 +89,14 @@ export function SettingsHub({
       <TabsContent value="general">
         <GeneralSection profile={settings.profile} />
       </TabsContent>
-      <TabsContent value="localization">
-        <LocalizationSection localization={settings.localization} timeZones={timeZones} />
-      </TabsContent>
-      <TabsContent value="business">
-        <BusinessSection booking={settings.booking} />
+      <TabsContent value="booking">
+        <BookingSection booking={settings.booking} />
       </TabsContent>
       <TabsContent value="email">
         <EmailSettings />
+      </TabsContent>
+      <TabsContent value="calendar">
+        <GoogleCalendarSettings />
       </TabsContent>
       <TabsContent value="payments">
         <PaymentSettings />
@@ -132,8 +126,8 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
     <Card className="p-6">
       <form action={action} className="space-y-5">
         <div>
-          <h2 className="text-sm font-semibold">Company</h2>
-          <p className="text-xs text-muted-foreground">Your branding across the booking page and emails.</p>
+          <h2 className="text-sm font-semibold">Brand & company</h2>
+          <p className="text-xs text-muted-foreground">What customers see across the booking page and emails.</p>
         </div>
         <Field
           label="Company name"
@@ -189,77 +183,9 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
   );
 }
 
-/* ------------------------------ Localization ------------------------------ */
+/* -------------------------------- Booking --------------------------------- */
 
-function LocalizationSection({
-  localization,
-  timeZones,
-}: {
-  localization: CompanySettings["localization"];
-  timeZones: string[];
-}) {
-  const [state, action] = useActionState<CompanySettingsState, FormData>(
-    updateCompanyLocalizationAction,
-    null,
-  );
-  useSavedToast(state);
-  return (
-    <Card className="p-6">
-      <form action={action} className="space-y-5">
-        <div>
-          <h2 className="text-sm font-semibold">Localization</h2>
-          <p className="text-xs text-muted-foreground">Default formats used for new records.</p>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Date format" htmlFor="dateFormat" hint="D – Date, M – Month, Y – Year.">
-            <select id="dateFormat" name="dateFormat" defaultValue={localization.dateFormat} className={SELECT_CLASS}>
-              <option value="DMY">DMY (31/12/2025)</option>
-              <option value="MDY">MDY (12/31/2025)</option>
-              <option value="YMD">YMD (2025/12/31)</option>
-            </select>
-          </Field>
-          <Field label="Time format" htmlFor="timeFormat" hint="12-hour or 24-hour clock.">
-            <select id="timeFormat" name="timeFormat" defaultValue={localization.timeFormat} className={SELECT_CLASS}>
-              <option value={12}>H:MM AM/PM</option>
-              <option value={24}>HH:MM</option>
-            </select>
-          </Field>
-          <Field label="First day of week" htmlFor="weekStart" hint="The first day of the calendar week.">
-            <select id="weekStart" name="weekStart" defaultValue={localization.weekStart} className={SELECT_CLASS}>
-              {WEEKDAY_SHORT.map((d, i) => (
-                <option key={i} value={i}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Default language" htmlFor="defaultLocale" hint="Default locale for new records.">
-            <select id="defaultLocale" name="defaultLocale" defaultValue={localization.defaultLocale} className={SELECT_CLASS}>
-              <option value="en">English</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-            </select>
-          </Field>
-          <Field label="Default timezone" htmlFor="defaultTimeZone" hint="Default timezone for new records.">
-            <select id="defaultTimeZone" name="defaultTimeZone" defaultValue={localization.defaultTimeZone} className={SELECT_CLASS}>
-              {timeZones.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <SaveButton />
-      </form>
-    </Card>
-  );
-}
-
-/* ------------------------------ Business logic ---------------------------- */
-
-function BusinessSection({ booking }: { booking: CompanySettings["booking"] }) {
+function BookingSection({ booking }: { booking: CompanySettings["booking"] }) {
   const [state, action] = useActionState<CompanySettingsState, FormData>(
     updateCompanyBookingAction,
     null,
@@ -267,70 +193,52 @@ function BusinessSection({ booking }: { booking: CompanySettings["booking"] }) {
   useSavedToast(state);
   return (
     <Card className="p-6">
-      <form action={action} className="space-y-5">
+      <form action={action} className="space-y-6">
         <div>
-          <h2 className="text-sm font-semibold">Business logic</h2>
-          <p className="text-xs text-muted-foreground">Default booking rules for the whole company.</p>
+          <h2 className="text-sm font-semibold">Booking defaults</h2>
+          <p className="text-xs text-muted-foreground">Control how your public booking page behaves.</p>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="Future booking limit (days)"
-            htmlFor="futureBookingLimitDays"
-            hint="How far ahead customers can book via the public page."
-          >
-            <Input
-              id="futureBookingLimitDays"
-              name="futureBookingLimitDays"
-              type="number"
-              min={0}
-              defaultValue={booking.futureBookingLimitDays}
-            />
-          </Field>
-          <Field
-            label="Minimum booking notice (minutes)"
-            htmlFor="minimumBookingNoticeMinutes"
-            hint="Lead time required before a slot can be booked."
-          >
-            <Input
-              id="minimumBookingNoticeMinutes"
-              name="minimumBookingNoticeMinutes"
-              type="number"
-              min={0}
-              defaultValue={booking.minimumBookingNoticeMinutes}
-            />
-          </Field>
-          <Field
-            label="Reschedule / cancel cut-off (minutes)"
-            htmlFor="rescheduleCancelTimeoutMinutes"
-            hint="Customers cannot reschedule or cancel within this window before the start."
-          >
-            <Input
-              id="rescheduleCancelTimeoutMinutes"
-              name="rescheduleCancelTimeoutMinutes"
-              type="number"
-              min={0}
-              defaultValue={booking.rescheduleCancelTimeoutMinutes}
-            />
-          </Field>
+
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+          <label className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm font-medium">Disable public bookings</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                When enabled, your booking page shows a maintenance message and no one can book.
+              </p>
+            </div>
+            <Switch name="bookingDisabled" defaultChecked={booking.bookingDisabled} />
+          </label>
         </div>
+
         <Field
-          label="Appointment status options"
-          htmlFor="appointmentStatuses"
-          hint="Comma-separated list used in the calendar. The first one is the default."
+          label="Future booking limit (days)"
+          htmlFor="futureBookingLimitDays"
+          hint="How far into the future customers can book."
         >
-          <Input
-            id="appointmentStatuses"
-            name="appointmentStatuses"
-            defaultValue={booking.appointmentStatuses.join(", ")}
-          />
+          <Input id="futureBookingLimitDays" name="futureBookingLimitDays" type="number" min={1} max={3650} defaultValue={booking.futureBookingLimitDays} />
         </Field>
-        <label className="flex items-center justify-between gap-4 rounded-lg border border-border/60 p-3">
-          <span className="space-y-0.5">
-            <span className="block text-sm font-medium">Disable booking</span>
-            <Hint>When on, the public booking page is disabled and no new appointments can be made.</Hint>
-          </span>
-          <Switch name="bookingDisabled" defaultChecked={booking.bookingDisabled} />
-        </label>
+        <Field
+          label="Minimum booking notice (minutes)"
+          htmlFor="minimumBookingNoticeMinutes"
+          hint="How much lead time is required before a slot can be booked."
+        >
+          <Input id="minimumBookingNoticeMinutes" name="minimumBookingNoticeMinutes" type="number" min={0} defaultValue={booking.minimumBookingNoticeMinutes} />
+        </Field>
+        <Field
+          label="Reschedule/cancel timeout (minutes)"
+          htmlFor="rescheduleCancelTimeoutMinutes"
+          hint="How close to the start reschedule or cancel is blocked."
+        >
+          <Input id="rescheduleCancelTimeoutMinutes" name="rescheduleCancelTimeoutMinutes" type="number" min={0} defaultValue={booking.rescheduleCancelTimeoutMinutes} />
+        </Field>
+        <Field
+          label="Appointment status labels"
+          htmlFor="appointmentStatuses"
+          hint="Comma-separated list of available status labels."
+        >
+          <Input id="appointmentStatuses" name="appointmentStatuses" defaultValue={booking.appointmentStatuses.join(", ")} />
+        </Field>
         <SaveButton />
       </form>
     </Card>

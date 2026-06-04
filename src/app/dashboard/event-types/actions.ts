@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { eventTypes, type BookingField, type EventLocation } from "@/db/schema";
@@ -29,6 +29,32 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "meeting";
+}
+
+async function nextEventTypePosition(userId: number): Promise<number> {
+  const [row] = await db
+    .select({ position: sql<number>`coalesce(max(${eventTypes.position}), -1)::int` })
+    .from(eventTypes)
+    .where(eq(eventTypes.userId, userId));
+  return (row?.position ?? -1) + 1;
+}
+
+async function normalizeEventTypePositions(userId: number): Promise<void> {
+  const rows = await db
+    .select({ id: eventTypes.id, position: eventTypes.position })
+    .from(eventTypes)
+    .where(eq(eventTypes.userId, userId))
+    .orderBy(asc(eventTypes.position), asc(eventTypes.createdAt), asc(eventTypes.id));
+
+  const needsUpdate = rows.some((row, index) => row.position !== index);
+  if (!needsUpdate) return;
+
+  await db.transaction(async (tx) => {
+    for (const [index, row] of rows.entries()) {
+      if (row.position === index) continue;
+      await tx.update(eventTypes).set({ position: index }).where(eq(eventTypes.id, row.id));
+    }
+  });
 }
 
 export async function createEventTypeAction(formData: FormData) {
@@ -58,7 +84,8 @@ export async function createEventTypeAction(formData: FormData) {
       title,
       slug,
       length,
-      locations: [{ type: "google_meet" }] satisfies EventLocation[],
+      position: await nextEventTypePosition(user.id),
+      locations: [] satisfies EventLocation[],
       bookingFields: DEFAULT_FIELDS,
     })
     .returning({ id: eventTypes.id });
@@ -100,6 +127,8 @@ const updateSchema = z.object({
   bookingLimits: bookingLimitsSchema,
   price: z.coerce.number().int().min(0).optional(),
   currency: currencySchema.optional(),
+  requiresPayment: z.boolean().optional(),
+  depositAmount: z.coerce.number().int().min(0).optional(),
   successRedirectUrl: z.union([httpUrlSchema, z.literal(""), z.null()]).optional(),
   resourceIds: z.array(z.coerce.number().int().positive()).optional(),
 });
@@ -154,6 +183,8 @@ export async function updateEventTypeAction(input: UpdateEventTypeInput): Promis
       bookingLimits: data.bookingLimits ?? null,
       price: data.price ?? 0,
       currency: data.currency ?? "usd",
+      requiresPayment: data.requiresPayment ?? false,
+      depositAmount: data.depositAmount ?? 0,
       successRedirectUrl: data.successRedirectUrl ? data.successRedirectUrl : null,
       updatedAt: new Date(),
     })
@@ -213,15 +244,56 @@ export async function duplicateEventTypeAction(formData: FormData) {
   }
 
   const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = orig;
-  await db.insert(eventTypes).values({ ...rest, slug, title: `${orig.title} (copy)` });
+  await db.insert(eventTypes).values({
+    ...rest,
+    slug,
+    title: `${orig.title} (copy)`,
+    position: await nextEventTypePosition(user.id),
+  });
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/event-types");
 }
 
 export async function listEventTypes(userId: number) {
+  await normalizeEventTypePositions(userId);
   return db
     .select()
     .from(eventTypes)
     .where(eq(eventTypes.userId, userId))
-    .orderBy(desc(eventTypes.position), desc(eventTypes.createdAt));
+    .orderBy(asc(eventTypes.position), asc(eventTypes.createdAt));
+}
+
+export async function reorderEventTypesAction(formData: FormData) {
+  const user = await requireUser();
+  const id = Number(formData.get("id"));
+  const direction = formData.get("direction") as "up" | "down";
+
+  await normalizeEventTypePositions(user.id);
+
+  // Get all event types for this user, ordered by position.
+  const all = await db
+    .select({ id: eventTypes.id, position: eventTypes.position })
+    .from(eventTypes)
+    .where(eq(eventTypes.userId, user.id))
+    .orderBy(asc(eventTypes.position), asc(eventTypes.createdAt));
+
+  const idx = all.findIndex((e) => e.id === id);
+  if (idx === -1) return;
+
+  if (direction === "up" && idx > 0) {
+    // Swap positions with the previous item.
+    const prev = all[idx - 1];
+    const curr = all[idx];
+    await db.update(eventTypes).set({ position: curr.position }).where(eq(eventTypes.id, prev.id));
+    await db.update(eventTypes).set({ position: prev.position }).where(eq(eventTypes.id, curr.id));
+  } else if (direction === "down" && idx < all.length - 1) {
+    // Swap positions with the next item.
+    const next = all[idx + 1];
+    const curr = all[idx];
+    await db.update(eventTypes).set({ position: curr.position }).where(eq(eventTypes.id, next.id));
+    await db.update(eventTypes).set({ position: next.position }).where(eq(eventTypes.id, curr.id));
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/event-types");
 }

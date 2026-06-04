@@ -87,6 +87,7 @@ For team event types:
 - sessions use opaque random tokens
 - only token hashes are stored in the database
 - cookies are `HttpOnly` and `SameSite=Lax`
+- production uses a `__Host-` session cookie for stronger browser-enforced scoping
 
 ### Credentials and secrets
 
@@ -98,7 +99,8 @@ For team event types:
 ### HTTP surface
 
 - global security headers are applied through `next.config.ts`
-- sensitive routes receive clickjacking protection
+- a Content-Security-Policy is sent on every response
+- sensitive routes receive stricter framing protection
 - public booking pages remain frameable so the embed widget works cross-origin
 
 ## Database model overview
@@ -117,6 +119,12 @@ Core entities include:
 - `workflows` and `scheduled_reminders`
 
 The schema intentionally keeps relations explicit and avoids magical side effects.
+
+## Operational safety notes
+
+- first-run setup is serialized with a PostgreSQL advisory lock so only one owner account can win
+- company-wide settings are stored in `app_settings` and merged over explicit defaults
+- the app is designed for single-instance self-hosting rather than multi-node orchestration
 
 ## Why this structure works well for open source
 

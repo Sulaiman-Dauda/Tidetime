@@ -1,20 +1,20 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users, schedules, availabilities, appSettings, teams, memberships } from "@/db/schema";
 import { hashPassword } from "@/lib/crypto";
 import { createSession, hasAnyUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
-import { setCompanyProfile } from "@/server/company-settings";
-import { DEFAULT_COMPANY_PROFILE } from "@/lib/company-settings";
+import { COMPANY_SETTING_KEYS, DEFAULT_COMPANY_PROFILE, normalizeBrandColor } from "@/lib/company-settings";
 
 const RESERVED = new Set([
   "api", "app", "dashboard", "login", "signup", "settings", "admin", "auth", "setup",
   "booking", "bookings", "availability", "event-types", "teams", "_next", "favicon.ico",
 ]);
+const SETUP_LOCK_ID = 20_260_604;
 
 const setupSchema = z.object({
   instanceName: z.string().trim().max(128).optional(),
@@ -62,50 +62,60 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     parsed.data.timeZone && isValidTimeZone(parsed.data.timeZone) ? parsed.data.timeZone : "UTC";
 
   const passwordHash = await hashPassword(password);
-  const [user] = await db
-    .insert(users)
-    .values({ name, email, username, passwordHash, timeZone, isAdmin: true })
-    .returning({ id: users.id });
-
-  // Seed a default Mon–Fri 9–5 working-hours schedule for the owner.
-  const [schedule] = await db
-    .insert(schedules)
-    .values({ userId: user.id, name: "Working Hours", timeZone })
-    .returning({ id: schedules.id });
-  await db.insert(availabilities).values({
-    scheduleId: schedule.id,
-    days: [1, 2, 3, 4, 5],
-    startTime: "09:00:00",
-    endTime: "17:00:00",
-  });
-  await db.update(users).set({ defaultScheduleId: schedule.id }).where(eq(users.id, user.id));
-
-  // Persist basic instance configuration.
-  await db
-    .insert(appSettings)
-    .values([
-      { name: "instance_name", value: instanceName || "Tidetime" },
-      { name: "setup_completed_at", value: new Date().toISOString() },
-    ])
-    .onConflictDoNothing();
-
-  // Seed company branding profile from the onboarding details.
-  await setCompanyProfile({
+  const companyProfile = {
     ...DEFAULT_COMPANY_PROFILE,
     name: instanceName || DEFAULT_COMPANY_PROFILE.name,
     email: parsed.data.companyEmail || "",
     websiteUrl: parsed.data.companyWebsite || "",
+    brandColor: normalizeBrandColor(DEFAULT_COMPANY_PROFILE.brandColor),
+  };
+
+  const setup = await db.transaction(async (tx) => {
+    // Serialize first-run setup so only one owner account can ever win.
+    await tx.execute(sql`select pg_advisory_xact_lock(${SETUP_LOCK_ID})`);
+
+    const [existingUser] = await tx.select({ id: users.id }).from(users).limit(1);
+    if (existingUser) return { alreadySetup: true as const };
+
+    const [user] = await tx
+      .insert(users)
+      .values({ name, email, username, passwordHash, timeZone, isAdmin: true })
+      .returning({ id: users.id });
+
+    // Seed a default Mon–Fri 9–5 working-hours schedule for the owner.
+    const [schedule] = await tx
+      .insert(schedules)
+      .values({ userId: user.id, name: "Working Hours", timeZone })
+      .returning({ id: schedules.id });
+    await tx.insert(availabilities).values({
+      scheduleId: schedule.id,
+      days: [1, 2, 3, 4, 5],
+      startTime: "09:00:00",
+      endTime: "17:00:00",
+    });
+    await tx.update(users).set({ defaultScheduleId: schedule.id }).where(eq(users.id, user.id));
+
+    await tx
+      .insert(appSettings)
+      .values([
+        { name: "instance_name", value: instanceName || "Tidetime" },
+        { name: "setup_completed_at", value: new Date().toISOString() },
+        { name: COMPANY_SETTING_KEYS.profile, value: companyProfile },
+      ])
+      .onConflictDoNothing();
+
+    const [team] = await tx
+      .insert(teams)
+      .values({ name: instanceName || "My Organization", slug: "default" })
+      .returning({ id: teams.id });
+
+    await tx.insert(memberships).values({ userId: user.id, teamId: team.id, role: "owner", accepted: true });
+
+    return { userId: user.id };
   });
 
-  // Create default team for the organization
-  const [team] = await db
-    .insert(teams)
-    .values({ name: instanceName || "My Organization", slug: "default" })
-    .returning({ id: teams.id });
+  if ("alreadySetup" in setup) redirect("/login");
 
-  // Add the admin as owner of the team
-  await db.insert(memberships).values({ userId: user.id, teamId: team.id, role: "owner", accepted: true });
-
-  await createSession(user.id);
-  redirect("/dashboard");
+  await createSession(setup.userId);
+  redirect("/dashboard/event-types?welcome=1");
 }

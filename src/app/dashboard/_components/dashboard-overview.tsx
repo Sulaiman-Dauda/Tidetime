@@ -238,7 +238,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
           </div>
           <p className="text-sm font-medium text-foreground">No bookings yet</p>
           <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
-            Share your booking link or create an event type to start receiving meetings.
+            Share your booking link or create a service to start receiving meetings.
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
             <button

@@ -13,6 +13,7 @@ export interface SmtpConfig {
 }
 
 export interface StripeConfig {
+  publishableKey: string;
   secretKey: string;
   webhookSecret: string;
 }
@@ -55,16 +56,23 @@ export async function getStripeConfig(): Promise<StripeConfig | null> {
   if (!row?.value) return null;
   const v = row.value as Record<string, unknown>;
   return {
+    publishableKey: String(v.publishableKey ?? ""),
     secretKey: decrypt(String(v.secretKey ?? "")),
     webhookSecret: decrypt(String(v.webhookSecret ?? "")),
   };
 }
 
-/** Store Stripe config (keys encrypted at rest). */
+/** Store Stripe config (secret values encrypted at rest). */
 export async function setStripeConfig(config: StripeConfig): Promise<void> {
+  const current = await getStripeConfig();
+  const secretKey = config.secretKey === "••••••••" ? current?.secretKey ?? "" : config.secretKey;
+  const webhookSecret =
+    config.webhookSecret === "••••••••" ? current?.webhookSecret ?? "" : config.webhookSecret;
+
   const value = {
-    secretKey: encrypt(config.secretKey),
-    webhookSecret: encrypt(config.webhookSecret),
+    publishableKey: config.publishableKey,
+    secretKey: encrypt(secretKey),
+    webhookSecret: encrypt(webhookSecret),
   };
   await db
     .insert(appSettings)

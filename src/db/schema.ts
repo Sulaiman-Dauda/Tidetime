@@ -897,8 +897,7 @@ export type BookingFieldType =
   | "select"
   | "radio"
   | "checkbox"
-  | "multiselect"
-  | "file";
+  | "multiselect";
 
 /** Show this field only when another field has one of these values. */
 export interface BookingFieldCondition {
@@ -915,9 +914,6 @@ export type BookingField = {
   options?: string[];
   /** conditional visibility — field is hidden until the condition is met */
   showWhen?: BookingFieldCondition;
-  /** accepted MIME types / max size (bytes) for file fields */
-  accept?: string;
-  maxSize?: number;
   /** system fields (name/email) cannot be removed or retyped, but their
    * label/placeholder/required/hidden can be overridden */
   system?: boolean;

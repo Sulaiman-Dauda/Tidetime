@@ -37,14 +37,18 @@ Production-ready **today**:
 
 - Personal and team scheduling
 - Public booking pages and embeddable widget
+- Google Calendar sync (busy-time read + booking event creation)
+- Stripe-powered paid bookings with public attendee checkout
 - API keys + REST API
 - Webhooks
-- Stripe-powered paid bookings
 - Email notifications and reminder worker
+- Public booking maintenance mode
 
-Present in the schema/UI but **not fully shipped as end-user flows in this repository**:
+Still intentionally limited or out of scope in this repository:
 
-- OAuth connection flows for calendar and conferencing providers such as Google Calendar / Google Meet / Zoom
+- provider-native Google Meet / Zoom connection flows
+- Outlook / CalDAV calendar sync
+- hosted file uploads in booking forms
 
 The documentation below reflects the current implementation rather than aspirational features.
 
@@ -53,15 +57,15 @@ The documentation below reflects the current implementation rather than aspirati
 | Area              | What you get                                                                                                                                       |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Event types**   | Multiple durations, buffers, minimum notice, slot intervals, booking caps, custom booking fields, hidden event types, confirmation-required events |
-| **Availability**  | Weekly schedules, date overrides, timezone-aware slot engine, out-of-office support                                                                |
-| **Booking flow**  | Public profile pages, team booking pages, cancel/reschedule links, ICS invites, embeddable widget                                                  |
+| **Availability**  | Weekly schedules, date overrides, timezone-aware slot engine, out-of-office support, Google Calendar busy-time sync                               |
+| **Booking flow**  | Public profile pages, team booking pages, cancel/reschedule links, ICS invites, embeddable widget                                                 |
 | **Teams**         | Shared event types, round-robin scheduling, collective scheduling, memberships and roles                                                           |
-| **Payments**      | Stripe-backed paid bookings with webhook-confirmed lifecycle                                                                                       |
+| **Payments**      | Stripe-powered attendee checkout for paid services, webhook confirmation, and stale-hold cleanup                                                   |
 | **Reviews**       | Post-booking feedback requests; happy ratings routed to your public review page, the rest captured privately                                       |
 | **Resources**     | Shared rooms, equipment and assets with capacity-aware double-booking prevention                                                                   |
-| **Notifications** | SMTP email delivery (configured in Settings → Email) or console fallback, scheduled reminders |
+| **Notifications** | SMTP email delivery (configured in Settings → Email) or console fallback, scheduled reminders                                                      |
 | **Automation**    | REST API, booking links, HMAC-signed webhooks, health check endpoint                                                                               |
-| **Dashboard**     | Bookings, analytics, availability editor, settings, API keys, links, resources, reviews, teams                                                     |
+| **Dashboard**     | Bookings, analytics, availability editor, settings, API keys, links, resources, reviews, teams, maintenance toggle, service ordering controls, first-run service creation flow |
 | **Installable**   | PWA manifest and offline-ready service worker for an app-like experience                                                                           |
 
 ## 🧱 Tech stack
@@ -132,6 +136,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+On a fresh instance, Tidetime will guide the owner through setup and then straight into **Create your first service**.
+
 ## ⚙️ Configuration
 
 Copy `.env.example` to `.env` and set the values below.
@@ -143,8 +149,10 @@ Copy `.env.example` to `.env` and set the values below.
 | `APP_NAME`                | no            | `Tidetime`                         | Display name                                        |
 | `DATABASE_URL`            | production    | local Postgres URL                 | PostgreSQL connection string                        |
 | `AUTH_SECRET`             | production    | dev fallback only                  | Must be **32+ characters** in production. Used as encryption key for all secrets stored in the database. |
+| `GOOGLE_CLIENT_ID`        | optional      | unset                              | Required only if you want Google Calendar sync      |
+| `GOOGLE_CLIENT_SECRET`    | optional      | unset                              | Required only if you want Google Calendar sync      |
 
-> **SMTP, Stripe, and all other integrations are configured via the Settings UI** (navigate to Settings after logging in). Secrets are encrypted at rest with AES-256-GCM using `AUTH_SECRET` as the key. No `.env` edits needed for day-to-day operations.
+> **SMTP and Stripe credentials are configured via the Settings UI** (navigate to Settings after logging in). Secrets are encrypted at rest with AES-256-GCM using `AUTH_SECRET` as the key. **Google Calendar still requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the app environment**, after which each provider connects their own Google account in Settings.
 
 ### Environment validation
 
@@ -153,7 +161,8 @@ Tidetime fails fast on startup when critical production settings are unsafe or m
 - missing `DATABASE_URL`
 - missing or short `AUTH_SECRET`
 - invalid `APP_URL`
-- partial Stripe configuration (one Stripe variable without the other)
+
+Google Calendar OAuth credentials are optional. If they are omitted, the Google Calendar connection flow stays unavailable.
 
 ## 📜 Scripts
 

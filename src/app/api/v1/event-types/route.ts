@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { eventTypes } from "@/db/schema";
 import { authenticateApiKey, unauthorized, jsonError, parsePage } from "@/server/api-auth";
@@ -61,9 +61,14 @@ export async function POST(req: NextRequest) {
     .limit(1);
   if (dupe) return jsonError("An event type with that slug already exists", 409);
 
+  const [maxPosition] = await db
+    .select({ position: sql<number>`coalesce(max(${eventTypes.position}), -1)::int` })
+    .from(eventTypes)
+    .where(eq(eventTypes.userId, user.id));
+
   const [row] = await db
     .insert(eventTypes)
-    .values({ ...parsed.data, userId: user.id })
+    .values({ ...parsed.data, userId: user.id, position: (maxPosition?.position ?? -1) + 1 })
     .returning();
   return NextResponse.json({ data: row }, { status: 201 });
 }

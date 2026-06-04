@@ -3,11 +3,13 @@ import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users, eventTypes, serviceCategories } from "@/db/schema";
+import { users, eventTypes, serviceCategories, schedules } from "@/db/schema";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { formatDuration, initials } from "@/lib/format";
+import { formatDuration, formatNextAvailable, initials } from "@/lib/format";
 import { locationLabel } from "@/lib/locations";
-import { Clock, ArrowRight, Video } from "lucide-react";
+import { findNextAvailableSlot } from "@/server/availability";
+import { isBookingDisabled } from "@/server/company-settings";
+import { Clock, ArrowRight, Video, AlertTriangle } from "lucide-react";
 import type { Metadata } from "next";
 import { PublicLegal } from "../_components/public-legal";
 import { CompanyBrandHeader } from "../_components/company-brand-header";
@@ -25,15 +27,17 @@ async function loadProfile(username: string) {
       avatarUrl: users.avatarUrl,
       bio: users.bio,
       brandColor: users.brandColor,
+      timeZone: users.timeZone,
     })
     .from(users)
     .where(eq(users.username, username))
     .limit(1);
   if (!user) return null;
 
-  const types = await db
-    .select()
+  const typeRows = await db
+    .select({ et: eventTypes, scheduleTz: schedules.timeZone })
     .from(eventTypes)
+    .leftJoin(schedules, eq(eventTypes.scheduleId, schedules.id))
     .where(and(eq(eventTypes.userId, user.id), eq(eventTypes.hidden, false)))
     .orderBy(asc(eventTypes.position), asc(eventTypes.id));
 
@@ -45,6 +49,21 @@ async function loadProfile(username: string) {
     })
     .from(serviceCategories)
     .orderBy(asc(serviceCategories.position), asc(serviceCategories.id));
+
+  const types = await Promise.all(
+    typeRows.map(async ({ et, scheduleTz }) => {
+      const resolved = {
+        ...et,
+        hostTimeZone: user.timeZone,
+        scheduleTimeZone: scheduleTz ?? user.timeZone,
+      };
+      const nextAvailable = await findNextAvailableSlot(resolved);
+      return {
+        ...resolved,
+        nextAvailable: nextAvailable?.time ?? null,
+      };
+    }),
+  );
 
   return { user, types, categories };
 }
@@ -64,6 +83,26 @@ export default async function PublicProfilePage({ params }: Props) {
 
   const { user, types, categories } = data;
   const name = user.name ?? user.username;
+  const disabled = await isBookingDisabled();
+
+  if (disabled) {
+    return (
+      <main className="min-h-screen bg-grid">
+        <CompanyBrandHeader />
+        <div className="mx-auto max-w-lg px-4 py-24 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
+            <AlertTriangle className="h-6 w-6 text-amber-600" />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Booking temporarily unavailable</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Online booking is currently disabled while we make some improvements.
+            Please check back soon or contact us directly.
+          </p>
+        </div>
+        <PublicLegal />
+      </main>
+    );
+  }
 
   // Group services by category; categories with no visible services are skipped,
   // and uncategorised services fall into a trailing "Other" group.
@@ -106,8 +145,22 @@ export default async function PublicProfilePage({ params }: Props) {
               </span>
             ) : null}
           </div>
+          <div className="mt-3">
+            {et.nextAvailable ? (
+              <span className="inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                Next available {formatNextAvailable(new Date(et.nextAvailable), et.scheduleTimeZone)}
+              </span>
+            ) : (
+              <span className="inline-flex rounded-full border border-border/60 bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                No times in the next 30 days
+              </span>
+            )}
+          </div>
         </div>
-        <ArrowRight className="ml-4 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+        <span className="ml-4 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-primary">
+          Choose time
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </span>
       </Link>
     );
   }
@@ -125,7 +178,14 @@ export default async function PublicProfilePage({ params }: Props) {
           {user.bio ? <p className="mt-2 max-w-md text-sm text-muted-foreground">{user.bio}</p> : null}
         </div>
 
-        <div className="mt-10 space-y-8">
+        <div className="mt-10">
+          <h2 className="text-sm font-semibold tracking-tight">Choose a service</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pick the type of appointment you want. You&apos;ll choose a time on the next screen.
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-8">
           {types.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground">No public event types yet.</p>
           ) : (

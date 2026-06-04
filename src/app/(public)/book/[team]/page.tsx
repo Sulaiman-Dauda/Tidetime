@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
 import { getPublicTeam, getTeamEventTypes } from "@/server/teams-public";
+import { isBookingDisabled } from "@/server/company-settings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { initials } from "@/lib/format";
-import { formatDuration } from "@/lib/format";
-import { Clock, Users } from "lucide-react";
+import { initials, formatDuration, formatNextAvailable } from "@/lib/format";
+import { AlertTriangle, Clock, Users, ArrowRight } from "lucide-react";
 import { PublicLegal } from "../../_components/public-legal";
 import { CompanyBrandHeader } from "../../_components/company-brand-header";
 
@@ -29,7 +29,29 @@ export default async function TeamLandingPage({ params }: Props) {
   const team = await getPublicTeam(slug);
   if (!team) notFound();
 
-  const events = await getTeamEventTypes(team.id);
+  const [events, disabled] = await Promise.all([
+    getTeamEventTypes(team.id),
+    isBookingDisabled(),
+  ]);
+
+  if (disabled) {
+    return (
+      <main className="min-h-screen bg-grid">
+        <CompanyBrandHeader />
+        <div className="mx-auto max-w-lg px-4 py-24 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
+            <AlertTriangle className="h-6 w-6 text-amber-600" />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Booking temporarily unavailable</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Online booking is currently disabled while we make some improvements.
+            Please check back soon or contact us directly.
+          </p>
+        </div>
+        <PublicLegal />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-grid">
@@ -44,12 +66,19 @@ export default async function TeamLandingPage({ params }: Props) {
           {team.bio ? <p className="mt-2 max-w-md text-sm text-muted-foreground">{team.bio}</p> : null}
         </div>
 
-        <div className="mt-10 space-y-3">
+        <div className="mt-10">
+          <h2 className="text-sm font-semibold tracking-tight">Choose a service</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pick the type of appointment you want. You&apos;ll choose a time on the next screen.
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-3">
           {events.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground">No public events yet.</p>
           ) : (
             events.map((e) => (
-              <Link key={e.id} href={`/book/${slug}/${e.slug}` as Route}>
+              <Link key={e.id} href={`/book/${slug}/${e.slug}` as Route} className="group block">
                 <Card className="flex items-center justify-between p-5 transition-colors hover:border-foreground">
                   <div>
                     <h2 className="font-medium">{e.title}</h2>
@@ -66,7 +95,22 @@ export default async function TeamLandingPage({ params }: Props) {
                         </span>
                       ) : null}
                     </div>
+                    <div className="mt-3">
+                      {e.nextAvailable ? (
+                        <span className="inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          Next available {formatNextAvailable(new Date(e.nextAvailable), e.scheduleTimeZone)}
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full border border-border/60 bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                          No times in the next 30 days
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <span className="ml-4 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-primary">
+                    Choose time
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
                 </Card>
               </Link>
             ))

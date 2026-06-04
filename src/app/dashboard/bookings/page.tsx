@@ -1,12 +1,14 @@
+import Link from "next/link";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
-import { bookings, attendees } from "@/db/schema";
+import { bookings, attendees, eventTypes } from "@/db/schema";
 import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
-import { CalendarX2, Clock, MapPin, User, X } from "lucide-react";
+import { CalendarX2, Clock, CreditCard, MapPin, User, X } from "lucide-react";
+import { expireStalePaymentHolds } from "@/server/payment-holds";
 
 type Filter = "upcoming" | "pending" | "past" | "cancelled";
 
@@ -18,11 +20,14 @@ interface BookingRow {
   location: string | null;
   meetingUrl: string | null;
   status: string;
+  paid: boolean;
+  requiresPayment: boolean;
   attendeeNames: string[];
   attendeeTz: string;
 }
 
 async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[]> {
+  await expireStalePaymentHolds();
   const now = new Date();
   const conditions = [eq(bookings.userId, userId)];
 
@@ -37,8 +42,9 @@ async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[
   }
 
   const rows = await db
-    .select()
+    .select({ booking: bookings, requiresPayment: eventTypes.requiresPayment })
     .from(bookings)
+    .leftJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
     .where(and(...conditions))
     .orderBy(
       filter === "past" || filter === "cancelled"
@@ -52,7 +58,7 @@ async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[
   const ats = await db
     .select()
     .from(attendees)
-    .where(inArray(attendees.bookingId, rows.map((r) => r.id)));
+    .where(inArray(attendees.bookingId, rows.map((r) => r.booking.id)));
 
   const byBooking = new Map<number, typeof ats>();
   for (const a of ats) {
@@ -61,17 +67,19 @@ async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[
     byBooking.set(a.bookingId, list);
   }
 
-  return rows.map((r) => {
-    const list = byBooking.get(r.id) ?? [];
+  return rows.map(({ booking, requiresPayment }) => {
+    const list = byBooking.get(booking.id) ?? [];
     const primary = list.find((a) => a.isPrimary) ?? list[0];
     return {
-      uid: r.uid,
-      title: r.title,
-      startTime: r.startTime,
-      endTime: r.endTime,
-      location: r.location,
-      meetingUrl: r.meetingUrl,
-      status: r.status,
+      uid: booking.uid,
+      title: booking.title,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      location: booking.location,
+      meetingUrl: booking.meetingUrl,
+      status: booking.status,
+      paid: booking.paid,
+      requiresPayment: requiresPayment ?? false,
       attendeeNames: list.map((a) => a.name),
       attendeeTz: primary?.timeZone ?? "UTC",
     };
@@ -109,7 +117,7 @@ export default async function BookingsPage({ searchParams }: Props) {
         <TabsList>
           {FILTERS.map((f) => (
             <TabsTrigger key={f} value={f} asChild>
-              <a href={`/dashboard/bookings?tab=${f}`}>{FILTER_LABELS[f]}</a>
+              <Link href={`/dashboard/bookings?tab=${f}`}>{FILTER_LABELS[f]}</Link>
             </TabsTrigger>
           ))}
         </TabsList>
@@ -154,21 +162,26 @@ function BookingRow({
   userTz: string;
 }) {
   const when = formatRange(booking.startTime, booking.endTime, userTz);
+  const attendeeSummary =
+    booking.attendeeNames.length <= 1
+      ? booking.attendeeNames[0]
+      : `${booking.attendeeNames[0]} + ${booking.attendeeNames.length - 1} guest${booking.attendeeNames.length - 1 === 1 ? "" : "s"}`;
+  const awaitingPayment = booking.status === "pending" && booking.requiresPayment && !booking.paid;
 
   return (
     <div className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <a
+          <Link
             href={`/dashboard/bookings/${booking.uid}`}
             className="text-[14px] font-medium text-foreground hover:underline"
           >
             {booking.title}
-          </a>
+          </Link>
           {booking.status === "pending" && (
             <Badge variant="pending" className="gap-1">
-              <Clock className="h-2.5 w-2.5" />
-              Pending
+              {awaitingPayment ? <CreditCard className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
+              {awaitingPayment ? "Awaiting payment" : "Pending"}
             </Badge>
           )}
           {booking.status === "cancelled" && (
@@ -189,10 +202,10 @@ function BookingRow({
             <Clock className="h-3 w-3" />
             {when}
           </span>
-          {booking.attendeeNames.length > 0 && (
+          {attendeeSummary && (
             <span className="inline-flex items-center gap-1.5">
               <User className="h-3 w-3" />
-              {booking.attendeeNames.join(", ")}
+              {attendeeSummary}
             </span>
           )}
           {booking.location && (
@@ -215,7 +228,7 @@ function BookingRow({
         </div>
       </div>
 
-      {filter === "pending" && (
+      {filter === "pending" && !awaitingPayment && (
         <div className="flex shrink-0 items-center gap-2">
           <DeclineButton uid={booking.uid} />
           <AcceptButton uid={booking.uid} />

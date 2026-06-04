@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { eventTypes } from "@/db/schema";
 import { listResources, getEventTypeResources } from "@/server/resources";
 import { listServiceCategories } from "@/server/service-categories";
+import { env } from "@/lib/env";
 import { EventTypeEditor } from "./editor";
 
 export default async function EventTypePage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +32,7 @@ export default async function EventTypePage({ params }: { params: Promise<{ id: 
     <EventTypeEditor
       eventType={et}
       username={user.username}
+      appUrl={env.appUrl}
       resources={resources
         .filter((r) => r.active)
         .map((r) => ({ id: r.id, name: r.name, type: r.type, capacity: r.capacity }))}

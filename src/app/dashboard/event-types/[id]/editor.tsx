@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Plus, Trash2, GripVertical } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Check, Plus, Trash2, AlertTriangle } from "lucide-react";
 import type { EventType, EventLocation, BookingField } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,19 +21,61 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DeleteEventButton } from "../../_components/delete-event-button";
+import { CopyLinkButton } from "../../_components/copy-link-button";
 import { useToast } from "@/hooks/use-toast";
-import { LOCATION_OPTIONS } from "@/lib/locations";
+import { LOCATION_OPTIONS, isUnsupportedLocationType, locationOption } from "@/lib/locations";
 import { updateEventTypeAction } from "../actions";
 
 type Props = {
   eventType: EventType;
   username: string;
+  appUrl: string;
   resources: { id: number; name: string; type: string; capacity: number }[];
   selectedResourceIds: number[];
   categories: { id: number; name: string }[];
 };
 
-export function EventTypeEditor({ eventType, username, resources, selectedResourceIds, categories }: Props) {
+const BOOKING_FIELD_TYPE_OPTIONS: Array<{ value: BookingField["type"]; label: string }> = [
+  { value: "text", label: "Short text" },
+  { value: "textarea", label: "Long text" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "number", label: "Number" },
+  { value: "select", label: "Select" },
+  { value: "radio", label: "Single choice" },
+  { value: "checkbox", label: "Checkbox" },
+  { value: "multiselect", label: "Multiple choice" },
+];
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "meeting";
+}
+
+function moveItem<T>(items: T[], from: number, to: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+function parseAdditionalDurations(value: string, defaultLength: number): number[] {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((entry) => Number(entry.trim()))
+        .filter((n) => Number.isFinite(n) && n >= 5 && n <= 1440 && n !== defaultLength)
+        .map((n) => Math.round(n)),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+export function EventTypeEditor({ eventType, username, appUrl, resources, selectedResourceIds, categories }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -62,6 +104,8 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
     periodDays: eventType.periodDays,
     price: eventType.price,
     currency: eventType.currency,
+    requiresPayment: eventType.requiresPayment,
+    depositAmount: eventType.depositAmount,
     successRedirectUrl: eventType.successRedirectUrl ?? "",
   };
 
@@ -70,12 +114,22 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
   const [fields, setFields] = useState<BookingField[]>(eventType.bookingFields ?? []);
   const [resourceIds, setResourceIds] = useState<number[]>(selectedResourceIds);
 
+  const publicUrl = `${appUrl}/${username}/${form.slug}`;
+
   // Track whether the form is dirty (different from initial)
   const initial = JSON.stringify({ form: initialForm, locations: eventType.locations ?? [], fields: eventType.bookingFields ?? [], resourceIds: selectedResourceIds });
   const dirty = JSON.stringify({ form, locations, fields, resourceIds }) !== initial;
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setTitle(value: string) {
+    set("title", value);
+  }
+
+  function setSlug(value: string) {
+    set("slug", slugify(value));
   }
 
   function save() {
@@ -116,51 +170,58 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
   return (
     <div className="animate-fade-in space-y-6 pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Tooltip content="Back to event types">
-            <Button asChild variant="ghost" size="icon">
-              <Link href="/dashboard">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-          </Tooltip>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{form.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              /{username}/{form.slug}
-            </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Tooltip content="Back to services">
+              <Button asChild variant="ghost" size="icon">
+                <Link href="/dashboard/event-types">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+            </Tooltip>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">{form.title}</h1>
+              <p className="text-sm text-muted-foreground">
+                This is the page people book from.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <CopyLinkButton url={publicUrl} label={`/${username}/${form.slug}`} />
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${form.hidden ? "bg-secondary text-muted-foreground" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
+              {form.hidden ? "Hidden from public page" : "Publicly bookable"}
+            </span>
           </div>
         </div>
-        <Button onClick={save} loading={pending}>
-          <Check className="h-4 w-4" /> Save
-        </Button>
+        <div className="flex items-center gap-2 self-start">
+          <DeleteEventButton id={eventType.id} label={form.title} />
+          <Button onClick={save} loading={pending}>
+            <Check className="h-4 w-4" /> Save
+          </Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <DeleteEventButton id={eventType.id} label={form.title} />
-      </div>
-
-      <Tabs defaultValue="setup">
-        <TabsList className="mb-6">
-          <TabsTrigger value="setup">Setup</TabsTrigger>
-          <TabsTrigger value="limits">Limits</TabsTrigger>
-          <TabsTrigger value="questions">Questions</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced</TabsTrigger>
+      <Tabs defaultValue="basics">
+        <TabsList className="mb-6 flex-wrap">
+          <TabsTrigger value="basics">Basics</TabsTrigger>
+          <TabsTrigger value="availability">Availability</TabsTrigger>
+          <TabsTrigger value="questions">Booking form</TabsTrigger>
+          <TabsTrigger value="more">More</TabsTrigger>
         </TabsList>
 
-        {/* SETUP */}
-        <TabsContent value="setup" className="space-y-5">
-          <Section title="Details">
+        {/* BASICS */}
+        <TabsContent value="basics" className="space-y-5">
+          <Section title="Details" description="Start with the essentials people see before they book.">
             <Field label="Title">
-              <Input value={form.title} onChange={(e) => set("title", e.target.value)} />
+              <Input value={form.title} onChange={(e) => setTitle(e.target.value)} placeholder="30 Minute Consultation" />
             </Field>
             <Field label="URL slug">
               <div className="flex items-center rounded-md border border-input pl-3 text-sm text-muted-foreground">
                 <span className="select-none">/{username}/</span>
                 <input
                   value={form.slug}
-                  onChange={(e) => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                  onChange={(e) => setSlug(e.target.value)}
                   className="h-9 flex-1 bg-transparent px-1 text-foreground outline-none"
                 />
               </div>
@@ -174,99 +235,176 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
             </Field>
             {categories.length > 0 && (
               <Field label="Category">
-                <select
-                  value={form.categoryId ?? ""}
-                  onChange={(e) => set("categoryId", e.target.value === "" ? null : Number(e.target.value))}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                <Select
+                  value={form.categoryId === null ? "__none" : String(form.categoryId)}
+                  onValueChange={(value) => set("categoryId", value === "__none" ? null : Number(value))}
                 >
-                  <option value="">Uncategorised</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Uncategorised" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">Uncategorised</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
             )}
+
+            <Toggle
+              label="Show on your public booking page"
+              description="Turn this off if you only want to share the direct link manually."
+              checked={!form.hidden}
+              onChange={(checked) => set("hidden", !checked)}
+            />
           </Section>
 
-          <Section title="Duration">
-            <Field label="Default length (minutes)">
-              <Input
-                type="number"
-                min={5}
-                value={form.length}
-                onChange={(e) => set("length", Number(e.target.value))}
-                className="w-32"
-              />
-            </Field>
-          </Section>
-
-          <Section title="Location" description="Where the meeting takes place.">
-            <div className="space-y-2">
-              {locations.map((loc, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Select
-                    value={loc.type}
-                    onValueChange={(v) =>
-                      setLocations((ls) => ls.map((l, j) => (j === i ? ({ type: v } as EventLocation) : l)))
-                    }
-                  >
-                    <SelectTrigger className="w-72">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LOCATION_OPTIONS.map((o) => (
-                        <SelectItem key={o.type} value={o.type}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {loc.type === "in_person" && (
-                    <Input
-                      placeholder="Address"
-                      value={loc.address ?? ""}
-                      onChange={(e) =>
-                        setLocations((ls) =>
-                          ls.map((l, j) => (j === i ? { type: "in_person", address: e.target.value } : l)),
-                        )
-                      }
-                    />
-                  )}
-                  {loc.type === "link" && (
-                    <Input
-                      placeholder="https://…"
-                      value={loc.link ?? ""}
-                      onChange={(e) =>
-                        setLocations((ls) =>
-                          ls.map((l, j) => (j === i ? { type: "link", link: e.target.value } : l)),
-                        )
-                      }
-                    />
-                  )}
-                  {loc.type === "phone" && (
-                    <Input
-                      placeholder="Your phone number"
-                      value={loc.phone ?? ""}
-                      onChange={(e) =>
-                        setLocations((ls) =>
-                          ls.map((l, j) => (j === i ? { type: "phone", phone: e.target.value } : l)),
-                        )
-                      }
-                    />
-                  )}
-                  <Tooltip content="Remove location">
-                    <Button variant="ghost" size="icon" onClick={() => setLocations((ls) => ls.filter((_, j) => j !== i))}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </Tooltip>
-                </div>
+          <Section title="Duration" description="Offer one default duration or a few sensible choices.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Default length (minutes)">
+                <Input
+                  type="number"
+                  min={5}
+                  value={form.length}
+                  onChange={(e) => {
+                    const nextLength = Number(e.target.value);
+                    set("length", nextLength);
+                    set("durations", form.durations.filter((d) => d !== nextLength));
+                  }}
+                  className="w-32"
+                />
+              </Field>
+              <Field label="Extra bookable lengths (optional)">
+                <Input
+                  value={form.durations.join(", ")}
+                  onChange={(e) => set("durations", parseAdditionalDurations(e.target.value, form.length))}
+                  placeholder="15, 45, 60"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated minutes. The default length stays available automatically.
+                </p>
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[form.length, ...form.durations].sort((a, b) => a - b).map((minutes) => (
+                <span
+                  key={minutes}
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${minutes === form.length ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"}`}
+                >
+                  {minutes} min{minutes === form.length ? " · default" : ""}
+                </span>
               ))}
+            </div>
+          </Section>
+
+          <Section
+            title="Location"
+            description="Choose from the location types Tidetime supports today. Use a custom link for video calls."
+          >
+            <div className="space-y-3">
+              {locations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No location yet. Add one so attendees know where to meet.</p>
+              ) : null}
+              {locations.map((loc, i) => {
+                const currentOption = locationOption(loc.type);
+                const options = currentOption && isUnsupportedLocationType(loc.type)
+                  ? [currentOption, ...LOCATION_OPTIONS]
+                  : LOCATION_OPTIONS;
+                return (
+                  <div key={i} className="space-y-2 rounded-xl border border-border/60 p-3">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                      <Select
+                        value={loc.type}
+                        onValueChange={(v) =>
+                          setLocations((ls) =>
+                            ls.map((l, j) =>
+                              j === i
+                                ? v === "in_person"
+                                  ? { type: "in_person", address: "" }
+                                  : v === "phone"
+                                    ? { type: "phone", phone: "" }
+                                    : v === "link"
+                                      ? { type: "link", link: "" }
+                                      : ({ type: v } as EventLocation)
+                                : l,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-full md:w-72">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {options.map((o) => (
+                            <SelectItem key={o.type} value={o.type}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {loc.type === "in_person" ? (
+                        <Input
+                          placeholder="Address"
+                          value={loc.address ?? ""}
+                          onChange={(e) =>
+                            setLocations((ls) =>
+                              ls.map((l, j) => (j === i ? { type: "in_person", address: e.target.value } : l)),
+                            )
+                          }
+                        />
+                      ) : loc.type === "link" ? (
+                        <Input
+                          placeholder="https://…"
+                          value={loc.link ?? ""}
+                          onChange={(e) =>
+                            setLocations((ls) =>
+                              ls.map((l, j) => (j === i ? { type: "link", link: e.target.value } : l)),
+                            )
+                          }
+                        />
+                      ) : loc.type === "phone" ? (
+                        <Input
+                          placeholder="Your phone number"
+                          value={loc.phone ?? ""}
+                          onChange={(e) =>
+                            setLocations((ls) =>
+                              ls.map((l, j) => (j === i ? { type: "phone", phone: e.target.value } : l)),
+                            )
+                          }
+                        />
+                      ) : loc.type === "attendee_phone" ? (
+                        <div className="flex-1 rounded-md border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                          The attendee provides the call number during booking.
+                        </div>
+                      ) : (
+                        <div className="flex-1 rounded-md border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                          This provider is kept for legacy data only and is not connected in Tidetime.
+                        </div>
+                      )}
+                      <Tooltip content="Remove location">
+                        <Button variant="ghost" size="icon" onClick={() => setLocations((ls) => ls.filter((_, j) => j !== i))}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
+                    </div>
+                    {isUnsupportedLocationType(loc.type) ? (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p>
+                          Google Meet and Zoom accounts are not connected in Tidetime yet. Replace this with a custom link or a phone/in-person location.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setLocations((ls) => [...ls, { type: "google_meet" }])}
+                onClick={() => setLocations((ls) => [...ls, { type: "link", link: "" }])}
               >
                 <Plus className="h-4 w-4" /> Add location
               </Button>
@@ -274,8 +412,8 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
           </Section>
         </TabsContent>
 
-        {/* LIMITS */}
-        <TabsContent value="limits" className="space-y-5">
+        {/* AVAILABILITY */}
+        <TabsContent value="availability" className="space-y-5">
           <Section title="Buffers" description="Block time around your meetings.">
             <div className="grid grid-cols-2 gap-4">
               <Field label="Before event (min)">
@@ -398,15 +536,22 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
 
         {/* QUESTIONS */}
         <TabsContent value="questions" className="space-y-5">
-          <Section title="Booking questions" description="What attendees fill in when booking.">
+          <Section
+            title="Booking questions"
+            description="Ask only what you need. Name and email stay built in so every booking is workable."
+          >
             <div className="space-y-2">
               {fields.map((f, i) => {
                 const hasOptions = f.type === "select" || f.type === "radio" || f.type === "multiselect";
                 const priorFields = fields.filter((p, j) => j < i && p.name !== f.name);
+                const typeOptions = BOOKING_FIELD_TYPE_OPTIONS;
                 return (
-                  <div key={i} className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  <div key={i} className="space-y-3 rounded-xl border border-border/60 p-4">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground xl:w-32">
+                        <span className="rounded-full border border-border/60 px-2 py-1">Field {i + 1}</span>
+                        {f.system ? <span className="rounded-full bg-secondary px-2 py-1">System</span> : null}
+                      </div>
                       <Input
                         className="flex-1"
                         value={f.label}
@@ -417,12 +562,12 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                         disabled={f.system}
                         onValueChange={(v) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, type: v as BookingField["type"] } : x)))}
                       >
-                        <SelectTrigger className="w-36">
+                        <SelectTrigger className="w-full xl:w-44">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {["text", "textarea", "email", "phone", "number", "select", "radio", "checkbox", "multiselect", "file"].map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          {typeOptions.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -433,25 +578,47 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                         />
                         Required
                       </label>
-                      {!f.system && (
-                        <Tooltip content="Remove question">
-                          <Button variant="ghost" size="icon" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </Tooltip>
-                      )}
+                      {!f.system ? (
+                        <div className="flex items-center gap-1 self-start xl:self-auto">
+                          <Tooltip content="Move up">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={i === 0}
+                              onClick={() => setFields((fs) => moveItem(fs, i, i - 1))}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Move down">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={i === fields.length - 1}
+                              onClick={() => setFields((fs) => moveItem(fs, i, i + 1))}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Remove question">
+                            <Button variant="ghost" size="icon" onClick={() => setFields((fs) => fs.filter((_, j) => j !== i))}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </Tooltip>
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="flex items-center gap-3 pl-6">
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                       <Input
-                        className="h-8 flex-1"
+                        className="h-9"
                         placeholder="Placeholder text (optional)"
                         value={f.placeholder ?? ""}
                         onChange={(e) =>
                           setFields((fs) => fs.map((x, j) => (j === i ? { ...x, placeholder: e.target.value || undefined } : x)))
                         }
                       />
-                      {f.name !== "name" && f.name !== "email" && (
+                      {f.name !== "name" && f.name !== "email" ? (
                         <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
                           <Switch
                             checked={f.hidden ?? false}
@@ -459,11 +626,13 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                           />
                           Hidden
                         </label>
-                      )}
+                      ) : null}
                     </div>
 
+
+
                     {hasOptions && (
-                      <div className="pl-6">
+                      <div>
                         <Label className="text-xs text-muted-foreground">Options (one per line)</Label>
                         <Textarea
                           rows={3}
@@ -484,7 +653,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                     )}
 
                     {!f.system && priorFields.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 pl-6 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span>Show only when</span>
                         <Select
                           value={f.showWhen?.field ?? "__always"}
@@ -500,7 +669,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                             )
                           }
                         >
-                          <SelectTrigger className="h-8 w-40">
+                          <SelectTrigger className="h-8 w-44">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -512,11 +681,11 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                             ))}
                           </SelectContent>
                         </Select>
-                        {f.showWhen && (
+                        {f.showWhen ? (
                           <>
                             <span>equals</span>
                             <Input
-                              className="h-8 w-48"
+                              className="h-8 w-52"
                               placeholder="value1, value2"
                               value={f.showWhen.equals.join(", ")}
                               onChange={(e) =>
@@ -536,7 +705,7 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
                               }
                             />
                           </>
-                        )}
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -558,49 +727,74 @@ export function EventTypeEditor({ eventType, username, resources, selectedResour
           </Section>
         </TabsContent>
 
-        {/* ADVANCED */}
-        <TabsContent value="advanced" className="space-y-5">
-          <Section title="Booking behaviour">
+        {/* MORE */}
+        <TabsContent value="more" className="space-y-5">
+          <Section title="Booking behaviour" description="Extra controls that change how the service behaves.">
             <Toggle
               label="Requires confirmation"
-              description="You approve each booking before it's confirmed."
+              description="You approve each booking before it becomes confirmed."
               checked={form.requiresConfirmation}
               onChange={(c) => set("requiresConfirmation", c)}
             />
             <Separator />
             <Toggle
-              label="Hide from your public page"
-              description="Only reachable via direct link."
-              checked={form.hidden}
-              onChange={(c) => set("hidden", c)}
-            />
-            <Separator />
-            <Toggle
               label="Disable guests"
-              description="Attendees can't add extra guests."
+              description="Attendees can only book for themselves."
               checked={form.disableGuests}
               onChange={(c) => set("disableGuests", c)}
             />
           </Section>
 
-          <Section title="Payment" description="Charge attendees to book (Stripe).">
+          <Section
+            title="Pricing & payments"
+            description="Set a price and require payment before the booking is confirmed. Attendees pay securely via Stripe at checkout."
+          >
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Price (cents, 0 = free)">
+              <Field label="Price in cents (0 = free)">
                 <Input type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} />
               </Field>
               <Field label="Currency">
                 <Input value={form.currency} maxLength={3} onChange={(e) => set("currency", e.target.value.toLowerCase())} />
               </Field>
             </div>
+            {form.price > 0 && (
+              <>
+                <Separator />
+                <Toggle
+                  label="Require payment to confirm"
+                  description="When enabled, the time slot is held but the booking is only confirmed after successful payment."
+                  checked={form.requiresPayment}
+                  onChange={(c) => set("requiresPayment", c)}
+                />
+                {form.requiresPayment && (
+                  <Field label="Up-front deposit (cents, 0 = full price)">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={form.price}
+                      value={form.depositAmount}
+                      onChange={(e) => set("depositAmount", Number(e.target.value))}
+                      className="w-40"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Charge a deposit now with the balance due later. Leave at 0 to charge the full price.
+                    </p>
+                  </Field>
+                )}
+              </>
+            )}
           </Section>
 
-          <Section title="After booking">
+          <Section title="After booking" description="Optionally send attendees to a thank-you or intake page after they finish booking.">
             <Field label="Redirect URL (optional)">
               <Input
                 placeholder="https://…"
                 value={form.successRedirectUrl}
                 onChange={(e) => set("successRedirectUrl", e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                Attendees are still emailed their manage link even when you send them elsewhere after booking.
+              </p>
             </Field>
           </Section>
 

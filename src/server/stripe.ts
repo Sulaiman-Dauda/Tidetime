@@ -1,12 +1,13 @@
 import "server-only";
 import Stripe from "stripe";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { payments, bookings } from "@/db/schema";
+import { payments, bookings, eventTypes } from "@/db/schema";
 import { getStripeConfig } from "@/server/settings";
 import { shortId } from "@/lib/crypto";
 import { computeCharge, computeRefund, mapStripeStatus } from "@/lib/payments";
 import { logBookingActivity } from "./activity";
+import { runAcceptedBookingEffects, runPendingApprovalEffects } from "./booking-effects";
 
 let client: Stripe | null = null;
 let clientKey = "";
@@ -32,7 +33,7 @@ export async function stripe(): Promise<Stripe> {
 
 export async function isStripeEnabled(): Promise<boolean> {
   const config = await resolveStripe();
-  return Boolean(config?.secretKey);
+  return Boolean(config?.publishableKey && config?.secretKey && config?.webhookSecret);
 }
 
 export interface CreatePaymentInput {
@@ -72,7 +73,7 @@ export async function createBookingPayment(input: CreatePaymentInput): Promise<C
       currency: plan.currency,
       description: input.description,
       metadata: { bookingUid: input.bookingUid, paymentUid: uid },
-      automatic_payment_methods: { enabled: true },
+      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
     });
 
     await db.insert(payments).values({
@@ -92,31 +93,95 @@ export async function createBookingPayment(input: CreatePaymentInput): Promise<C
   }
 }
 
-/** Mark a payment paid and confirm its booking (idempotent). */
+/** Mark a payment paid and advance its booking to the correct next state. */
 export async function markPaymentPaid(externalId: string): Promise<void> {
   const [pay] = await db.select().from(payments).where(eq(payments.externalId, externalId)).limit(1);
   if (!pay || pay.status === "paid") return;
 
-  await db
-    .update(payments)
-    .set({ status: "paid", success: true })
-    .where(eq(payments.id, pay.id));
+  const [bookingRow] = await db
+    .select({
+      id: bookings.id,
+      eventTypeId: bookings.eventTypeId,
+      requiresConfirmation: eventTypes.requiresConfirmation,
+    })
+    .from(bookings)
+    .leftJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+    .where(eq(bookings.id, pay.bookingId))
+    .limit(1);
+  if (!bookingRow) return;
 
-  // Confirm the booking now that payment succeeded.
-  await db
-    .update(bookings)
-    .set({ paid: true, status: "accepted", updatedAt: new Date() })
-    .where(eq(bookings.id, pay.bookingId));
+  const nextStatus = bookingRow.requiresConfirmation ? "pending" : "accepted";
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(payments)
+      .set({ status: "paid", success: true })
+      .where(eq(payments.id, pay.id));
+
+    await tx
+      .update(bookings)
+      .set({ paid: true, status: nextStatus, updatedAt: new Date() })
+      .where(eq(bookings.id, pay.bookingId));
+  });
 
   await logBookingActivity(pay.bookingId, "payment_succeeded", {
-    message: "Payment received and booking confirmed",
+    message:
+      nextStatus === "accepted"
+        ? "Payment received and booking confirmed"
+        : "Payment received; awaiting host approval",
     data: { amount: pay.amount, currency: pay.currency },
   });
+
+  if (nextStatus === "accepted") {
+    await runAcceptedBookingEffects(pay.bookingId);
+  } else {
+    await runPendingApprovalEffects(pay.bookingId);
+  }
 }
 
 /** Mark a payment failed without confirming the booking. */
 export async function markPaymentFailed(externalId: string): Promise<void> {
-  await db.update(payments).set({ status: "failed", success: false }).where(eq(payments.externalId, externalId));
+  await db
+    .update(payments)
+    .set({ status: "failed", success: false })
+    .where(eq(payments.externalId, externalId));
+}
+
+export interface CompletePaymentResult {
+  ok: boolean;
+  status?: "succeeded" | "processing";
+  error?: string;
+}
+
+/** Verify a PaymentIntent belongs to the booking and finalise it if succeeded. */
+export async function completeBookingPayment(
+  bookingUid: string,
+  paymentIntentId: string,
+): Promise<CompletePaymentResult> {
+  try {
+    const intent = await (await stripe()).paymentIntents.retrieve(paymentIntentId);
+    if (intent.metadata?.bookingUid !== bookingUid) {
+      return { ok: false, error: "This payment does not match the booking." };
+    }
+
+    if (intent.status === "succeeded") {
+      await markPaymentPaid(intent.id);
+      return { ok: true, status: "succeeded" };
+    }
+
+    if (intent.status === "processing") {
+      return { ok: false, status: "processing", error: "Payment is still processing." };
+    }
+
+    if (intent.status === "canceled") {
+      await markPaymentFailed(intent.id);
+      return { ok: false, error: "Payment was cancelled." };
+    }
+
+    return { ok: false, error: "Payment has not completed yet." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not verify payment" };
+  }
 }
 
 export interface RefundResult {
@@ -127,7 +192,12 @@ export interface RefundResult {
 
 /** Refund a booking's payment (full or partial). */
 export async function refundBookingPayment(bookingId: number, amount?: number): Promise<RefundResult> {
-  const [pay] = await db.select().from(payments).where(eq(payments.bookingId, bookingId)).limit(1);
+  const [pay] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.bookingId, bookingId))
+    .orderBy(desc(payments.createdAt))
+    .limit(1);
   if (!pay) return { ok: false, error: "No payment found for booking" };
   if (pay.status !== "paid") return { ok: false, error: "Payment is not in a refundable state" };
   if (!pay.externalId) return { ok: false, error: "Payment has no Stripe reference" };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTeamEventType, getTeamSlots, groupTeamSlotsByDay } from "@/server/teams-public";
 import { isValidTimeZone } from "@/lib/time";
+import { isBookingDisabled } from "@/server/company-settings";
 
 const MAX_PUBLIC_RANGE_DAYS = 93;
 
@@ -16,6 +17,10 @@ export async function GET(req: NextRequest) {
   const slug = sp.get("slug");
   if (!teamSlug || !slug) {
     return NextResponse.json({ error: "Missing team or slug" }, { status: 400 });
+  }
+
+  if (await isBookingDisabled()) {
+    return NextResponse.json({ error: "Booking is temporarily disabled" }, { status: 503 });
   }
 
   const resolved = await getTeamEventType(teamSlug, slug);

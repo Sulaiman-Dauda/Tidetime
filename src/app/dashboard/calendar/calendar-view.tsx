@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarX2, ExternalLink } from "lucide-react";
@@ -80,7 +80,17 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
   }, [events, timeZone]);
 
   const todayKey = localDayKey(new Date());
-  const [selected, setSelected] = useState<string | null>(todayKey);
+  const defaultSelected = useMemo(() => {
+    const visibleDays = rows.flat().filter((d): d is Date => Boolean(d)).map((d) => localDayKey(d));
+    if (visibleDays.includes(todayKey)) return todayKey;
+    const firstWithEvents = visibleDays.find((key) => (byDay.get(key)?.length ?? 0) > 0);
+    return firstWithEvents ?? visibleDays[0] ?? null;
+  }, [rows, todayKey, byDay]);
+  const [selected, setSelected] = useState<string | null>(defaultSelected);
+
+  useEffect(() => {
+    setSelected(defaultSelected);
+  }, [defaultSelected]);
 
   const prev = month === 0 ? monthKey(year - 1, 11) : monthKey(year, month - 1);
   const next = month === 11 ? monthKey(year + 1, 0) : monthKey(year, month + 1);
@@ -213,7 +223,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
               selectedEvents.map((e) => (
                 <Link
                   key={e.uid}
-                  href={`/booking/${e.uid}` as Route}
+                  href={`/dashboard/bookings/${e.uid}` as Route}
                   className="group block rounded-lg border border-border/50 bg-card p-3 transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -244,7 +254,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
                     ) : null}
                   </div>
                   <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                    Open booking <ExternalLink className="h-3 w-3" />
+                    Open details <ExternalLink className="h-3 w-3" />
                   </span>
                 </Link>
               ))

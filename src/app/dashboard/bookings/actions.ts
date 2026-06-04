@@ -20,6 +20,7 @@ export async function decideBookingAction(formData: FormData) {
   if (!parsed.success) return;
   await decideBooking(parsed.data.uid, parsed.data.decision, user.id);
   revalidatePath("/dashboard/bookings");
+  revalidatePath(`/dashboard/bookings/${parsed.data.uid}`);
 }
 
 export async function cancelByHostAction(formData: FormData) {
@@ -29,4 +30,5 @@ export async function cancelByHostAction(formData: FormData) {
   const reason = formData.get("reason");
   await cancelBooking(uid, typeof reason === "string" ? reason : undefined);
   revalidatePath("/dashboard/bookings");
+  revalidatePath(`/dashboard/bookings/${uid}`);
 }

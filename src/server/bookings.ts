@@ -1,19 +1,14 @@
 import "server-only";
 import { and, eq, gte, lt, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, attendees, eventTypes, eventTypeHosts, users, type BookingField } from "@/db/schema";
+import { bookings, attendees, eventTypes, eventTypeHosts, teams, users, bookingReferences, type BookingField } from "@/db/schema";
 import { checkTeamCapacity, CAPACITY_MESSAGES, type CapacityRule } from "@/lib/team-availability";
 import { shortId } from "@/lib/crypto";
 import { getPublicEventType, isSlotBookable, type ResolvedEventType } from "./availability";
 import { resolveLocation } from "@/lib/locations";
-import { generateIcs, bookingIcalUid } from "@/lib/ics";
 import { sendMail } from "./mailer";
 import {
-  bookingConfirmedAttendee,
-  bookingConfirmedHost,
-  bookingPendingAttendee,
   bookingCancelledAttendee,
-  bookingRescheduledAttendee,
   bookingSeriesConfirmedAttendee,
   type EmailBookingView,
 } from "./emails";
@@ -24,12 +19,15 @@ import { createBookingPayment, refundBookingPayment } from "./stripe";
 import { resolveBookingLink, consumeBookingLink } from "./booking-links";
 import { reserveResourcesForBooking } from "./resources";
 import { getTeamEventType } from "./teams-public";
+import { deleteGoogleCalendarEvent } from "./google-calendar";
 import { validateResponses as validateFieldResponses, type FieldValues } from "@/lib/booking-fields";
 import { normalizeRecurringRule, expandRecurrence } from "@/lib/recurrence";
 import { logBookingActivity } from "./activity";
 import { upsertCustomerFromBooking } from "./customers";
 import { env } from "@/lib/env";
 import { isValidTimeZone } from "@/lib/time";
+import { runAcceptedBookingEffects, runPendingApprovalEffects } from "./booking-effects";
+import { expireStalePaymentHolds } from "./payment-holds";
 
 export interface CreateBookingInput {
   username: string;
@@ -222,7 +220,6 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   // Team scheduling: pick the host(s) for this slot via round-robin/collective.
   let assignedUserId = eventType.userId;
   let assignedHost = { id: host.id, name: host.name, username: host.username };
-  let coHostUserIds: number[] = [];
   if (eventType.schedulingType === "round_robin" || eventType.schedulingType === "collective") {
     const assignment = await assignTeamHosts(
       eventType.id,
@@ -234,7 +231,6 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     );
     if (!assignment) return { ok: false, error: "No host is available for that time" };
     assignedUserId = assignment.hostUserId;
-    coHostUserIds = assignment.coHostUserIds;
     const [u] = await db
       .select({ id: users.id, name: users.name, username: users.username })
       .from(users)
@@ -246,8 +242,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   const attendeePhone = typeof input.responses.phone === "string" ? input.responses.phone : undefined;
   const { location, meetingUrl } = resolveLocation(eventType.locations[0], attendeePhone);
 
-  // Paid events stay unconfirmed until Stripe confirms the payment.
   const needsPayment = eventType.requiresPayment && eventType.price > 0;
+
+  // Paid bookings stay pending until payment succeeds. If confirmation is also
+  // required, they remain pending after payment and only move to accepted when
+  // the host approves them.
   const status = needsPayment || eventType.requiresConfirmation ? "pending" : "accepted";
   const uid = shortId(12);
   const notes = typeof input.responses.notes === "string" ? (input.responses.notes as string) : null;
@@ -322,22 +321,25 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     return { ok: false, error: "A required resource is no longer available for that time" };
   }
 
-  // If this is a reschedule, cancel the original booking.
-  if (input.rescheduleUid) {
-    await db
-      .update(bookings)
-      .set({ status: "cancelled", cancellationReason: "Rescheduled", updatedAt: new Date() })
-      .where(eq(bookings.uid, input.rescheduleUid));
-  }
+  const tasks: Promise<unknown>[] = [
+    logBookingActivity(bookingId, input.rescheduleUid ? "rescheduled" : "created", {
+      actor: input.name,
+      message: input.rescheduleUid ? "Rescheduled to a new time" : `Booked by ${input.name}`,
+    }),
+    upsertCustomerFromBooking({
+      userId: assignedUserId,
+      teamId: teamCapacity?.teamId ?? null,
+      email: input.email,
+      name: input.name,
+      phoneNumber: attendeePhone ?? null,
+      timeZone: input.timeZone,
+      bookedAt: start,
+    }),
+  ];
+  await Promise.allSettled(tasks);
 
-  // Mark a temporary booking link as used (the slot is now reserved).
-  if (input.bookingLinkToken) {
-    await consumeBookingLink(input.bookingLinkToken);
-  }
-
-  // Paid events: create a Stripe PaymentIntent. The booking is confirmed by the
-  // Stripe webhook once payment succeeds — we return the client secret so the
-  // front-end can complete the charge.
+  // Paid events: create a Stripe PaymentIntent. The slot is held for checkout,
+  // but the booking only moves forward once payment succeeds.
   if (needsPayment) {
     const pay = await createBookingPayment({
       bookingId,
@@ -348,91 +350,28 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       description: `${eventType.title} — ${assignedHost.name ?? assignedHost.username}`,
     });
     if (!pay.ok) {
-      // Roll back the unpaid booking so the slot is freed.
-      await db.update(bookings).set({ status: "cancelled", cancellationReason: "Payment setup failed" }).where(eq(bookings.id, bookingId));
+      await db
+        .update(bookings)
+        .set({ status: "cancelled", cancellationReason: "Payment setup failed" })
+        .where(eq(bookings.id, bookingId));
       return { ok: false, error: pay.error ?? "Could not start payment" };
+    }
+    if (input.bookingLinkToken) {
+      await consumeBookingLink(input.bookingLinkToken);
     }
     return { ok: true, uid, requiresPayment: true, paymentClientSecret: pay.clientSecret };
   }
 
-  // Schedule reminder jobs for this booking (best-effort).
-  if (assignedUserId && status === "accepted") {
-    await scheduleRemindersForBooking(bookingId, assignedUserId, eventType.id, start);
+  if (input.bookingLinkToken) {
+    await consumeBookingLink(input.bookingLinkToken);
   }
 
-  // Notifications (best-effort, non-blocking for the booker).
-  const hostName = assignedHost.name ?? assignedHost.username;
-  const ics = generateIcs({
-    uid: bookingIcalUid(uid),
-    start,
-    end,
-    summary: eventType.title,
-    description: notes ?? undefined,
-    location: meetingUrl ?? location,
-    organizer: { name: hostName, email: `${assignedHost.username}@tidetime` },
-    attendees: [{ name: input.name, email: input.email }],
-    url: meetingUrl ?? undefined,
-    status: "CONFIRMED",
-  });
-
-  const [hostUser] = await db.select({ email: users.email, timeFormat: users.timeFormat }).from(users).where(eq(users.id, assignedHost.id)).limit(1);
-  const hour12 = (hostUser?.timeFormat ?? 12) === 12;
-
-  const attendeeView = buildEmailView({ eventType, hostName, attendeeName: input.name, start, end, timeZone: input.timeZone, location, meetingUrl, notes, uid, hour12: true });
-  const hostView = buildEmailView({ eventType, hostName, attendeeName: input.name, start, end, timeZone: eventType.hostTimeZone, location, meetingUrl, notes, uid, hour12 });
-
-  const tasks: Promise<unknown>[] = [];
   if (status === "accepted") {
-    const a = input.rescheduleUid ? bookingRescheduledAttendee(attendeeView) : bookingConfirmedAttendee(attendeeView);
-    tasks.push(sendMail({ to: input.email, subject: a.subject, html: a.html, icalEvent: { method: "REQUEST", content: ics } }));
-    if (hostUser) {
-      const h = bookingConfirmedHost(hostView);
-      tasks.push(sendMail({ to: hostUser.email, subject: h.subject, html: h.html, icalEvent: { method: "REQUEST", content: ics } }));
-    }
+    await runAcceptedBookingEffects(bookingId);
   } else {
-    const a = bookingPendingAttendee(attendeeView);
-    tasks.push(sendMail({ to: input.email, subject: a.subject, html: a.html }));
-    if (hostUser) {
-      const h = bookingConfirmedHost(hostView);
-      tasks.push(sendMail({ to: hostUser.email, subject: `Approval needed: ${h.subject}`, html: h.html }));
-    }
+    await runPendingApprovalEffects(bookingId);
   }
 
-  if (assignedUserId) {
-    tasks.push(
-      dispatchWebhook(assignedUserId, input.rescheduleUid ? "booking_rescheduled" : status === "pending" ? "booking_requested" : "booking_created", {
-        uid,
-        eventTypeId: eventType.id,
-        title: eventType.title,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        attendee: { name: input.name, email: input.email, timeZone: input.timeZone },
-        coHosts: coHostUserIds,
-        status,
-      }),
-    );
-  }
-
-  tasks.push(
-    logBookingActivity(bookingId, input.rescheduleUid ? "rescheduled" : "created", {
-      actor: input.name,
-      message: input.rescheduleUid ? "Rescheduled to a new time" : `Booked by ${input.name}`,
-    }),
-  );
-
-  tasks.push(
-    upsertCustomerFromBooking({
-      userId: assignedUserId,
-      teamId: teamCapacity?.teamId ?? null,
-      email: input.email,
-      name: input.name,
-      phoneNumber: attendeePhone ?? null,
-      timeZone: input.timeZone,
-      bookedAt: start,
-    }),
-  );
-
-  await Promise.allSettled(tasks);
   return { ok: true, uid };
 }
 
@@ -631,6 +570,19 @@ export async function cancelBooking(
     message: reason ? `Cancelled: ${reason}` : "Booking cancelled",
   });
 
+  // Delete Google Calendar event for this booking (best-effort).
+  if (b.userId) {
+    const [ref] = await db
+      .select({ uid: bookingReferences.uid, externalCalendarId: bookingReferences.externalCalendarId })
+      .from(bookingReferences)
+      .where(and(eq(bookingReferences.bookingId, b.id), eq(bookingReferences.type, "google_calendar")))
+      .limit(1);
+    if (ref) {
+      await deleteGoogleCalendarEvent(b.userId, ref.uid, ref.externalCalendarId).catch(() => undefined);
+      await db.delete(bookingReferences).where(eq(bookingReferences.bookingId, b.id));
+    }
+  }
+
   // Refund any captured payment for this booking (best-effort).
   if (b.paid) {
     await refundBookingPayment(b.id).catch(() => undefined);
@@ -671,6 +623,18 @@ export async function decideBooking(uid: string, decision: "accepted" | "rejecte
   if (!b || b.userId !== hostUserId) return { ok: false, error: "Not found" };
   if (b.status !== "pending") return { ok: false, error: "Booking is not pending" };
 
+  const [et] = b.eventTypeId
+    ? await db
+        .select({ requiresPayment: eventTypes.requiresPayment })
+        .from(eventTypes)
+        .where(eq(eventTypes.id, b.eventTypeId))
+        .limit(1)
+    : [{ requiresPayment: false }];
+
+  if (decision === "accepted" && et?.requiresPayment && !b.paid) {
+    return { ok: false, error: "This booking is still waiting for payment" };
+  }
+
   await db.update(bookings).set({ status: decision, updatedAt: new Date() }).where(eq(bookings.id, b.id));
 
   await logBookingActivity(b.id, decision === "accepted" ? "confirmed" : "rejected", {
@@ -678,53 +642,49 @@ export async function decideBooking(uid: string, decision: "accepted" | "rejecte
     message: decision === "accepted" ? "Booking approved by host" : "Booking declined by host",
   });
 
-  const ats = await db.select().from(attendees).where(and(eq(attendees.bookingId, b.id), eq(attendees.isPrimary, true)));
-  const primary = ats[0];
-  if (primary) {
-    if (decision === "accepted") {
-      const ics = generateIcs({
-        uid: bookingIcalUid(uid),
-        start: b.startTime,
-        end: b.endTime,
-        summary: b.title,
-        location: b.meetingUrl ?? b.location ?? undefined,
-        attendees: [{ name: primary.name, email: primary.email }],
-        status: "CONFIRMED",
-      });
-      const view: EmailBookingView = {
-        title: b.title,
-        start: b.startTime,
-        end: b.endTime,
-        timeZone: primary.timeZone,
-        hostName: "your host",
-        attendeeName: primary.name,
-        location: b.location ?? "Online",
-        meetingUrl: b.meetingUrl,
-        manageUrl: `${env.appUrl}/booking/${uid}`,
-      };
-      const m = bookingConfirmedAttendee(view);
-      await sendMail({ to: primary.email, subject: m.subject, html: m.html, icalEvent: { method: "REQUEST", content: ics } });
+  if (decision === "accepted") {
+    await runAcceptedBookingEffects(b.id);
+  } else {
+    if (b.paid) {
+      await refundBookingPayment(b.id).catch(() => undefined);
     }
+    await dispatchWebhook(hostUserId, "booking_rejected", { uid });
   }
 
-  await dispatchWebhook(hostUserId, decision === "accepted" ? "booking_created" : "booking_rejected", { uid });
   return { ok: true, uid };
 }
 
 /** Fetch a booking with attendees for the public manage page. */
 export async function getBookingByUid(uid: string) {
+  await expireStalePaymentHolds();
   const [b] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!b) return null;
   const ats = await db.select().from(attendees).where(eq(attendees.bookingId, b.id));
   let host: { username: string; name: string | null; avatarUrl: string | null } | null = null;
   let slug: string | null = null;
+  let team: { slug: string; name: string } | null = null;
+  let eventTypeMeta: { requiresPayment: boolean } | null = null;
   if (b.userId) {
     const [u] = await db.select({ username: users.username, name: users.name, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, b.userId)).limit(1);
     host = u ?? null;
   }
   if (b.eventTypeId) {
-    const [et] = await db.select({ slug: eventTypes.slug }).from(eventTypes).where(eq(eventTypes.id, b.eventTypeId)).limit(1);
+    const [et] = await db
+      .select({ slug: eventTypes.slug, teamId: eventTypes.teamId, requiresPayment: eventTypes.requiresPayment })
+      .from(eventTypes)
+      .where(eq(eventTypes.id, b.eventTypeId))
+      .limit(1);
     slug = et?.slug ?? null;
+    eventTypeMeta = et ? { requiresPayment: et.requiresPayment } : null;
+
+    if (et?.teamId) {
+      const [teamRow] = await db
+        .select({ slug: teams.slug, name: teams.name })
+        .from(teams)
+        .where(eq(teams.id, et.teamId))
+        .limit(1);
+      team = teamRow ?? null;
+    }
   }
-  return { booking: b, attendees: ats, host, slug };
+  return { booking: b, attendees: ats, host, slug, team, eventType: eventTypeMeta };
 }

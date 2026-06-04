@@ -89,9 +89,9 @@ Legend: ✅ Complete · 🟡 Partial · ❌ Missing
 | Conflict detection                         | ✅         | ✅        | ✅      | ✅       | ✅      | ✅      |
 | Email notifications                        | ✅         | ✅        | ✅      | ✅       | ✅      | ✅      |
 | SMS notifications                          | 🟡         | ❌        | ✅      | ✅       | ✅      | ✅      |
-| Payments (Stripe) + deposits               | ✅         | ❌        | ✅      | ✅       | ✅      | ✅      |
+| Payments (Stripe) + deposits               | 🟡         | ❌        | ✅      | ✅       | ✅      | ✅      |
 | Custom + conditional booking fields        | ✅         | 🟡        | ✅      | ✅       | ✅      | 🟡      |
-| File uploads in forms                      | ✅         | ❌        | 🟡      | ✅       | 🟡      | ❌      |
+| File uploads in forms                      | ❌         | ❌        | 🟡      | ✅       | 🟡      | ❌      |
 | Inline / popup / floating widgets          | ✅         | 🟡        | ✅      | ✅       | ✅      | ✅      |
 | Public / team / provider links             | ✅         | ✅        | ✅      | ✅       | ✅      | ✅      |
 | Temporary / one-time / expiring links      | ✅         | ❌        | ✅      | 🟡       | 🟡      | ❌      |
@@ -122,8 +122,9 @@ Legend: ✅ Complete · 🟡 Partial · ❌ Missing
 
 ### Optional / already present (no work needed)
 
-- Seats, round-robin, collective, payments + deposits, booking links, conditional fields, file
-  uploads, custom branding, webhooks, REST API + keys, analytics, CSV — already shipped.
+- Seats, round-robin, collective, booking links, conditional fields, custom branding, webhooks,
+  REST API + keys, analytics, CSV — shipped.
+- Stripe checkout is now live for paid bookings. Deposits still need more UX polish, and booking-form file uploads are intentionally not part of the product.
 - SMS and full two-way calendar sync remain **adapter stubs** by design (avoid mandatory paid
   third-party dependencies in the lean self-hosted default; pluggable when a provider is added).
 - Recurring bookings: schema + slot rule exist; multi-occurrence UI is a follow-up.

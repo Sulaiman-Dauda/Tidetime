@@ -8,8 +8,9 @@ This guide covers the recommended production deployment patterns for Tidetime.
 - PostgreSQL 14+
 - a stable `APP_URL`
 - a strong `AUTH_SECRET`
-- SMTP and Stripe configured via Settings UI (optional)
-- optional Stripe credentials for paid bookings
+- SMTP configured via Settings UI (optional)
+- optional Stripe credentials in Settings if you want paid bookings
+- optional `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` if you want Google Calendar sync
 
 ## Required production environment
 
@@ -27,6 +28,13 @@ Generate a secret with:
 
 ```bash
 openssl rand -base64 32
+```
+
+If you want Google Calendar sync, also set:
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
 ```
 
 ## Docker Compose deployment
@@ -106,8 +114,6 @@ GET /api/health
 
 A healthy instance returns HTTP 200 with a successful database check. If the database is unavailable, the endpoint returns HTTP 503.
 
-## Email delivery
-
 ## Email (SMTP)
 
 Configure SMTP via the Settings UI (navigate to Settings → Email after logging in as admin).
@@ -115,10 +121,26 @@ Credentials are encrypted at rest in the database.
 
 If no SMTP is configured, emails are logged to the console instead of being sent.
 
+## Google Calendar
+
+To enable Google Calendar sync:
+
+1. set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the app environment
+2. restart the app
+3. connect each provider account in **Settings → Google Calendar**
+
+Tidetime reads busy time from the selected Google calendars and creates booking events on the chosen destination calendar.
+
 ## Stripe
 
-To enable paid bookings, configure Stripe via the Settings UI (Settings → Payments).
-Both the secret key and webhook secret are encrypted at rest.
+Stripe credentials can be stored and tested via the Settings UI (Settings → Stripe).
+The publishable key, secret key, and webhook secret are encrypted at rest. Paid-booking checkout is live for services with **Require payment** enabled.
+
+For production, configure your Stripe webhook to send `payment_intent.*` events to:
+
+```text
+POST /api/stripe/webhook
+```
 
 ## Backups
 
@@ -127,6 +149,29 @@ Back up PostgreSQL regularly. At minimum:
 - schedule logical backups (`pg_dump`) or physical snapshots
 - test restores periodically
 - keep backups encrypted and off-host
+
+Example logical backup from Docker Compose:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  pg_dump -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tidetime} \
+  | gzip > tidetime-$(date +%F).sql.gz
+```
+
+Example restore into a fresh database:
+
+```bash
+gunzip -c tidetime-2026-06-04.sql.gz | \
+  docker compose -f docker-compose.prod.yml exec -T postgres \
+  psql -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tidetime}
+```
+
+After every restore, verify:
+
+- you can log in as an admin
+- `/api/health` returns `200`
+- a public booking page loads successfully
+- reminder jobs still run on schedule
 
 ## Upgrades
 
@@ -147,6 +192,7 @@ Before going live, confirm:
 - [ ] `AUTH_SECRET` is long and unique
 - [ ] PostgreSQL backups are configured
 - [ ] SMTP configured and tested (Settings → Email)
-- [ ] Stripe webhook delivery is verified if payments are enabled
+- [ ] Stripe credentials and webhook delivery are verified if you plan to use paid bookings
+- [ ] `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set if you plan to use Google Calendar sync
 - [ ] the reminder worker is scheduled
 - [ ] `/api/health` is monitored

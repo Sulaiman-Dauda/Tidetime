@@ -17,7 +17,7 @@ export default async function SetupPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl">Welcome to Tidetime</CardTitle>
           <CardDescription>
-            Create the owner account for this instance. You can invite others later.
+            Create the owner account for this instance. Next, you’ll create your first service and share its booking link.
           </CardDescription>
         </CardHeader>
         <CardContent>

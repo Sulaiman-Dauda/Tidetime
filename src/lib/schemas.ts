@@ -52,7 +52,6 @@ export const bookingFieldTypeSchema = z.enum([
   "radio",
   "checkbox",
   "multiselect",
-  "file",
 ]);
 
 export const bookingFieldConditionSchema = z.object({
@@ -79,8 +78,6 @@ export const bookingFieldSchema = z
     placeholder: optionalTrimmedString(200),
     options: z.array(z.string().trim().min(1).max(100)).max(100).optional(),
     showWhen: bookingFieldConditionSchema.optional(),
-    accept: optionalTrimmedString(200),
-    maxSize: z.number().int().positive().max(50 * 1024 * 1024).optional(),
     system: z.boolean().optional(),
     hidden: z.boolean().optional(),
   })

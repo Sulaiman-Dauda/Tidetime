@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   teams,
@@ -20,6 +20,8 @@ export interface TeamEventView {
   description: string | null;
   length: number;
   schedulingType: string | null;
+  scheduleTimeZone: string;
+  nextAvailable: string | null;
 }
 
 /** Resolve a team by its public slug. */
@@ -31,17 +33,43 @@ export async function getPublicTeam(slug: string): Promise<Team | null> {
 /** List a team's visible event types for its public landing page. */
 export async function getTeamEventTypes(teamId: number): Promise<TeamEventView[]> {
   const rows = await db
-    .select({
-      id: eventTypes.id,
-      slug: eventTypes.slug,
-      title: eventTypes.title,
-      description: eventTypes.description,
-      length: eventTypes.length,
-      schedulingType: eventTypes.schedulingType,
-    })
+    .select({ et: eventTypes, scheduleTz: schedules.timeZone })
     .from(eventTypes)
-    .where(and(eq(eventTypes.teamId, teamId), eq(eventTypes.hidden, false)));
-  return rows;
+    .leftJoin(schedules, eq(eventTypes.scheduleId, schedules.id))
+    .where(and(eq(eventTypes.teamId, teamId), eq(eventTypes.hidden, false)))
+    .orderBy(asc(eventTypes.position), asc(eventTypes.id));
+
+  const now = new Date();
+  const rangeEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const nextById = new Map(
+    await Promise.all(
+      rows.map(async ({ et, scheduleTz }) => {
+        const resolved: ResolvedEventType = {
+          ...et,
+          hostTimeZone: scheduleTz ?? "UTC",
+          scheduleTimeZone: scheduleTz ?? "UTC",
+        };
+        const next = await getTeamSlots({
+          eventType: resolved,
+          rangeStart: now,
+          rangeEnd,
+        });
+        return [et.id, next[0]?.time ?? null] as const;
+      }),
+    ),
+  );
+
+  return rows.map(({ et, scheduleTz }) => ({
+    id: et.id,
+    slug: et.slug,
+    title: et.title,
+    description: et.description,
+    length: et.length,
+    schedulingType: et.schedulingType,
+    scheduleTimeZone: scheduleTz ?? "UTC",
+    nextAvailable: nextById.get(et.id) ?? null,
+  }));
 }
 
 /** Load a single team event type by team slug + event slug. */

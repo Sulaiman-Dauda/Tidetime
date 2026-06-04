@@ -1,4 +1,4 @@
-import { getZonedParts } from "./time";
+import { addDaysToKey, formatDateKey, getZonedParts } from "./time";
 
 /** Render a UTC instant as a localized time string in a given zone. */
 export function formatTime(date: Date, timeZone: string, hour12 = true): string {
@@ -61,4 +61,23 @@ export function todayKey(timeZone: string): string {
   const p = getZonedParts(new Date(), timeZone);
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+/** Human booking-page label for the next available slot in a timezone. */
+export function formatNextAvailable(date: Date, timeZone: string, hour12 = true): string {
+  const key = formatDateKey(date, timeZone);
+  const today = todayKey(timeZone);
+  const tomorrow = addDaysToKey(today, 1);
+  const time = formatTime(date, timeZone, hour12);
+
+  if (key === today) return `Today · ${time}`;
+  if (key === tomorrow) return `Tomorrow · ${time}`;
+
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+  return `${label} · ${time}`;
 }

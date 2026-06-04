@@ -23,7 +23,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard/analytics": "Analytics",
   "/dashboard/reviews": "Reviews",
   "/dashboard/teams": "Teams",
-  "/dashboard/integrations": "Integrations",
+  "/dashboard/integrations": "Connections",
   "/dashboard/account": "Profile settings",
   "/dashboard/settings": "Settings",
   "/dashboard/blocked-periods": "Blocked Periods",

@@ -105,6 +105,7 @@
 }
 
 /* Subtle dot-grid backdrop */
+.bg-grid,
 .bg-dot-grid {
   background-image: radial-gradient(circle, hsl(var(--border) / 0.5) 1px, transparent 1px);
   background-size: 28px 28px;

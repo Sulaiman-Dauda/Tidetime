@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { randomToken, sha256 } from "./crypto";
 
-const COOKIE_NAME = "tidetime_session";
+const COOKIE_NAME = process.env.NODE_ENV === "production" ? "__Host-tidetime_session" : "tidetime_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
 /** Create a new session for a user and set the cookie. */

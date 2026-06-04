@@ -14,7 +14,6 @@ import {
   Star,
   Users,
   Building2,
-  Plug2,
   Settings2,
   UserCog,
   Tags,
@@ -51,7 +50,6 @@ const PAGES = [
   { href: "/dashboard/reviews", label: "Reviews", icon: Star, group: "Grow" },
   { href: "/dashboard/teams", label: "Teams", icon: Building2, group: "Grow" },
   { href: "/dashboard/settings", label: "Settings", icon: Settings2, group: "Admin" },
-  { href: "/dashboard/integrations", label: "Integrations", icon: Plug2, group: "Admin" },
   { href: "/dashboard/blocked-periods", label: "Blocked Periods", icon: CalendarOff, group: "Admin" },
   { href: "/dashboard/account", label: "Profile settings", icon: UserCog, group: "Account" },
 ];

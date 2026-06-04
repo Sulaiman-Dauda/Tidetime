@@ -5,7 +5,9 @@ import { getBookingByUid } from "@/server/bookings";
 import { formatRange } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CancelBooking } from "./cancel";
-import { CalendarCheck, Clock, MapPin, User, AlertCircle, CalendarClock, XCircle } from "lucide-react";
+import { CompanyBrandHeader } from "../../_components/company-brand-header";
+import { PublicLegal } from "../../_components/public-legal";
+import { CalendarCheck, Clock, MapPin, User, Mail, AlertCircle, CalendarClock, XCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 
@@ -20,25 +22,33 @@ export default async function BookingDetailPage({ params }: Props) {
   const data = await getBookingByUid(uid);
   if (!data) notFound();
 
-  const { booking, attendees, host, slug } = data;
+  const { booking, attendees, host, slug, team, eventType } = data;
   const primary = attendees.find((a) => a.isPrimary) ?? attendees[0];
   const tz = primary?.timeZone ?? "UTC";
   const when = formatRange(booking.startTime, booking.endTime, tz);
 
   const cancelled = booking.status === "cancelled" || booking.status === "rejected";
-  const pending = booking.status === "pending";
+  const awaitingPayment = booking.status === "pending" && Boolean(eventType?.requiresPayment) && !booking.paid;
+  const pending = booking.status === "pending" && !awaitingPayment;
 
   const status = cancelled
     ? { icon: XCircle, label: "Cancelled", cls: "text-destructive", ring: "bg-destructive/10 text-destructive" }
-    : pending
-      ? { icon: AlertCircle, label: "Awaiting confirmation", cls: "text-amber-600", ring: "bg-amber-500/10 text-amber-600" }
-      : { icon: CalendarCheck, label: "Confirmed", cls: "text-emerald-600", ring: "bg-emerald-500/10 text-emerald-600" };
+    : awaitingPayment
+      ? { icon: AlertCircle, label: "Awaiting payment", cls: "text-amber-600", ring: "bg-amber-500/10 text-amber-600" }
+      : pending
+        ? { icon: AlertCircle, label: "Awaiting confirmation", cls: "text-amber-600", ring: "bg-amber-500/10 text-amber-600" }
+        : { icon: CalendarCheck, label: "Confirmed", cls: "text-emerald-600", ring: "bg-emerald-500/10 text-emerald-600" };
 
   const StatusIcon = status.icon;
-  const rescheduleHref = host && slug ? (`/${host.username}/${slug}?reschedule=${booking.uid}` as Route) : null;
+  const rescheduleHref = team && slug
+    ? (`/book/${team.slug}/${slug}?reschedule=${booking.uid}` as Route)
+    : host && slug
+      ? (`/${host.username}/${slug}?reschedule=${booking.uid}` as Route)
+      : null;
 
   return (
     <main className="min-h-screen bg-grid">
+      <CompanyBrandHeader />
       <div className="mx-auto flex max-w-lg flex-col px-4 py-16">
         <div className="rounded-2xl border bg-card p-8 shadow-sm">
           {/* Host info */}
@@ -57,26 +67,42 @@ export default async function BookingDetailPage({ params }: Props) {
             <StatusIcon className="h-7 w-7" />
           </div>
           <h1 className="mt-5 text-center text-xl font-semibold tracking-tight">
-            {cancelled ? "This booking was cancelled" : pending ? "Booking requested" : "You're booked"}
+            {cancelled
+              ? "This booking was cancelled"
+              : awaitingPayment
+                ? "Payment still needed"
+                : pending
+                  ? "Booking requested"
+                  : "You're booked"}
           </h1>
           <p className="mt-1 text-center text-sm text-muted-foreground">
-            {pending
-              ? "We've sent your request to the host. You'll be notified once it's confirmed."
-              : cancelled
-                ? booking.cancellationReason ?? "This event is no longer scheduled."
-                : "A calendar invite has been sent to your email."}
+            {awaitingPayment
+              ? "Your slot is reserved while payment is being completed. Once Stripe confirms it, we'll update the booking automatically."
+              : pending
+                ? "We've sent your request to the host. You'll be notified once it's confirmed."
+                : cancelled
+                  ? booking.cancellationReason ?? "This event is no longer scheduled."
+                  : "A calendar invite has been sent to your email."}
           </p>
 
           <dl className="mt-8 space-y-4 border-t pt-6 text-sm">
             <Detail icon={CalendarCheck} label="What" value={booking.title} />
             <Detail icon={Clock} label="When" value={`${when} (${tz.replace(/_/g, " ")})`} />
             {host ? <Detail icon={User} label="Who" value={host.name ?? host.username} /> : null}
+            {team ? <Detail icon={User} label="Team" value={team.name} /> : null}
+            {primary ? (
+              <Detail
+                icon={Mail}
+                label="Email"
+                value={<a href={`mailto:${primary.email}`} className="text-primary hover:underline">{primary.email}</a>}
+              />
+            ) : null}
             <Detail
               icon={MapPin}
               label="Where"
               value={
                 booking.meetingUrl ? (
-                  <a href={booking.meetingUrl} className="text-primary hover:underline">
+                  <a href={booking.meetingUrl} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
                     {booking.location ?? "Join meeting"}
                   </a>
                 ) : (
@@ -98,6 +124,12 @@ export default async function BookingDetailPage({ params }: Props) {
               <CancelBooking uid={booking.uid} isRecurring={Boolean(booking.recurringEventId)} />
             </div>
           ) : null}
+
+          {!cancelled ? (
+            <div className="mt-6 rounded-xl border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+              Need to make a change? Use the buttons above. Your latest manage link also stays in your confirmation email.
+            </div>
+          ) : null}
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
@@ -107,6 +139,7 @@ export default async function BookingDetailPage({ params }: Props) {
           </Link>
         </p>
       </div>
+      <PublicLegal />
     </main>
   );
 }

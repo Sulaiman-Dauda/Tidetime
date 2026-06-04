@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { cache } from "react";
 import {
   COMPANY_SETTING_KEYS,
@@ -82,4 +82,16 @@ export function setCompanyBookingDefaults(booking: CompanyBookingDefaults): Prom
 
 export function setCompanyLegalContents(legal: CompanyLegalContents): Promise<void> {
   return writeSetting(COMPANY_SETTING_KEYS.legal, legal);
+}
+
+/** Check if public bookings are globally disabled (maintenance mode). */
+export async function isBookingDisabled(): Promise<boolean> {
+  const [row] = await db
+    .select({ value: appSettings.value })
+    .from(appSettings)
+    .where(eq(appSettings.name, COMPANY_SETTING_KEYS.booking))
+    .limit(1);
+  if (!row?.value || typeof row.value !== "object" || !row.value) return false;
+  const v = row.value as Record<string, unknown>;
+  return v.bookingDisabled === true;
 }

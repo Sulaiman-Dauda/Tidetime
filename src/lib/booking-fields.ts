@@ -49,6 +49,8 @@ export function validateResponses(
     // form inputs and server-side Zod schema.
     if (field.system) continue;
     if (!isFieldVisible(field, values)) continue;
+
+
     const value = values[field.name];
 
     if (field.required && isEmpty(value)) {

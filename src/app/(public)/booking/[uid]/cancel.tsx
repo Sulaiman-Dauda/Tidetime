@@ -35,9 +35,9 @@ export function CancelBooking({ uid, isRecurring = false }: { uid: string; isRec
         <Textarea id="reason" name="reason" rows={2} placeholder="Let the host know why…" />
       </div>
       {isRecurring ? (
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input type="checkbox" name="series" className="h-4 w-4 rounded border-input" />
-          Cancel all upcoming occurrences in this series
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-secondary/60">
+          <input type="checkbox" name="series" className="mt-0.5 h-4 w-4 rounded border-input" />
+          <span>Cancel all upcoming occurrences in this series</span>
         </label>
       ) : null}
       {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}

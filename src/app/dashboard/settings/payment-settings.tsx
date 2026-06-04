@@ -12,7 +12,7 @@ export function PaymentSettings() {
   const { toast } = useToast();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [form, setForm] = useState({ secretKey: "", webhookSecret: "" });
+  const [form, setForm] = useState({ publishableKey: "", secretKey: "", webhookSecret: "" });
   const [loaded, setLoaded] = useState(false);
   const [pending, start] = useTransition();
 
@@ -25,6 +25,7 @@ export function PaymentSettings() {
         const data = await res.json();
         if (data.config) {
           setForm({
+            publishableKey: data.config.publishableKey || "",
             secretKey: data.config.secretKey || "",
             webhookSecret: data.config.webhookSecret || "",
           });
@@ -86,11 +87,21 @@ export function PaymentSettings() {
         <CreditCard className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-base font-semibold">Payments (Stripe)</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-5">
-        Enable paid bookings. Keys are encrypted at rest.
+      <p className="mb-5 text-sm text-muted-foreground">
+        Store your Stripe publishable key, secret key, and webhook secret. Attendee checkout is live for paid services. Secret values are encrypted at rest.
       </p>
 
       <div className="grid gap-4">
+        <div className="space-y-1.5">
+          <Label>Publishable key</Label>
+          <Input
+            value={form.publishableKey}
+            onChange={(e) => setForm({ ...form, publishableKey: e.target.value })}
+            placeholder="pk_live_••••••••••••••••••••"
+            autoComplete="off"
+          />
+          <p className="text-xs text-muted-foreground">Starts with pk_live_ or pk_test_</p>
+        </div>
         <div className="space-y-1.5">
           <Label>Secret key</Label>
           <Input
@@ -100,7 +111,9 @@ export function PaymentSettings() {
             placeholder="sk_live_••••••••••••••••••••"
             autoComplete="off"
           />
-          <p className="text-xs text-muted-foreground">Starts with sk_live_ or sk_test_</p>
+          <p className="text-xs text-muted-foreground">
+            Starts with sk_live_ or sk_test_. Leave the masked value unchanged to keep the current key.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label>Webhook secret</Label>
@@ -111,7 +124,9 @@ export function PaymentSettings() {
             placeholder="whsec_••••••••••••••••••••"
             autoComplete="off"
           />
-          <p className="text-xs text-muted-foreground">Starts with whsec_</p>
+          <p className="text-xs text-muted-foreground">
+            Starts with whsec_. Leave the masked value unchanged to keep the current secret.
+          </p>
         </div>
       </div>
 
@@ -126,7 +141,7 @@ export function PaymentSettings() {
 
       <div className="mt-5 flex items-center gap-2">
         <Button onClick={save} loading={pending}>Save</Button>
-        <Button variant="outline" onClick={test} loading={testing}>Test keys</Button>
+        <Button variant="outline" onClick={test} loading={testing}>Test secret key</Button>
       </div>
     </Card>
   );

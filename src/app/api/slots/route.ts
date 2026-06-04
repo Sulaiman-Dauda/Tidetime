@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPublicEventType, getSlots } from "@/server/availability";
 import { groupSlotsByDay } from "@/lib/slots";
 import { isValidTimeZone } from "@/lib/time";
+import { isBookingDisabled } from "@/server/company-settings";
 
 const MAX_PUBLIC_RANGE_DAYS = 93;
 
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
   const slug = sp.get("slug");
   if (!username || !slug) {
     return NextResponse.json({ error: "Missing username or slug" }, { status: 400 });
+  }
+
+  if (await isBookingDisabled()) {
+    return NextResponse.json({ error: "Booking is temporarily disabled" }, { status: 503 });
   }
 
   const result = await getPublicEventType(username, slug);

@@ -15,7 +15,6 @@ import {
   Star,
   CalendarOff,
   CalendarRange,
-  Plug2,
   Zap,
   Building2,
   Tags,
@@ -59,7 +58,6 @@ const ADMIN_GROUP = {
   label: "Admin",
   items: [
     { href: "/dashboard/settings", label: "Settings", icon: Settings2 },
-    { href: "/dashboard/integrations", label: "Integrations", icon: Plug2 },
     { href: "/dashboard/blocked-periods", label: "Blocked Periods", icon: CalendarOff },
   ],
 } as const;

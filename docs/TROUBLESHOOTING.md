@@ -44,13 +44,24 @@ Tidetime's typecheck script runs `next typegen` first, which regenerates route t
 - Check spam/junk folders
 - If no SMTP is configured, emails are logged to the console instead
 
-## Paid bookings are not working
+## Stripe key tests are failing
 
-- Go to **Settings → Payments** and verify your Stripe keys are correct
-- Click **Test keys** to validate your secret key works
+- Go to **Settings → Stripe** and verify your Stripe keys are correct
+- Click **Test secret key** to validate your secret key works
 - Ensure the webhook endpoint is configured in your Stripe dashboard
 
-Tidetime expects them as a pair.
+Tidetime expects the publishable key, secret key, and webhook secret to be saved together. Paid bookings only go live when the Stripe webhook can reach `/api/stripe/webhook` and the service itself has **Require payment** enabled.
+
+## Why can’t I connect Google Calendar or find Google Meet / Zoom in the dashboard?
+
+- Google Calendar is available today, but it requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the app environment before the connect flow can work.
+- Google Meet and Zoom provider-native connection flows are not shipped yet. Use a custom link, phone, or in-person location for now.
+
+## Booking page says “Booking temporarily unavailable”
+
+- Check **Settings → Booking defaults**
+- Make sure **Disable public bookings** is turned off
+- If it is enabled intentionally, the public landing pages, slot APIs, and booking form will all stay unavailable until you turn it back on
 
 ## Docker app starts but booking/payment features fail
 
