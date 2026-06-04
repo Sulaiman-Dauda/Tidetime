@@ -107,9 +107,8 @@
 /* Subtle dot-grid backdrop */
 .bg-grid,
 .bg-dot-grid {
-  background-image: radial-gradient(circle, hsl(var(--border) / 0.5) 1px, transparent 1px);
+  background-image: radial-gradient(circle, hsl(var(--border) / 0.35) 1px, transparent 1px);
   background-size: 28px 28px;
-  mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000 40%, transparent 100%);
 }
 
 @layer utilities {

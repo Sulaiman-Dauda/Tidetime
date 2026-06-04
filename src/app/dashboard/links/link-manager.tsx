@@ -57,7 +57,7 @@ export function LinkManager({
         <h2 className="font-medium">New link</h2>
         <form action={action} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="eventTypeId">Event type</Label>
+            <Label htmlFor="eventTypeId">Service</Label>
             <select
               id="eventTypeId"
               name="eventTypeId"

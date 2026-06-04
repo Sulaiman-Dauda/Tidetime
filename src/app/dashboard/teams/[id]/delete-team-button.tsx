@@ -33,7 +33,7 @@ export function DeleteTeamButton({ teamId, teamName }: { teamId: number; teamNam
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{teamName}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the team, all its event types, and removes all members. This cannot be undone.
+            This permanently deletes the team, all its services, and removes all members. This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input");
 
   if (!(await userOwnsEventType(user.id, parsed.data.eventTypeId))) {
-    return jsonError("Event type not found", 404);
+    return jsonError("Service not found", 404);
   }
 
   const { token } = await createBookingLink({

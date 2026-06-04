@@ -30,15 +30,17 @@ curl "https://your-host.example/api/v1/bookings?limit=25&page=2" \
 
 ## Endpoints
 
-### Event types
+### Services (`event-types` in the API)
+
+In the product UI these are called **services**. The API resource name remains `event-types`.
 
 #### `GET /api/v1/event-types`
 
-List event types owned by the authenticated user.
+List services owned by the authenticated user.
 
 #### `POST /api/v1/event-types`
 
-Create a personal event type.
+Create a personal service.
 
 Example body:
 
@@ -56,21 +58,21 @@ Example body:
 
 #### `GET /api/v1/event-types/:id`
 
-Fetch a single event type owned by the authenticated user.
+Fetch a single service owned by the authenticated user.
 
 #### `PATCH /api/v1/event-types/:id`
 
-Update fields on an existing event type.
+Update fields on an existing service.
 
 #### `DELETE /api/v1/event-types/:id`
 
-Delete an event type.
+Delete a service.
 
 ### Availability
 
 #### `GET /api/v1/availability?username=&slug=&from=&to=&duration=`
 
-Public availability lookup for a personal event type.
+Public availability lookup for a personal service.
 
 Notes:
 
@@ -92,7 +94,7 @@ Optional query params:
 
 #### `POST /api/v1/bookings`
 
-Create a booking on a personal event type owned by the authenticated user.
+Create a booking on a personal service owned by the authenticated user.
 
 Example body:
 
@@ -145,7 +147,7 @@ Cancel a booking.
 
 #### `POST /api/v1/booking-links`
 
-Create a temporary booking link for one of your event types.
+Create a temporary booking link for one of your services.
 
 Kinds:
 

@@ -32,7 +32,7 @@ import { expireStalePaymentHolds } from "./payment-holds";
 export interface CreateBookingInput {
   username: string;
   slug: string;
-  /** when set, resolves a team event type by team slug instead of a user handle */
+  /** when set, resolves a team service by team slug instead of a user handle */
   teamSlug?: string;
   /** UTC ISO start */
   start: string;
@@ -93,7 +93,7 @@ function buildEmailView(args: {
   };
 }
 
-/** Load the first host attached to a team event type (placeholder before assignment). */
+/** Load the first host attached to a team service (placeholder before assignment). */
 async function firstTeamHost(
   eventTypeId: number,
 ): Promise<{ id: number; name: string | null; username: string } | null> {
@@ -144,7 +144,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 
   if (input.teamSlug) {
     const teamResolved = await getTeamEventType(input.teamSlug, input.slug);
-    if (!teamResolved) return { ok: false, error: "Event type not found" };
+    if (!teamResolved) return { ok: false, error: "Service not found" };
     eventType = teamResolved.eventType;
     teamCapacity = {
       teamId: teamResolved.team.id,
@@ -153,14 +153,14 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
         maxConcurrentBookings: teamResolved.team.maxConcurrentBookings,
       },
     };
-    // Team events assign their host below; seed a placeholder from the first host.
+    // Team services assign their host below; seed a placeholder from the first host.
     const placeholder = await firstTeamHost(eventType.id);
-    if (!placeholder) return { ok: false, error: "This team event has no hosts" };
+    if (!placeholder) return { ok: false, error: "This team service has no hosts" };
     host = placeholder;
     eventType = { ...eventType, userId: placeholder.id };
   } else {
     const resolved = await getPublicEventType(input.username, input.slug);
-    if (!resolved) return { ok: false, error: "Event type not found" };
+    if (!resolved) return { ok: false, error: "Service not found" };
     eventType = resolved.eventType;
     host = resolved.host;
   }
@@ -170,7 +170,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     const link = await resolveBookingLink(input.bookingLinkToken, input.email);
     if (!link.ok) return { ok: false, error: link.error };
     if (link.link && link.link.eventTypeId !== eventType.id) {
-      return { ok: false, error: "This link is for a different event" };
+      return { ok: false, error: "This link is for a different service" };
     }
   }
 
@@ -196,7 +196,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   const validationError = validateResponses(eventType.bookingFields, input.responses);
   if (validationError) return { ok: false, error: validationError };
 
-  // Race-safe availability check. Team events validate per-host during assignment.
+  // Race-safe availability check. Team services validate per-host during assignment.
   const isTeamEvent =
     eventType.schedulingType === "round_robin" || eventType.schedulingType === "collective";
   if (!isTeamEvent) {

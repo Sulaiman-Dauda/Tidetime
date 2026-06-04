@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
   const resolved = await getPublicEventType(parsed.data.username, parsed.data.slug);
   if (!resolved || resolved.eventType.userId !== user.id) {
-    return jsonError("Event type not found", 404);
+    return jsonError("Service not found", 404);
   }
 
   const result = await createBooking({ ...parsed.data, responses: parsed.data.responses ?? {} });

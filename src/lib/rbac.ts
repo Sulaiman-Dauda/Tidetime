@@ -11,7 +11,7 @@ export type Permission =
   | "member.invite"
   | "member.remove"
   | "member.role.assign"
-  | "eventType.manage" // create/edit team event types
+  | "eventType.manage" // create/edit team services
   | "availability.manage" // edit shared/provider availability
   | "booking.view" // see team bookings
   | "booking.manage" // create/reschedule/cancel on behalf of others
@@ -38,7 +38,7 @@ const ALL: Permission[] = [
  * - owner: everything
  * - admin: everything except deleting the team and billing
  * - manager: people + scheduling operations, no structural/billing changes
- * - provider: manage their own availability + event types, view their bookings
+ * - provider: manage their own availability + services, view their bookings
  * - receptionist: front-desk — view and manage bookings, no config changes
  * - member: read-only team visibility
  */

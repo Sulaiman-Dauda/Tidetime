@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/v1/availability?username=&slug=&from=&to=&duration=
- * Public availability for an event type (no auth required).
+ * Public availability for a service (no auth required).
  */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;

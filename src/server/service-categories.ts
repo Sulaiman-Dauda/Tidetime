@@ -25,7 +25,7 @@ export async function listServiceCategories(): Promise<ServiceCategoryRow[]> {
     .orderBy(asc(serviceCategories.position), asc(serviceCategories.id));
 }
 
-/** List categories together with how many event types each contains. */
+/** List categories together with how many services each contains. */
 export async function listServiceCategoriesWithCounts(): Promise<
   (ServiceCategoryRow & { eventTypeCount: number })[]
 > {

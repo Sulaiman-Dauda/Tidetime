@@ -119,8 +119,8 @@ export function ResourceManager({
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {usage[r.id]
-                      ? `Used by ${usage[r.id]} event type${usage[r.id] === 1 ? "" : "s"}`
-                      : "Not attached to any event type yet"}
+                      ? `Used by ${usage[r.id]} service${usage[r.id] === 1 ? "" : "s"}`
+                      : "Not attached to any service yet"}
                   </p>
                 </div>
               </div>

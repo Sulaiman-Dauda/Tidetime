@@ -154,7 +154,7 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
         if (!result.ok) {
           throw new Error(result.error);
         }
-        toast({ title: "Saved", description: "Your event type has been updated." });
+        toast({ title: "Saved", description: "Your service has been updated." });
         router.refresh();
       } catch (error) {
         toast({
@@ -801,7 +801,7 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
           {resources.length > 0 ? (
             <Section
               title="Resources"
-              description="Require shared resources for this event. Tidetime blocks times when they're fully booked."
+              description="Require shared resources for this service. Tidetime blocks times when they're fully booked."
             >
               <div className="space-y-2">
                 {resources.map((r) => {

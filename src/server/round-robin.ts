@@ -16,7 +16,7 @@ import {
 } from "@/lib/round-robin";
 import { computeSlots, type AvailabilityRule } from "@/lib/slots";
 
-/** Map an event type's stored round-robin distribution to the engine mode. */
+/** Map a service's stored round-robin distribution to the engine mode. */
 function resolveMode(value: unknown): RoundRobinMode {
   return value === "least_busy" || value === "random" ? value : "sequential";
 }
@@ -143,7 +143,7 @@ export interface AssignmentResult {
 }
 
 /**
- * Choose the host(s) for a team event type at a specific slot.
+ * Choose the host(s) for a team service at a specific slot.
  *
  * - `round_robin`: one rotating host (plus any fixed hosts) chosen by the
  *   configured distribution mode, only among hosts free for the slot.

@@ -233,7 +233,7 @@ export const availabilities = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
-/*  Service categories (group event types / services)                          */
+/*  Service categories (group services)                                        */
 /* -------------------------------------------------------------------------- */
 
 export const serviceCategories = pgTable(
@@ -252,14 +252,14 @@ export const serviceCategories = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
-/*  Event types                                                               */
+/*  Services (stored in `event_types`)                                        */
 /* -------------------------------------------------------------------------- */
 
 export const eventTypes = pgTable(
   "event_types",
   {
     id: serial("id").primaryKey(),
-    /** owner — either a personal user OR a team event */
+    /** owner — either a personal user OR a team service */
     userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
     teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }),
     scheduleId: integer("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
@@ -319,7 +319,7 @@ export const eventTypes = pgTable(
     successRedirectUrl: text("success_redirect_url"),
     /** team scheduling */
     schedulingType: schedulingType("scheduling_type"),
-    /** distribution strategy for round-robin team events */
+    /** distribution strategy for round-robin team services */
     roundRobinMode: roundRobinMode("round_robin_mode").notNull().default("sequential"),
 
     /** deposit charged up-front (in cents); 0 = full price or free */
@@ -336,7 +336,7 @@ export const eventTypes = pgTable(
   ],
 );
 
-/** team event hosts (round-robin / collective) */
+/** team service hosts (round-robin / collective) */
 export const eventTypeHosts = pgTable(
   "event_type_hosts",
   {
@@ -517,7 +517,7 @@ export const workflows = pgTable("workflows", {
   action: workflowAction("action").notNull(),
   /** minutes offset for before/after triggers */
   offsetMinutes: integer("offset_minutes").notNull().default(0),
-  /** null = applies to all of the user's event types */
+  /** null = applies to all of the user's services */
   eventTypeId: integer("event_type_id").references(() => eventTypes.id, { onDelete: "cascade" }),
   subject: text("subject"),
   body: text("body"),
@@ -645,7 +645,7 @@ export const resources = pgTable(
   (t) => [index("resources_user_idx").on(t.userId), index("resources_team_idx").on(t.teamId)],
 );
 
-/** event types that require / use a given resource */
+/** services that require / use a given resource */
 export const eventTypeResources = pgTable(
   "event_type_resources",
   {

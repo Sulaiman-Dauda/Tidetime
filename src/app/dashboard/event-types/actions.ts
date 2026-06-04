@@ -154,7 +154,7 @@ export async function updateEventTypeAction(input: UpdateEventTypeInput): Promis
     .where(and(eq(eventTypes.userId, user.id), eq(eventTypes.slug, data.slug), ne(eventTypes.id, data.id)))
     .limit(1);
   if (slugClash) {
-    return { ok: false, error: "An event type with that slug already exists." };
+    return { ok: false, error: "A service with that slug already exists." };
   }
 
   await db
@@ -270,7 +270,7 @@ export async function reorderEventTypesAction(formData: FormData) {
 
   await normalizeEventTypePositions(user.id);
 
-  // Get all event types for this user, ordered by position.
+  // Get all services for this user, ordered by position.
   const all = await db
     .select({ id: eventTypes.id, position: eventTypes.position })
     .from(eventTypes)

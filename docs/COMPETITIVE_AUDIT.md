@@ -37,7 +37,7 @@ enterprise bloat (no CRM, marketing automation, SAML/SCIM, AI assistants, workfl
 
 | Feature                                                       | Files                                                | Description                                    | Complexity |
 | ------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------- | ---------- |
-| Event types (buffers, min-notice, slot interval, offsetStart) | `packages/prisma/schema.prisma` (EventType)          | Full config surface                            | Medium     |
+| Services (stored as `EventType`) (buffers, min-notice, slot interval, offsetStart) | `packages/prisma/schema.prisma` (EventType) | Full config surface | Medium |
 | Booking / duration limits                                     | `features/bookings/lib/checkBookingLimits.ts`        | per day/week/month caps                        | Medium     |
 | Period types ROLLING/ROLLING_WINDOW/RANGE                     | schema `PeriodType`                                  | Booking windows                                | Medium     |
 | Seats / group bookings                                        | `BookingSeat`, `features/bookings/lib/handleSeats`   | Capacity per slot, show attendees/count        | High       |
@@ -72,7 +72,7 @@ Legend: ✅ Complete · 🟡 Partial · ❌ Missing
 | Feature                                    | Tidetime   | EasyAppts | Cal.diy | Calendly | Cal.com | Setmore |
 | ------------------------------------------ | ---------- | --------- | ------- | -------- | ------- | ------- |
 | Unlimited appts/bookings                   | ✅         | ✅        | ✅      | ✅       | ✅      | ✅      |
-| Event types                                | ✅         | 🟡        | ✅      | ✅       | ✅      | ✅      |
+| Services                                   | ✅         | 🟡        | ✅      | ✅       | ✅      | ✅      |
 | Group / multi-attendant (seats)            | ✅         | ✅        | ✅      | ✅       | ✅      | ✅      |
 | Round-robin / collective                   | ✅         | 🟡        | ✅      | ✅       | ✅      | 🟡      |
 | Buffers / min-notice / windows             | ✅         | ✅        | ✅      | ✅       | ✅      | 🟡      |

@@ -23,7 +23,7 @@ export interface ResolvedEventType extends EventType {
   scheduleTimeZone: string;
 }
 
-/** Load an event type for a user handle + slug, with the host's timezone. */
+/** Load a service for a user handle + slug, with the host's timezone. */
 export async function getPublicEventType(
   username: string,
   slug: string,
@@ -57,7 +57,7 @@ export async function getPublicEventType(
   };
 }
 
-/** Load the availability rules for an event type's schedule (or host default). */
+/** Load the availability rules for a service's schedule (or host default). */
 async function loadRules(eventType: ResolvedEventType): Promise<AvailabilityRule[]> {
   let scheduleId = eventType.scheduleId;
   if (!scheduleId && eventType.userId) {
@@ -150,7 +150,7 @@ export interface GetSlotsArgs {
   now?: Date;
 }
 
-/** Top-level: compute bookable slots for a public event type. */
+/** Top-level: compute bookable slots for a public service. */
 export async function getSlots({ eventType, rangeStart, rangeEnd, duration, now }: GetSlotsArgs): Promise<Slot[]> {
   if (eventType.hidden) return [];
   await expireStalePaymentHolds();

@@ -76,7 +76,7 @@ export async function revokeBookingLink(id: number, ownerUserId: number): Promis
   return result.length > 0;
 }
 
-/** Verify an event type belongs to a user (for link creation authz). */
+/** Verify a service belongs to a user (for link creation authz). */
 export async function userOwnsEventType(userId: number, eventTypeId: number): Promise<boolean> {
   const [row] = await db
     .select({ id: eventTypes.id })
@@ -123,7 +123,7 @@ export async function listBookingLinks(userId: number): Promise<BookingLinkRow[]
   return rows.map((r) => ({ ...r, kind: r.kind as BookingLinkKind }));
 }
 
-/** Event types a user can create links for. */
+/** Services a user can create links for. */
 export async function userEventTypesForLinks(
   userId: number,
 ): Promise<{ id: number; title: string }[]> {

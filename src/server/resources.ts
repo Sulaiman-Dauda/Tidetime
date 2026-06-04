@@ -39,7 +39,7 @@ export async function createResource(input: NewResource): Promise<Resource> {
 }
 
 /**
- * Count how many event types reference each given resource. Used by the
+ * Count how many services reference each given resource. Used by the
  * dashboard to show where a shared asset is in play (the "person + place +
  * equipment" wedge). Returns a map keyed by resourceId.
  */
@@ -77,7 +77,7 @@ export async function deleteResource(id: number, userId: number): Promise<boolea
   return Boolean(row);
 }
 
-/** Required resources (with capacity) attached to an event type. */
+/** Required resources (with capacity) attached to a service. */
 export async function getEventTypeResources(
   eventTypeId: number,
 ): Promise<{ resourceId: number; capacity: number; required: boolean }[]> {
@@ -92,7 +92,7 @@ export async function getEventTypeResources(
     .where(and(eq(eventTypeResources.eventTypeId, eventTypeId), eq(resources.active, true)));
 }
 
-/** Replace the resource links for an event type. */
+/** Replace the resource links for a service. */
 export async function setEventTypeResources(
   eventTypeId: number,
   resourceIds: number[],

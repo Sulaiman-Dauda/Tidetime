@@ -21,7 +21,7 @@ export interface ChargePlan {
   balanceDue: number;
 }
 
-/** Compute what to charge at booking time for a paid event type. */
+/** Compute what to charge at booking time for a paid service. */
 export function computeCharge(config: PriceConfig): ChargePlan | null {
   const { price, depositAmount, currency } = config;
   if (price <= 0) return null; // free event — nothing to charge

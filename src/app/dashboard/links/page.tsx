@@ -25,7 +25,7 @@ export default async function LinksPage() {
         <div className="flex flex-col items-center rounded-xl border border-dashed border-border py-20 text-center">
           <LinkIcon className="h-8 w-8 text-muted-foreground" />
           <p className="mt-3 text-sm text-muted-foreground">
-            Create an event type first to generate booking links.
+            Create a service first to generate booking links.
           </p>
         </div>
       ) : (

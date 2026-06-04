@@ -32,7 +32,7 @@ export function DeleteResourceButton({ id, name }: { id: number; name: string })
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{name}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently removes the resource and detaches it from all event types. This cannot be undone.
+            This permanently removes the resource and detaches it from all services. This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

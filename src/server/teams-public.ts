@@ -30,7 +30,7 @@ export async function getPublicTeam(slug: string): Promise<Team | null> {
   return team ?? null;
 }
 
-/** List a team's visible event types for its public landing page. */
+/** List a team's visible services for its public landing page. */
 export async function getTeamEventTypes(teamId: number): Promise<TeamEventView[]> {
   const rows = await db
     .select({ et: eventTypes, scheduleTz: schedules.timeZone })
@@ -72,7 +72,7 @@ export async function getTeamEventTypes(teamId: number): Promise<TeamEventView[]
   }));
 }
 
-/** Load a single team event type by team slug + event slug. */
+/** Load a single team service by team slug + event slug. */
 export async function getTeamEventType(
   teamSlug: string,
   eventSlug: string,
@@ -98,7 +98,7 @@ export async function getTeamEventType(
   };
 }
 
-/** Host user ids attached to a team event type. */
+/** Host user ids attached to a team service. */
 async function loadHostUserIds(eventTypeId: number): Promise<number[]> {
   const rows = await db
     .select({ userId: eventTypeHosts.userId })
@@ -108,9 +108,9 @@ async function loadHostUserIds(eventTypeId: number): Promise<number[]> {
 }
 
 /**
- * Compute merged team availability for a team event type over a window.
+ * Compute merged team availability for a team service over a window.
  * Each host's slots are computed individually (respecting their own schedule
- * and bookings) then merged by the event's scheduling type.
+ * and bookings) then merged by the service's scheduling type.
  */
 export async function getTeamSlots(args: {
   eventType: ResolvedEventType;

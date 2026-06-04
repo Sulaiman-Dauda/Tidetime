@@ -75,7 +75,7 @@ export default async function TeamLandingPage({ params }: Props) {
 
         <div className="mt-6 space-y-3">
           {events.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">No public events yet.</p>
+            <p className="text-center text-sm text-muted-foreground">No public services yet.</p>
           ) : (
             events.map((e) => (
               <Link key={e.id} href={`/book/${slug}/${e.slug}` as Route} className="group block">

@@ -56,10 +56,10 @@ The documentation below reflects the current implementation rather than aspirati
 
 | Area              | What you get                                                                                                                                       |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Event types**   | Multiple durations, buffers, minimum notice, slot intervals, booking caps, custom booking fields, hidden event types, confirmation-required events |
+| **Services**      | Multiple durations, buffers, minimum notice, slot intervals, booking caps, custom booking fields, hidden services, and services that require confirmation |
 | **Availability**  | Weekly schedules, date overrides, timezone-aware slot engine, out-of-office support, Google Calendar busy-time sync                               |
 | **Booking flow**  | Public profile pages, team booking pages, cancel/reschedule links, ICS invites, embeddable widget                                                 |
-| **Teams**         | Shared event types, round-robin scheduling, collective scheduling, memberships and roles                                                           |
+| **Teams**         | Shared services, round-robin scheduling, collective scheduling, memberships and roles                                                               |
 | **Payments**      | Stripe-powered attendee checkout for paid services, webhook confirmation, and stale-hold cleanup                                                   |
 | **Reviews**       | Post-booking feedback requests; happy ratings routed to your public review page, the rest captured privately                                       |
 | **Resources**     | Shared rooms, equipment and assets with capacity-aware double-booking prevention                                                                   |
@@ -198,8 +198,8 @@ See [docs/API.md](./docs/API.md) for endpoint details, payloads, pagination, and
 ### Other operational endpoints
 
 - `GET /api/health` — readiness probe for uptime checks, Docker health checks, and orchestration
-- `GET /api/slots` — public slot lookup for personal event types
-- `GET /api/slots/team` — public slot lookup for team event types
+- `GET /api/slots` — public slot lookup for personal services
+- `GET /api/slots/team` — public slot lookup for team services
 
 ## 🧩 Embeddable widget
 

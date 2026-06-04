@@ -1,5 +1,5 @@
 /**
- * Round-robin host assignment for team event types.
+ * Round-robin host assignment for team services.
  *
  * Pure functions over plain data so the selection policy is fully testable
  * without a database. The DB-backed wrapper lives in `src/server/round-robin.ts`.

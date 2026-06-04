@@ -14,7 +14,7 @@ export default async function ResourcesPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Resources</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Rooms, equipment, and other shared assets. Attach a resource to an event type and
+          Rooms, equipment, and other shared assets. Attach a resource to a service and
           Tidetime prevents double-booking beyond its capacity — so attendees book a person, a
           place, and the equipment in one step.
         </p>

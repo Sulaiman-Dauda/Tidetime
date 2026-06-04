@@ -42,7 +42,7 @@ export async function createLinkAction(
   const { eventTypeId, kind, maxUses, expiresAt, inviteEmail } = parsed.data;
 
   if (!(await userOwnsEventType(user.id, eventTypeId))) {
-    return { error: "You do not own that event type" };
+    return { error: "You do not own that service" };
   }
   if (kind === "limited" && !maxUses) {
     return { error: "A usage limit is required for limited links" };

@@ -32,7 +32,7 @@ export function DeleteEventButton({ id, label }: { id: number; label: string }) 
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{label}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes this event type and all its settings. Any existing bookings remain unaffected but no new bookings can be made.
+            This permanently deletes this service and all its settings. Any existing bookings remain unaffected but no new bookings can be made.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -51,7 +51,7 @@ export function DeleteEventButton({ id, label }: { id: number; label: string }) 
               className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
               disabled={pending}
             >
-              {pending ? "Deleting…" : "Delete event type"}
+              {pending ? "Deleting…" : "Delete service"}
             </AlertDialogAction>
           </form>
         </AlertDialogFooter>

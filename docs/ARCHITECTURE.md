@@ -59,7 +59,7 @@ Each boundary validates and normalizes data before it reaches the deeper booking
 ### Public booking flow
 
 1. A visitor opens a public booking page
-2. The page resolves an event type and its schedule
+2. The page resolves a service and its schedule
 3. The client fetches slots from `/api/slots` or `/api/slots/team`
 4. Slot generation runs on the server using the pure slot engine
 5. The visitor submits a booking through a server action or API route
@@ -67,7 +67,7 @@ Each boundary validates and normalizes data before it reaches the deeper booking
 
 ### Team scheduling flow
 
-For team event types:
+For team services:
 
 1. hosts are loaded from `eventTypeHosts`
 2. each host's availability is computed separately

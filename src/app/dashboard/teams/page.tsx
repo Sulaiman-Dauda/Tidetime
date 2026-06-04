@@ -27,7 +27,7 @@ export default async function TeamsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Teams</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Collaborate on shared event types and round-robin scheduling.
+            Collaborate on shared services and round-robin scheduling.
           </p>
         </div>
         <CreateTeam />
@@ -38,7 +38,7 @@ export default async function TeamsPage() {
           <Users className="h-7 w-7 text-muted-foreground/50" />
           <p className="mt-3 text-sm font-medium text-foreground">No teams yet</p>
           <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-            Create a team to collaborate on collective and round-robin events.
+            Create a team to collaborate on collective and round-robin services.
           </p>
         </div>
       ) : (

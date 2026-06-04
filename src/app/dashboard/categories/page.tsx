@@ -14,7 +14,7 @@ export default async function CategoriesPage() {
         <h1 className="text-xl font-semibold tracking-tight">Service Categories</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
           Group your services so customers can find them quickly on the booking page. Assign a
-          category to each event type from its editor.
+          category to each service from its editor.
         </p>
       </div>
       <CategoriesManager categories={categories} />

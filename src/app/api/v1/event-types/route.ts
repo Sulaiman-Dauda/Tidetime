@@ -7,7 +7,7 @@ import { authenticateApiKey, unauthorized, jsonError, parsePage } from "@/server
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/v1/event-types — list the authenticated user's event types. */
+/** GET /api/v1/event-types — list the authenticated user's services. */
 export async function GET(req: NextRequest) {
   const user = await authenticateApiKey(req);
   if (!user) return unauthorized();
@@ -39,7 +39,7 @@ const createSchema = z.object({
   currency: z.string().length(3).optional(),
 });
 
-/** POST /api/v1/event-types — create a personal event type. */
+/** POST /api/v1/event-types — create a personal service. */
 export async function POST(req: NextRequest) {
   const user = await authenticateApiKey(req);
   if (!user) return unauthorized();
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     .from(eventTypes)
     .where(and(eq(eventTypes.userId, user.id), eq(eventTypes.slug, parsed.data.slug)))
     .limit(1);
-  if (dupe) return jsonError("An event type with that slug already exists", 409);
+  if (dupe) return jsonError("A service with that slug already exists", 409);
 
   const [maxPosition] = await db
     .select({ position: sql<number>`coalesce(max(${eventTypes.position}), -1)::int` })

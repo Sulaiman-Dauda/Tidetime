@@ -187,7 +187,7 @@ export default async function PublicProfilePage({ params }: Props) {
 
         <div className="mt-6 space-y-8">
           {types.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">No public event types yet.</p>
+            <p className="text-center text-sm text-muted-foreground">No public services yet.</p>
           ) : (
             groups.map((group) => (
               <div key={group.key} className="space-y-3">
