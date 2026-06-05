@@ -2,9 +2,9 @@
  * Pure review-routing logic — no DB / server-only imports, so it is unit
  * testable and reusable on both client and server.
  *
- * Reputation flow (Setmore/Birdeye style):
+ * Review-routing flow:
  *   - A happy rating (>= threshold) is sent to a public review URL
- *     (e.g. Google Reviews) to maximise public reputation.
+ *     (for example, Google Reviews) to encourage public feedback.
  *   - An unhappy rating (< threshold) is captured privately so the provider
  *     can follow up without a public negative review.
  */

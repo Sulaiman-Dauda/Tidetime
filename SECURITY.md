@@ -1,5 +1,9 @@
 # Security Policy
 
+> Audience: security reporters, maintainers, and self-hosters.
+>
+> If you need product help instead, see [docs/README.md](./docs/README.md) or [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
+
 ## Supported versions
 
 Tidetime is currently maintained on the latest default branch and the latest tagged release line.

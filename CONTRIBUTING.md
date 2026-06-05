@@ -1,5 +1,9 @@
 # Contributing to Tidetime
 
+> Audience: contributors and code collaborators.
+>
+> If you are looking for product help instead, start with [docs/README.md](./docs/README.md).
+
 Thanks for contributing to Tidetime. 🌊
 
 This guide explains how to work on the project, run the local checks, and open high-quality pull requests.

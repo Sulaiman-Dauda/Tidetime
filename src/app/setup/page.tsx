@@ -5,6 +5,7 @@ import { hasAnyUser } from "@/lib/auth";
 import { SetupForm } from "./setup-form";
 
 export const metadata: Metadata = { title: "Set up Tidetime" };
+export const dynamic = "force-dynamic";
 
 export default async function SetupPage() {
   // Once an owner exists, onboarding is closed.

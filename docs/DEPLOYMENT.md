@@ -1,16 +1,25 @@
 # Deployment
 
-This guide covers the recommended production deployment patterns for Tidetime.
+> Audience: self-hosters and technical administrators.
+>
+> If Tidetime is already running and you only need to use the product, start with [Getting Started](./GETTING_STARTED.md) instead.
 
-## Requirements
+This guide explains how to run Tidetime in production.
+
+## What you need
+
+Minimum requirements:
 
 - Node.js 20+
 - PostgreSQL 14+
-- a stable `APP_URL`
+- a stable public URL for the app
 - a strong `AUTH_SECRET`
-- SMTP configured via Settings UI (optional)
-- optional Stripe credentials in Settings if you want paid bookings
-- optional `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` if you want Google Calendar sync
+
+Optional but common additions:
+
+- SMTP for real email delivery
+- Stripe for paid bookings
+- Google Calendar credentials for calendar sync
 
 ## Required production environment
 
@@ -37,9 +46,13 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 ```
 
-## Docker Compose deployment
+## Two ways to deploy Tidetime
 
-Use the provided production compose file:
+### Option 1: Docker Compose
+
+This is the easiest production path if you are comfortable with Docker.
+
+Run:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
@@ -48,109 +61,148 @@ docker compose -f docker-compose.prod.yml up -d --build
 That stack runs:
 
 - PostgreSQL
-- the app server
+- the web app
 - a reminder worker loop
 
-### What the app service does
-
-On startup the app service:
+On startup, the app service:
 
 1. waits for PostgreSQL
 2. runs database migrations
-3. starts the Next.js production server
+3. starts the production server
 
-## Manual deployment
+### Option 2: manual deployment
 
-### 1. Install dependencies
+Use this if you want to manage Node.js and PostgreSQL yourself.
+
+#### 1. Install dependencies
 
 ```bash
 npm ci
 ```
 
-### 2. Build the app
+#### 2. Build the app
 
 ```bash
 npm run build
 ```
 
-### 3. Apply migrations
+#### 3. Apply migrations
 
 ```bash
 npm run db:migrate
 ```
 
-### 4. Start the server
+#### 4. Start the server
 
 ```bash
 npm run start
 ```
 
-### 5. Run the reminder worker on a schedule
+#### 5. Run the reminder worker on a schedule
 
-For example, every 5 minutes:
+Example cron entry every 5 minutes:
 
 ```bash
 */5 * * * * cd /srv/tidetime && npm run jobs:reminders >> /var/log/tidetime-reminders.log 2>&1
 ```
 
-## Reverse proxy guidance
+## Reverse proxy and HTTPS
 
-Terminate TLS in a reverse proxy such as Nginx, Caddy, or Traefik.
+In production, you should put Tidetime behind a reverse proxy such as:
 
-Recommended upstream settings:
+- Nginx
+- Caddy
+- Traefik
+
+A reverse proxy is the front door that:
+
+- handles HTTPS
+- accepts web traffic from the public internet
+- forwards requests to the Tidetime app
+
+Recommended setup:
 
 - force HTTPS
 - forward `X-Forwarded-*` headers correctly
-- keep `APP_URL` aligned with the external HTTPS origin
-- avoid caching dynamic authenticated pages
+- keep `APP_URL` exactly aligned with the public HTTPS address
+- avoid caching logged-in dynamic pages
 
 ## Health checks
 
-Use:
+Tidetime provides a simple health endpoint:
 
 ```text
 GET /api/health
 ```
 
-A healthy instance returns HTTP 200 with a successful database check. If the database is unavailable, the endpoint returns HTTP 503.
+Expected behavior:
 
-## Email (SMTP)
+- `200` means the app can reach PostgreSQL
+- `503` means the app is running but the database check failed
 
-Configure SMTP via the Settings UI (navigate to Settings → Email after logging in as admin).
-Credentials are encrypted at rest in the database.
+This is useful for monitors, containers, and uptime checks.
 
-If no SMTP is configured, emails are logged to the console instead of being sent.
+## Email setup
 
-## Google Calendar
+Configure email from inside the app at **Settings → Email**.
+
+You can store and test:
+
+- SMTP host
+- port
+- username
+- password
+- from address
+
+If SMTP is not configured, Tidetime logs email output to the console instead of sending it.
+
+## Google Calendar setup
 
 To enable Google Calendar sync:
 
 1. set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the app environment
 2. restart the app
-3. connect each provider account in **Settings → Google Calendar**
+3. connect each user's Google account in **Settings → Calendar**
 
-Tidetime reads busy time from the selected Google calendars and creates booking events on the chosen destination calendar.
+After that, Tidetime can:
 
-## Stripe
+- read busy time from selected calendars
+- create new booking events in the chosen destination calendar
 
-Stripe credentials can be stored and tested via the Settings UI (Settings → Stripe).
-The publishable key, secret key, and webhook secret are encrypted at rest. Paid-booking checkout is live for services with **Require payment** enabled.
+## Stripe setup
 
-For production, configure your Stripe webhook to send `payment_intent.*` events to:
+Stripe settings are stored from inside the app at **Settings → Stripe**.
+
+Save:
+
+- publishable key
+- secret key
+- webhook secret
+
+For production, configure Stripe to send `payment_intent.*` events to:
 
 ```text
 POST /api/stripe/webhook
 ```
 
+Paid bookings only work when:
+
+- Stripe keys are valid
+- the webhook is configured correctly
+- the service itself requires payment
+
 ## Backups
 
-Back up PostgreSQL regularly. At minimum:
+Back up PostgreSQL regularly.
 
-- schedule logical backups (`pg_dump`) or physical snapshots
-- test restores periodically
-- keep backups encrypted and off-host
+At minimum:
 
-Example logical backup from Docker Compose:
+- schedule backups
+- store them securely
+- keep copies off the same host when possible
+- test restores from time to time
+
+Example backup from the Docker Compose stack:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec -T postgres \
@@ -166,33 +218,41 @@ gunzip -c tidetime-2026-06-04.sql.gz | \
   psql -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tidetime}
 ```
 
-After every restore, verify:
+After a restore, verify that:
 
-- you can log in as an admin
+- you can sign in
 - `/api/health` returns `200`
-- a public booking page loads successfully
+- a public booking page loads
 - reminder jobs still run on schedule
 
 ## Upgrades
 
-Recommended upgrade process:
+A safe upgrade flow is:
 
-1. review the changelog
-2. pull the new release
+1. review the changelog and release notes
+2. pull the new version
 3. run `npm ci`
 4. run `npm run build`
 5. run `npm run db:migrate`
 6. restart the app and reminder worker
+7. test one booking flow after the upgrade
 
-## Operational checklist
+## Production checklist
 
 Before going live, confirm:
 
-- [ ] `APP_URL` matches the public HTTPS origin
-- [ ] `AUTH_SECRET` is long and unique
-- [ ] PostgreSQL backups are configured
-- [ ] SMTP configured and tested (Settings → Email)
-- [ ] Stripe credentials and webhook delivery are verified if you plan to use paid bookings
-- [ ] `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set if you plan to use Google Calendar sync
-- [ ] the reminder worker is scheduled
-- [ ] `/api/health` is monitored
+- [ ] `APP_URL` matches the real public HTTPS address
+- [ ] `AUTH_SECRET` is long, unique, and private
+- [ ] PostgreSQL backups are set up
+- [ ] email is configured and tested if you need customer emails
+- [ ] Stripe is configured if you need paid bookings
+- [ ] Google Calendar credentials are set if you need calendar sync
+- [ ] the reminder worker is running on schedule
+- [ ] `/api/health` is being monitored
+- [ ] one complete test booking has been completed
+
+## Related guides
+
+- [Troubleshooting](./TROUBLESHOOTING.md)
+- [Admin Guide](./ADMIN_GUIDE.md)
+- [Architecture](./ARCHITECTURE.md)

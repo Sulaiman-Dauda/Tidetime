@@ -2,7 +2,7 @@
   "name": "tidetime",
   "version": "0.1.0",
   "private": true,
-  "description": "Tidetime — open-source scheduling platform. A fast, lean, self-hostable Calendly/Cal.com alternative.",
+  "description": "Tidetime — open-source scheduling platform for self-hosted booking, team coordination, and reliable scheduling workflows.",
   "license": "MIT",
   "homepage": "https://github.com/Sulaiman-Dauda/tidetime#readme",
   "repository": {
@@ -17,8 +17,8 @@
     "calendar",
     "booking",
     "appointments",
-    "calendly-alternative",
-    "cal.com-alternative",
+    "appointment-scheduling",
+    "team-scheduling",
     "nextjs",
     "typescript",
     "self-hosted",
@@ -42,10 +42,12 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
+    "db:migrate:runtime": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
-    "jobs:reminders": "tsx --env-file=.env scripts/run-reminders.ts"
+    "jobs:reminders": "tsx --env-file=.env scripts/run-reminders.ts",
+    "jobs:reminders:runtime": "tsx scripts/run-reminders.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

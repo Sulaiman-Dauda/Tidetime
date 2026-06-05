@@ -7,6 +7,8 @@ import { CopyLinkButton } from "./_components/copy-link-button";
 import { env } from "@/lib/env";
 import { DashboardShell } from "./_components/dashboard-shell";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");

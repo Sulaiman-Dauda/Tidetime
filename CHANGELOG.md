@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- reorganized the documentation into clearer guides for users, admins, self-hosters, and contributors
+- rewrote the main README and core docs in simpler language
+- added a documentation hub, getting started guide, user guide, admin guide, FAQ, and glossary
+
 ## [0.1.0] - 2026-06-01
 
 ### Added

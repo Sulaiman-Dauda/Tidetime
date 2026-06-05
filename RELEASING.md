@@ -1,5 +1,9 @@
 # Releasing Tidetime
 
+> Audience: maintainers preparing releases.
+>
+> If you are looking for user or admin documentation, start with [docs/README.md](./docs/README.md).
+
 This document defines the versioning and release process for Tidetime.
 
 ## Versioning strategy

@@ -1,23 +1,40 @@
 # API Reference
 
-Tidetime exposes a REST API under `/api/v1`.
+> Audience: developers and integrators.
+>
+> If you only want to use Tidetime in the browser, start with [Getting Started](./GETTING_STARTED.md) or the [User Guide](./USER_GUIDE.md).
+
+Tidetime exposes a versioned REST API under `/api/v1`.
+
+## Quick summary
+
+You can use the API to:
+
+- list and manage services
+- look up availability
+- create and manage bookings
+- create booking links
+- list customers
+- manage outgoing webhooks
 
 ## Authentication
 
-Create an API key in **Dashboard → Settings → API keys** and pass it as a bearer token:
+Create an API key in **Dashboard → Settings → API keys**.
+
+Send it as a bearer token:
 
 ```bash
 curl https://your-host.example/api/v1/event-types \
   -H "Authorization: Bearer tt_your_api_key"
 ```
 
-A query-string `apiKey` fallback exists for compatibility, but bearer auth is recommended because it avoids leaking credentials in logs and URLs.
+A query-string `apiKey` fallback exists for compatibility, but bearer auth is recommended because it keeps credentials out of URLs and most logs.
 
 ## Pagination
 
 List endpoints support:
 
-- `limit` (default `50`, max `200`)
+- `limit` — default `50`, maximum `200`
 - `offset`
 - `page`
 
@@ -28,11 +45,15 @@ curl "https://your-host.example/api/v1/bookings?limit=25&page=2" \
   -H "Authorization: Bearer tt_your_api_key"
 ```
 
+## Naming note
+
+In the Tidetime dashboard, the product uses the word **services**.
+
+In the API, the same resource is still named **`event-types`**.
+
 ## Endpoints
 
-### Services (`event-types` in the API)
-
-In the product UI these are called **services**. The API resource name remains `event-types`.
+### Services (`event-types`)
 
 #### `GET /api/v1/event-types`
 
@@ -58,7 +79,7 @@ Example body:
 
 #### `GET /api/v1/event-types/:id`
 
-Fetch a single service owned by the authenticated user.
+Fetch one service owned by the authenticated user.
 
 #### `PATCH /api/v1/event-types/:id`
 
@@ -77,7 +98,7 @@ Public availability lookup for a personal service.
 Notes:
 
 - date ranges are validated and capped
-- duration must be between 5 and 1440 minutes
+- `duration` must be between 5 and 1440 minutes
 
 ### Bookings
 
@@ -85,12 +106,12 @@ Notes:
 
 List bookings for the authenticated user.
 
-Optional query params:
+Optional query parameters include:
 
 - `status`
 - `from`
 - `to`
-- pagination params
+- pagination parameters
 
 #### `POST /api/v1/bookings`
 
@@ -113,7 +134,7 @@ Example body:
 }
 ```
 
-Response:
+Example response:
 
 ```json
 {
@@ -125,7 +146,7 @@ Response:
 
 #### `GET /api/v1/bookings/:uid`
 
-Fetch a single booking owned by the authenticated user.
+Fetch one booking owned by the authenticated user.
 
 #### `PATCH /api/v1/bookings/:uid`
 
@@ -147,9 +168,9 @@ Cancel a booking.
 
 #### `POST /api/v1/booking-links`
 
-Create a temporary booking link for one of your services.
+Create a special booking link for one of your services.
 
-Kinds:
+Supported kinds:
 
 - `one_time`
 - `expiring`
@@ -166,7 +187,7 @@ List customers associated with the authenticated user's bookings.
 
 #### `GET /api/v1/webhooks`
 
-List registered webhooks.
+List registered outgoing webhooks.
 
 #### `POST /api/v1/webhooks`
 
@@ -181,11 +202,11 @@ Example body:
 }
 ```
 
-If no secret is supplied, Tidetime generates one.
+If no secret is supplied, Tidetime generates one for you.
 
 #### `GET /api/v1/webhooks/:id`
 
-Fetch a webhook.
+Fetch one webhook.
 
 #### `PATCH /api/v1/webhooks/:id`
 
@@ -195,9 +216,17 @@ Update a webhook.
 
 Delete a webhook.
 
+## Other useful endpoints
+
+These are not part of the versioned REST surface above, but they are useful operationally:
+
+- `GET /api/health` — simple health check for uptime monitoring
+- `GET /api/slots` — public slot lookup for personal services
+- `GET /api/slots/team` — public slot lookup for team services
+
 ## Outgoing webhook signatures
 
-Outgoing webhook deliveries include:
+Outgoing webhook deliveries include this header:
 
 ```text
 X-Tidetime-Signature-256: sha256=<hex-hmac>
@@ -207,7 +236,7 @@ The signature is the HMAC-SHA256 of the raw JSON payload using the webhook's sec
 
 ## Error format
 
-API errors use a simple JSON shape:
+API errors use a small JSON shape:
 
 ```json
 {
@@ -217,6 +246,14 @@ API errors use a simple JSON shape:
 
 ## Stability guidance
 
-- rely on `/api/v1` paths rather than unversioned internal endpoints
+When building against the API:
+
+- rely on `/api/v1` routes rather than internal unversioned endpoints
 - treat undocumented fields as subject to change
-- update clients when new releases change behavior or validation rules
+- update your client when new releases change validation or behavior
+
+## Related guides
+
+- [Glossary](./GLOSSARY.md)
+- [Deployment](./DEPLOYMENT.md)
+- [Troubleshooting](./TROUBLESHOOTING.md)

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, hasAnyUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   if (!(await hasAnyUser())) redirect("/setup");
   const user = await getCurrentUser();

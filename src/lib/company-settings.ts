@@ -1,10 +1,10 @@
 /**
  * Company-wide settings for a single-company Tidetime instance.
  *
- * Modelled after Easy!Appointments' admin-driven configuration: one company,
- * one admin who configures global branding, localization, business logic and
- * legal contents. Values are persisted in the `app_settings` key/value table
- * (see {@link file://./../server/company-settings.ts}); this module is the pure,
+ * Designed for an admin-driven configuration flow: one company, one admin who
+ * configures global branding, localization, business logic and legal contents.
+ * Values are persisted in the `app_settings` key/value table (see
+ * {@link file://./../server/company-settings.ts}); this module is the pure,
  * testable core — types, defaults and merge/format helpers with no I/O.
  */
 
