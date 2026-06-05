@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const isProd = process.env.NODE_ENV === "production";
 const isBuildCommand = process.env.npm_lifecycle_event === "build";
-const DEFAULT_APP_URL = "http://localhost:3000";
+const DEFAULT_APP_URL = "http://localhost:3100";
 const DEFAULT_DATABASE_URL = "postgres://postgres:postgres@localhost:5432/tidetime";
 const DEFAULT_AUTH_SECRET = "dev-insecure-secret-change-me";
 

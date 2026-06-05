@@ -30,10 +30,10 @@ services:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tidetime}
-      PORT: 3000
+      PORT: 3100
     command: sh -c "npm run db:migrate:runtime && npm run start"
     ports:
-      - "3000:3000"
+      - "3100:3100"
 
   reminders:
     build:

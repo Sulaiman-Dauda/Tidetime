@@ -19,7 +19,7 @@ describe("timeZoneSchema", () => {
 describe("httpUrlSchema", () => {
   it("accepts http and https URLs", () => {
     expect(httpUrlSchema.parse("https://example.com/path")).toBe("https://example.com/path");
-    expect(httpUrlSchema.parse("http://localhost:3000/webhook")).toBe("http://localhost:3000/webhook");
+    expect(httpUrlSchema.parse("http://localhost:3100/webhook")).toBe("http://localhost:3100/webhook");
   });
 
   it("rejects non-http URLs", () => {

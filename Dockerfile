@@ -10,7 +10,7 @@ FROM base AS builder
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN APP_URL=http://localhost:3000 \
+RUN APP_URL=http://localhost:3100 \
     DATABASE_URL=postgres://postgres:postgres@localhost:5432/tidetime \
     AUTH_SECRET=docker-build-auth-secret-please-change-32chars \
     npm run build
@@ -23,7 +23,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=3100
 ENV HOSTNAME=0.0.0.0
 
 RUN addgroup -S nodejs -g 1001 \
@@ -43,9 +43,9 @@ COPY --from=builder /app/next-env.d.ts ./next-env.d.ts
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 3100
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then((r)=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3100/api/health')".then((r)=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["npm", "run", "start"]

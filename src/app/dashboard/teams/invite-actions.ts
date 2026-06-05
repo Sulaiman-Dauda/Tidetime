@@ -68,7 +68,7 @@ export async function createInviteAction(_prev: InviteState, formData: FormData)
   });
 
   const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, parsed.data.teamId)).limit(1);
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const appUrl = process.env.APP_URL || "http://localhost:3100";
   const inviteUrl = `${appUrl}/signup?invite=${token}`;
 
   const email = inviteEmail({

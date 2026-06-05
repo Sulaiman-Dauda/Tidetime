@@ -146,7 +146,7 @@ Demo account:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3100](http://localhost:3100).
 
 On a brand-new instance, Tidetime opens the setup flow so you can create the owner account and then your first service.
 
@@ -157,7 +157,7 @@ Copy `.env.example` to `.env` and set the values you need.
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `NODE_ENV` | no | `development` | Tells Tidetime whether it is running locally or in production |
-| `APP_URL` | yes in production | `http://localhost:3000` | The public web address people use to reach your Tidetime app |
+| `APP_URL` | yes in production | `http://localhost:3100` | The public web address people use to reach your Tidetime app |
 | `APP_NAME` | no | `Tidetime` | The product name shown in the app |
 | `DATABASE_URL` | yes in production | local Postgres URL | Connection string for PostgreSQL |
 | `AUTH_SECRET` | yes in production | none | Secret used to secure stored credentials and sessions |
@@ -210,7 +210,7 @@ Tidetime exposes a versioned REST API under `/api/v1`.
 Create an API key in **Settings → API keys**, then send it as a bearer token:
 
 ```bash
-curl http://localhost:3000/api/v1/event-types \
+curl http://localhost:3100/api/v1/event-types \
   -H "Authorization: Bearer tt_your_api_key"
 ```
 
