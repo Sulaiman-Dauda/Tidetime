@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    shm_size: 256mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -11,8 +12,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tidetime}"]
       interval: 5s
-      timeout: 3s
-      retries: 20
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   app:
     build:
