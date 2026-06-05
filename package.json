@@ -42,12 +42,12 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
-    "db:migrate:runtime": "tsx src/db/migrate.ts",
+    "db:migrate:runtime": "tsx --require ./scripts/suppress-server-only.cjs src/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
     "jobs:reminders": "tsx --env-file=.env scripts/run-reminders.ts",
-    "jobs:reminders:runtime": "tsx scripts/run-reminders.ts"
+    "jobs:reminders:runtime": "tsx --require ./scripts/suppress-server-only.cjs scripts/run-reminders.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -78,7 +78,6 @@
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "server-only": "^0.0.1",
     "stripe": "^22.2.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
