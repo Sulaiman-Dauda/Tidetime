@@ -59,8 +59,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   typedRoutes: true,
-  // Emit a self-contained server build for minimal Docker images.
-  output: "standalone",
+  // Emit a standard production build compatible with "next start".
+  // output: "standalone",
   async headers() {
     return [
       // Sensitive routes are protected against clickjacking.

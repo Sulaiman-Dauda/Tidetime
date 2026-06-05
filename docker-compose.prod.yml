@@ -33,7 +33,7 @@ services:
       PORT: 3100
     command: sh -c "npm run db:migrate:runtime && npm run start"
     ports:
-      - "3100:3100"
+      - "3000:3100"
 
   reminders:
     build:
@@ -43,6 +43,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      app:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -51,7 +53,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tidetime}
       REMINDER_INTERVAL_SECONDS: ${REMINDER_INTERVAL_SECONDS:-300}
     command: >-
-      sh -c "while true; do npm run jobs:reminders:runtime; sleep ${REMINDER_INTERVAL_SECONDS:-300}; done"
+      sh -c "sleep 5; while true; do npm run jobs:reminders:runtime; sleep ${REMINDER_INTERVAL_SECONDS:-300}; done"
 
 volumes:
   tidetime_pgdata:
