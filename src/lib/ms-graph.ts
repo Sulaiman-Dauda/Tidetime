@@ -22,7 +22,7 @@ export function parseGraphDate(value?: { dateTime?: string; timeZone?: string })
 }
 
 /** showAs values that should count as busy for availability purposes. */
-export const GRAPH_BUSY_STATES = new Set(["busy", "oof", "workingElsewhere", "tentative"]);
+const GRAPH_BUSY_STATES = new Set(["busy", "oof", "workingElsewhere", "tentative"]);
 
 export function isGraphEventBusy(ev: { showAs?: string; isCancelled?: boolean }): boolean {
   if (ev.isCancelled) return false;

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { webhooks, webhookTrigger } from "@/db/schema";
 import { authenticateApiKey, unauthorized, jsonError } from "@/server/api-auth";
 import { webhookUrlSchema } from "@/lib/schemas";
+import { assertPublicUrl } from "@/server/ssrf";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  // Same up-front SSRF check as registration when the target URL changes.
+  if (parsed.data.subscriberUrl) {
+    try {
+      await assertPublicUrl(parsed.data.subscriberUrl);
+    } catch (err) {
+      return jsonError(err instanceof Error ? err.message : "URL is not allowed");
+    }
+  }
 
   const [row] = await db
     .update(webhooks)

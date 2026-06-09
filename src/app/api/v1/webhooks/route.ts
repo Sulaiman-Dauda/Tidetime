@@ -12,6 +12,7 @@ import {
 } from "@/server/api-auth";
 import { randomToken } from "@/lib/crypto";
 import { webhookUrlSchema } from "@/lib/schemas";
+import { assertPublicUrl } from "@/server/ssrf";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,15 @@ export async function POST(req: NextRequest) {
   }
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  // Reject URLs that resolve to non-public addresses up front. Delivery re-checks
+  // before every send (DNS rebinding), but failing fast here gives the caller a
+  // clear error instead of a webhook that silently never delivers.
+  try {
+    await assertPublicUrl(parsed.data.subscriberUrl);
+  } catch (err) {
+    return jsonError(err instanceof Error ? err.message : "URL is not allowed");
+  }
 
   const [row] = await db
     .insert(webhooks)

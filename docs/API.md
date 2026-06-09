@@ -438,6 +438,8 @@ Register a webhook. **Rate-limited to 120/min.**
 
 Returns `201` with the created webhook (including its `secret`).
 
+The `subscriberUrl` is resolved and SSRF-checked when you register or update it — a URL that points at a private or non-resolvable address is rejected with `400`. The same check runs again before every delivery.
+
 #### `GET /api/v1/webhooks/:id`
 
 Fetch one webhook, or `404`.

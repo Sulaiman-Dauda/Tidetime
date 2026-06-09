@@ -10,17 +10,6 @@ export function formatTime(date: Date, timeZone: string, hour12 = true): string 
   }).format(date);
 }
 
-/** Render a UTC instant as a long date in a given zone. */
-export function formatLongDate(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
 /** Render a full date+time range, e.g. "Mon, Jun 1 · 9:00–9:30 AM (GMT+1)". */
 export function formatRange(start: Date, end: Date, timeZone: string, hour12 = true): string {
   const date = new Intl.DateTimeFormat("en-US", {

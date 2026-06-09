@@ -8,6 +8,7 @@ import { users, schedules, availabilities, appSettings, teams, memberships } fro
 import { hashPassword } from "@/lib/crypto";
 import { createSession, hasAnyUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
+import { fieldErrorsFromIssues } from "@/lib/schemas";
 import {
   COMPANY_SETTING_KEYS,
   DEFAULT_COMPANY_PROFILE,
@@ -67,11 +68,7 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     confirmPassword: formData.get("confirmPassword"),
     timeZone: formData.get("timeZone"),
   });
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as string] = issue.message;
-    return { fieldErrors };
-  }
+  if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
 
   const { name, email, password, instanceName } = parsed.data;
   const username = deriveUsername(email);

@@ -278,6 +278,16 @@ gunzip -c tidetime-2026-06-04.sql.gz | \
 
 After a restore, verify that you can sign in, `/api/health` returns `200`, a public booking page loads, and the background jobs still run.
 
+## Logs
+
+The Compose stack caps container logs at 20 MB × 3 files per service (json-file driver), so logs can't fill the host disk. View them with:
+
+```bash
+docker compose -p tidetime -f docker-compose.prod.yml logs -f app
+```
+
+If you run the manual Node path instead, put the app behind a process manager that rotates logs (systemd journal, pm2 with logrotate, etc.).
+
 ## Upgrades
 
 - **Installer / Docker path:** re-run `./install.sh` (it preserves your secrets), or pull the new source and run `docker compose -p tidetime -f docker-compose.prod.yml up -d --build`. Migrations run automatically on app start.

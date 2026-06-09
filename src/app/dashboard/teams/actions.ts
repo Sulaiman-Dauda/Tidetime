@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { teams, memberships, users, type MembershipRole } from "@/db/schema";
 import { can, canAssignRole } from "@/lib/rbac";
+import { teamRole } from "@/server/memberships";
 import { parseCsvRecords, validateProviderImport } from "@/lib/csv";
 
 export type TeamState = { ok?: boolean; error?: string } | null;
@@ -44,16 +45,6 @@ export async function createTeamAction(_prev: TeamState, formData: FormData): Pr
   return { ok: true };
 }
 
-/** Resolve the caller's role on a team, or null if they're not a member. */
-async function callerRole(userId: number, teamId: number): Promise<MembershipRole | null> {
-  const [m] = await db
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(and(eq(memberships.userId, userId), eq(memberships.teamId, teamId)))
-    .limit(1);
-  return m?.role ?? null;
-}
-
 const roleSchema = z.object({
   teamId: z.coerce.number().int().positive(),
   membershipId: z.coerce.number().int().positive(),
@@ -70,7 +61,7 @@ export async function changeMemberRoleAction(_prev: TeamState, formData: FormDat
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const role = await callerRole(user.id, parsed.data.teamId);
+  const role = await teamRole(user.id, parsed.data.teamId);
   if (!role || !can(role, "member.role.assign")) return { error: "You don't have permission to change roles" };
 
   const [target] = await db
@@ -107,7 +98,7 @@ export async function removeMemberAction(_prev: TeamState, formData: FormData): 
   });
   if (!parsed.success) return { error: "Invalid request" };
 
-  const role = await callerRole(user.id, parsed.data.teamId);
+  const role = await teamRole(user.id, parsed.data.teamId);
   if (!role || !can(role, "member.remove")) return { error: "You don't have permission to remove members" };
 
   const [target] = await db
@@ -136,7 +127,7 @@ export async function bulkImportMembersAction(_prev: ImportState, formData: Form
     return { error: "Invalid request" };
   }
 
-  const role = await callerRole(user.id, teamId);
+  const role = await teamRole(user.id, teamId);
   if (!role || !can(role, "member.invite")) return { error: "You don't have permission to import members" };
 
   const { valid, errors } = validateProviderImport(parseCsvRecords(csv));

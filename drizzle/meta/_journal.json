@@ -113,6 +113,13 @@
       "when": 1780838292085,
       "tag": "0015_multi_attendant",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1781040597374,
+      "tag": "0016_drop_organizations",
+      "breakpoints": true
     }
   ]
 }

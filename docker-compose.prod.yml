@@ -1,7 +1,16 @@
+# Cap container log growth — Docker's default json-file driver is unbounded
+# and will eventually fill the host disk on a long-running deployment.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    logging: *default-logging
     shm_size: 256mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -21,6 +30,7 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,6 +60,7 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy

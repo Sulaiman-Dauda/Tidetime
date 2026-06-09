@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eq, and, ne } from "drizzle-orm";
-import { requireUser } from "@/lib/auth";
+import { requireUser, revokeOtherSessions } from "@/lib/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
@@ -86,5 +86,7 @@ export async function updatePasswordAction(_prev: SettingsState, formData: FormD
 
   const hash = await hashPassword(parsed.data.next);
   await db.update(users).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(users.id, user.id));
+  // Revoke every other session so a stolen session can't outlive a password change.
+  await revokeOtherSessions(user.id);
   return { ok: true };
 }

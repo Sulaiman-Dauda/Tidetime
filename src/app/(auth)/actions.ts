@@ -11,6 +11,7 @@ import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
 import { requestPasswordReset, resetPassword } from "@/server/password-reset";
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
+import { fieldErrorsFromIssues } from "@/lib/schemas";
 
 /** Best-effort client IP for rate-limit keys, from forwarding headers. */
 async function clientIp(): Promise<string> {
@@ -36,8 +37,6 @@ const signupSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
   timeZone: z.string().optional(),
   inviteToken: z.string(),
-  teamId: z.coerce.number().int(),
-  role: z.string(),
 });
 
 export type ActionResult = { error?: string; fieldErrors?: Record<string, string> };
@@ -50,14 +49,8 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
     password: formData.get("password"),
     timeZone: formData.get("timeZone"),
     inviteToken: formData.get("inviteToken"),
-    teamId: formData.get("teamId"),
-    role: formData.get("role"),
   });
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as string] = issue.message;
-    return { fieldErrors };
-  }
+  if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
 
   // Throttle signups per source IP to curb automated account creation.
   const signupLimit = checkRateLimit(`signup:${await clientIp()}`, {
@@ -78,7 +71,7 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
     .where(and(eq(invites.token, inviteToken), isNull(invites.acceptedAt), gt(invites.expiresAt, new Date())))
     .limit(1);
   if (!invite) return { error: "This invitation is invalid or has expired." };
-  if (invite.email !== email) return { error: "The email doesn't match the invitation." };
+  if (invite.email.toLowerCase() !== email) return { error: "The email doesn't match the invitation." };
 
   if (RESERVED.has(username)) return { fieldErrors: { username: "That username is reserved" } };
 
@@ -132,11 +125,7 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
     email: formData.get("email"),
     password: formData.get("password"),
   });
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as string] = issue.message;
-    return { fieldErrors };
-  }
+  if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
 
   // Throttle credential attempts per IP and per targeted email to curb brute
   // force and credential stuffing without leaking whether an account exists.
@@ -189,9 +178,10 @@ export async function requestPasswordResetAction(
   const parsed = forgotSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid email" };
 
-  // Throttle by email to curb abuse / enumeration probing.
+  // Throttle by email and by source IP to curb abuse / enumeration probing.
   const limited = checkRateLimit(`pwreset:${parsed.data.email}`, { limit: 5, windowMs: 60 * 60 * 1000 });
-  if (!limited.ok) return { error: "Too many requests. Please try again later." };
+  const ipLimited = checkRateLimit(`pwreset-ip:${await clientIp()}`, { limit: 15, windowMs: 60 * 60 * 1000 });
+  if (!limited.ok || !ipLimited.ok) return { error: "Too many requests. Please try again later." };
 
   await requestPasswordReset(parsed.data.email);
   // Always report success — never reveal whether the email exists.

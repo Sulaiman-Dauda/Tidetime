@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
 import { invites, memberships, teams, users } from "@/db/schema";
 import { can, canAssignRole } from "@/lib/rbac";
+import { teamRole } from "@/server/memberships";
 import { inviteEmail } from "@/server/emails";
 import { sendMail } from "@/server/mailer";
 import { randomToken } from "@/lib/crypto";
@@ -28,15 +29,11 @@ export async function createInviteAction(_prev: InviteState, formData: FormData)
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
-  const [membership] = await db
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(and(eq(memberships.teamId, parsed.data.teamId), eq(memberships.userId, user.id)))
-    .limit(1);
-  if (!membership || !can(membership.role, "member.invite")) {
+  const role = await teamRole(user.id, parsed.data.teamId);
+  if (!role || !can(role, "member.invite")) {
     return { error: "You don't have permission to invite members" };
   }
-  if (!canAssignRole(membership.role, parsed.data.role)) {
+  if (!canAssignRole(role, parsed.data.role)) {
     return { error: "You can't assign that role" };
   }
 

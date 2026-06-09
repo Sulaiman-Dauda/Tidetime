@@ -108,7 +108,7 @@ Examples:
 - **Settings** is for workspace setup and has five tabs: Brand, Booking, Reviews, API keys, and Legal
 - **Integrations** is where you connect outside services and has tabs for Calendars, Video, CRM, Payments, Email, and Setup
 
-If you want to change your name or password, use **Profile settings**.
+If you want to change your name or password, use **Profile settings**. Changing your password signs you out everywhere else — every other active session is revoked, and only the browser you changed it from stays signed in.
 
 If you want to change branding, booking defaults, reviews, or legal pages, use **Settings**.
 

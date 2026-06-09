@@ -66,7 +66,7 @@ export default async function SignupPage({ searchParams }: Props) {
         </p>
       </div>
 
-      <SignupForm inviteToken={invite} inviteEmail={inviteRow.email} teamId={inviteRow.teamId} role={inviteRow.role} />
+      <SignupForm inviteToken={invite} inviteEmail={inviteRow.email} />
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}

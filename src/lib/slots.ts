@@ -18,6 +18,39 @@ export interface Interval {
   end: number;
 }
 
+/** Hard cap on the date span a public slots request may ask for. */
+export const MAX_PUBLIC_RANGE_DAYS = 93;
+
+export type PublicSlotRange =
+  | { ok: true; rangeStart: Date; rangeEnd: Date }
+  | { ok: false; error: string };
+
+/**
+ * Parse and validate the start/end query params of a public slots request.
+ * Defaults to a 33-day window from the requested start (or today).
+ */
+export function parsePublicSlotRange(
+  startParam: string | null,
+  endParam: string | null,
+): PublicSlotRange {
+  const rangeStart = startParam ? new Date(`${startParam}T00:00:00Z`) : new Date();
+  const rangeEnd = endParam
+    ? new Date(`${endParam}T23:59:59Z`)
+    : new Date(rangeStart.getTime() + 33 * 24 * 60 * 60 * 1000);
+
+  if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+    return { ok: false, error: "Invalid date range" };
+  }
+  if (rangeEnd < rangeStart) {
+    return { ok: false, error: "End date must be after start date" };
+  }
+  const spanDays = (rangeEnd.getTime() - rangeStart.getTime()) / (24 * 60 * 60 * 1000);
+  if (spanDays > MAX_PUBLIC_RANGE_DAYS) {
+    return { ok: false, error: `Range cannot exceed ${MAX_PUBLIC_RANGE_DAYS} days` };
+  }
+  return { ok: true, rangeStart, rangeEnd };
+}
+
 export interface AvailabilityRule {
   /** weekday integers 0-6 for recurring rules; empty for date overrides */
   days: number[];

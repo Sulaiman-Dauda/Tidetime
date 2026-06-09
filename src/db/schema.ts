@@ -125,29 +125,13 @@ export const verificationTokens = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
-/*  Organizations, teams & memberships                                        */
+/*  Teams & memberships                                                       */
 /* -------------------------------------------------------------------------- */
-
-export const organizations = pgTable(
-  "organizations",
-  {
-    id: serial("id").primaryKey(),
-    slug: varchar("slug", { length: 64 }).notNull(),
-    name: varchar("name", { length: 128 }).notNull(),
-    logoUrl: text("logo_url"),
-    brandColor: varchar("brand_color", { length: 9 }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("organizations_slug_idx").on(t.slug)],
-);
 
 export const teams = pgTable(
   "teams",
   {
     id: serial("id").primaryKey(),
-    organizationId: integer("organization_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }),
     slug: varchar("slug", { length: 64 }).notNull(),
     name: varchar("name", { length: 128 }).notNull(),
     logoUrl: text("logo_url"),
@@ -162,10 +146,7 @@ export const teams = pgTable(
     reviewThreshold: integer("review_threshold").notNull().default(4),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    uniqueIndex("teams_slug_idx").on(t.slug),
-    index("teams_org_idx").on(t.organizationId),
-  ],
+  (t) => [uniqueIndex("teams_slug_idx").on(t.slug)],
 );
 
 export const memberships = pgTable(
@@ -1141,8 +1122,6 @@ export type Schedule = typeof schedules.$inferSelect;
 export type Availability = typeof availabilities.$inferSelect;
 export type Team = typeof teams.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
-export type Organization = typeof organizations.$inferSelect;
-export type NewOrganization = typeof organizations.$inferInsert;
 export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 export type BookingLink = typeof bookingLinks.$inferSelect;

@@ -19,21 +19,15 @@ function SubmitButton() {
 export function SignupForm({
   inviteToken,
   inviteEmail,
-  teamId,
-  role,
 }: {
   inviteToken: string;
   inviteEmail: string;
-  teamId: number;
-  role: string;
 }) {
   const [state, formAction] = useActionState<ActionResult, FormData>(signupAction, {});
 
   return (
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="inviteToken" value={inviteToken} />
-      <input type="hidden" name="teamId" value={teamId} />
-      <input type="hidden" name="role" value={role} />
 
       {state.error && (
         <p className="rounded-md border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">

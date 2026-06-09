@@ -417,7 +417,7 @@ export function BookingFlow({
                   >
                     Any available
                   </button>
-                  {teamHosts!.map((th) => (
+                  {(teamHosts ?? []).map((th) => (
                     <button
                       key={th.id}
                       onClick={() => setSelectedHostId(th.id)}

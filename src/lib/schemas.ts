@@ -2,6 +2,13 @@ import { z } from "zod";
 import { isValidTimeZone } from "@/lib/time";
 import { isBlockedHostname } from "@/lib/ssrf";
 
+/** Map Zod issues to a per-field error record for form actions. */
+export function fieldErrorsFromIssues(issues: z.ZodIssue[]): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of issues) fieldErrors[issue.path[0] as string] = issue.message;
+  return fieldErrors;
+}
+
 function optionalTrimmedString(max: number) {
   return z.preprocess((value) => {
     if (typeof value !== "string") return value;

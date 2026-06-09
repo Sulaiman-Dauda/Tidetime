@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
 import { randomToken, sha256 } from "./crypto";
@@ -25,6 +25,20 @@ export async function createSession(userId: number): Promise<void> {
     path: "/",
     expires: expiresAt,
   });
+}
+
+/** Revoke all of a user's sessions except the one making this request. */
+export async function revokeOtherSessions(userId: number): Promise<void> {
+  const store = await cookies();
+  const token = store.get(COOKIE_NAME)?.value;
+  const currentId = token ? sha256(token) : null;
+  await db
+    .delete(sessions)
+    .where(
+      currentId
+        ? and(eq(sessions.userId, userId), ne(sessions.id, currentId))
+        : eq(sessions.userId, userId),
+    );
 }
 
 /** Destroy the current session. */
