@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
+import { formatMoney } from "@/lib/payments";
 import { Loader2, CreditCard, AlertTriangle } from "lucide-react";
 
 export function StripeCheckout({
@@ -25,10 +26,7 @@ export function StripeCheckout({
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const displayAmount = (amount / 100).toLocaleString(undefined, {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  });
+  const displayAmount = formatMoney(amount, currency);
 
   async function finalizePayment(paymentIntentId: string) {
     const res = await fetch("/api/stripe/complete", {

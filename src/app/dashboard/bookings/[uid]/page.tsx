@@ -44,6 +44,7 @@ const ACTIVITY_META: Record<
   reminder_sent: { label: "Reminder sent", icon: Mail, tone: "text-sky-500" },
   review_submitted: { label: "Review submitted", icon: Star, tone: "text-amber-500" },
   no_show: { label: "Marked no-show", icon: UserX, tone: "text-destructive" },
+  rsvp: { label: "RSVP", icon: CheckCircle2, tone: "text-sky-500" },
 };
 
 function formatResponseValue(value: unknown): string {

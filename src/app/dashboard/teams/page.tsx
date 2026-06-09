@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { CreateTeam } from "./create-team";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { Users } from "lucide-react";
 
 export const metadata = { title: "Teams" };
@@ -23,24 +25,18 @@ export default async function TeamsPage() {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Teams</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Collaborate on shared services and round-robin scheduling.
-          </p>
-        </div>
-        <CreateTeam />
-      </div>
+      <PageHeader
+        title="Teams"
+        description="Collaborate on shared services and round-robin scheduling."
+        action={<CreateTeam />}
+      />
 
       {rows.length === 0 ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-border py-20 text-center">
-          <Users className="h-7 w-7 text-muted-foreground/50" />
-          <p className="mt-3 text-sm font-medium text-foreground">No teams yet</p>
-          <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-            Create a team to collaborate on collective and round-robin services.
-          </p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="No teams yet"
+          description="Create a team to collaborate on collective and round-robin services."
+        />
       ) : (
         <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
           {rows.map(({ team, role }) => (
@@ -55,7 +51,7 @@ export default async function TeamsPage() {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-medium text-foreground">{team.name}</span>
+                  <span className="text-sm font-medium text-foreground">{team.name}</span>
                   <Badge variant="secondary" className="capitalize text-[11px]">
                     {role}
                   </Badge>

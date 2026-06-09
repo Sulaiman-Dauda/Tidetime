@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/auth";
 import { listReviews, reviewStats } from "@/server/reviews";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "../_components/page-header";
 import { DeleteReviewButton } from "./delete-review-button";
 import { Star, MessageSquare } from "lucide-react";
 
@@ -27,13 +29,10 @@ export default async function ReviewsPage() {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Reviews</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Feedback collected after bookings. Happy attendees are directed to your public review
-          page; the rest stays private here.
-        </p>
-      </div>
+      <PageHeader
+        title="Reviews"
+        description="Feedback collected after bookings. Happy attendees are directed to your public review page; the rest stays private here."
+      />
 
       {stats.count > 0 && (
         <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-[13px] text-muted-foreground">
@@ -86,13 +85,11 @@ export default async function ReviewsPage() {
 
       {/* Review list */}
       {reviews.length === 0 ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-border py-20 text-center">
-          <MessageSquare className="h-7 w-7 text-muted-foreground/50" />
-          <p className="mt-3 text-sm font-medium text-foreground">No reviews yet</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Reviews appear here after attendees submit feedback.
-          </p>
-        </div>
+        <EmptyState
+          icon={MessageSquare}
+          title="No reviews yet"
+          description="Reviews appear here once attendees submit feedback after their bookings."
+        />
       ) : (
         <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
           {reviews.map((r) => (

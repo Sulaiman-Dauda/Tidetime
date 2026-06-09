@@ -51,7 +51,7 @@ export function DeleteBlockedPeriodButton({ id }: { id: number }) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
               disabled={pending}
             >
-              {pending ? "Deleting…" : "Delete"}
+              {pending ? "Deleting…" : "Delete blocked period"}
             </AlertDialogAction>
           </form>
         </AlertDialogFooter>

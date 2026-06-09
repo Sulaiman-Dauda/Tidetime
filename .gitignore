@@ -35,3 +35,8 @@ yarn-error.log*
 
 # Note: drizzle/meta is intentionally committed — it is required for
 # incremental migration generation.
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

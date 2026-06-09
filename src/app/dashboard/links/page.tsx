@@ -1,5 +1,9 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { listBookingLinks, userEventTypesForLinks } from "@/server/booking-links";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "../_components/page-header";
 import { LinkManager } from "./link-manager";
 import { LinkIcon } from "lucide-react";
 
@@ -14,20 +18,22 @@ export default async function LinksPage() {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Booking Links</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Create single-use, expiring, limited, or invite-only links to share specific availability.
-        </p>
-      </div>
+      <PageHeader
+        title="Booking Links"
+        description="Create single-use, expiring, limited, or invite-only links to share specific availability."
+      />
 
       {eventTypes.length === 0 ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed border-border py-20 text-center">
-          <LinkIcon className="h-8 w-8 text-muted-foreground" />
-          <p className="mt-3 text-sm text-muted-foreground">
-            Create a service first to generate booking links.
-          </p>
-        </div>
+        <EmptyState
+          icon={LinkIcon}
+          title="No services to link yet"
+          description="Create a service first, then generate booking links to share its availability."
+          action={
+            <Button asChild size="sm">
+              <Link href="/dashboard/event-types">Create a service</Link>
+            </Button>
+          }
+        />
       ) : (
         <LinkManager eventTypes={eventTypes} links={links} />
       )}

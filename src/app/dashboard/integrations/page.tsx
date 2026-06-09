@@ -1,82 +1,43 @@
 import { requirePermission } from "@/lib/guard";
-import { getStripeConfig } from "@/server/settings";
 import { getCurrentUser } from "@/lib/auth";
-import { isGoogleConnected } from "@/server/google-calendar";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CreditCard, Mail, Webhook, Calendar } from "lucide-react";
+import { getAppStatuses } from "@/app-store/registry";
+import { getCredentialStatuses } from "@/server/integration-credentials";
+import { getLicenseInfo } from "@/server/license";
+import { getFeatureFlags } from "@/server/feature-flags";
+import { env } from "@/lib/env";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
+import { IntegrationsHub } from "./integrations-hub";
 
-export const metadata = { title: "Connections" };
+export const metadata = { title: "Integrations" };
 
 export default async function IntegrationsPage() {
-  await requirePermission("team.manage");
+  const { role } = await requirePermission("team.manage");
   const user = await getCurrentUser();
-  const stripeConfig = await getStripeConfig();
-  const stripeConfigured = Boolean(
-    stripeConfig?.publishableKey && stripeConfig?.secretKey && stripeConfig?.webhookSecret,
-  );
-  const googleConnected = user ? await isGoogleConnected(user.id) : false;
+  const [statuses, credentialStatuses, license, flags] = await Promise.all([
+    user ? getAppStatuses(user.id) : Promise.resolve([]),
+    getCredentialStatuses(),
+    getLicenseInfo(),
+    getFeatureFlags(),
+  ]);
 
-  const items = [
-    {
-      name: "Google Calendar",
-      icon: Calendar,
-      badge: googleConnected
-        ? { label: "Connected", variant: "success" as const }
-        : { label: "Available", variant: "outline" as const },
-      description: googleConnected
-        ? "Your Google Calendar is connected. Busy time is synced and new bookings create calendar events."
-        : "Connect your Google Calendar to sync availability and create events automatically.",
-    },
-    {
-      name: "Email (SMTP)",
-      icon: Mail,
-      badge: { label: "Ready", variant: "success" as const },
-      description: "Configure and test SMTP in Settings → Email for confirmations, reminders, and cancellations.",
-    },
-    {
-      name: "Webhooks",
-      icon: Webhook,
-      badge: { label: "Ready", variant: "success" as const },
-      description: "Outgoing booking lifecycle webhooks are available today through the REST API.",
-    },
-    {
-      name: "Stripe",
-      icon: CreditCard,
-      badge: stripeConfigured
-        ? { label: "Configured", variant: "success" as const }
-        : { label: "Optional", variant: "secondary" as const },
-      description: stripeConfigured
-        ? "Stripe is configured for live paid-booking checkout, payment webhooks, and attendee card collection."
-        : "Add your Stripe publishable key, secret key, and webhook secret in Settings → Stripe to accept payments.",
-    },
-  ];
+  const isAdmin = Boolean(user?.isAdmin) || role === "owner" || role === "admin";
+  // CRM is a business feature: only surface its cards once the instance opts in.
+  const crm = flags.crm ? statuses.filter((a) => a.category === "crm") : [];
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Connections</h1>
-        <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-          Connect Tidetime to the tools you already use.
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {items.map(({ name, icon: Icon, badge, description }) => (
-          <Card key={name} className="space-y-4 p-5">
-            <div className="flex items-start justify-between gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-secondary text-foreground">
-                <Icon className="h-4 w-4" />
-              </span>
-              <Badge variant={badge.variant}>{badge.label}</Badge>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">{name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <PageHeader
+        title="Integrations"
+        description="Connect Tidetime to your calendar, video, CRM, payments and email. Staff connect their own accounts in one click; an admin sets up provider credentials once under Setup."
+      />
+      <IntegrationsHub
+        appUrl={env.appUrl}
+        video={statuses.filter((a) => a.category === "video")}
+        crm={crm}
+        credentialStatuses={credentialStatuses}
+        isAdmin={isAdmin}
+        edition={{ licensed: license.edition === "licensed", plan: license.plan ?? null }}
+      />
     </div>
   );
 }

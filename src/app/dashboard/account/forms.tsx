@@ -44,13 +44,23 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
   const [pwState, pwAction, pwPending] = useActionState<SettingsState, FormData>(updatePasswordAction, null);
 
   useEffect(() => {
-    if (profileState?.ok) toast({ title: "Profile saved" });
-    if (profileState?.error) toast({ title: profileState.error, variant: "destructive" });
+    if (profileState?.ok) toast({ title: "Changes saved", description: "Your profile has been updated." });
+    if (profileState?.error)
+      toast({
+        title: "Couldn't save changes",
+        description: profileState.error || "Please check your details and try again.",
+        variant: "destructive",
+      });
   }, [profileState, toast]);
 
   useEffect(() => {
     if (pwState?.ok) toast({ title: "Password updated" });
-    if (pwState?.error) toast({ title: pwState.error, variant: "destructive" });
+    if (pwState?.error)
+      toast({
+        title: "Couldn't update password",
+        description: pwState.error || "Please check your details and try again.",
+        variant: "destructive",
+      });
   }, [pwState, toast]);
 
   return (

@@ -8,7 +8,7 @@ export interface ReminderRule {
   id: number;
   /** minutes before the event start to send the reminder */
   offsetMinutes: number;
-  action: "email_attendee" | "email_host" | "sms_attendee";
+  action: "email_attendee" | "email_host";
 }
 
 export interface PlannedReminder {

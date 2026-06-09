@@ -17,14 +17,19 @@ export interface TeamSlot {
 /**
  * Merge per-host slot lists into the team's bookable slots.
  *
- * - "round_robin" and "managed": a slot is offered if ANY host is free
- *   (union). seatsRemaining is the sum across free hosts.
+ * - "round_robin" and "managed": a slot is offered if at least `requiredHosts`
+ *   hosts are free. For ordinary services (`requiredHosts` = 1) that's "ANY host
+ *   free" and seatsRemaining is the sum across free hosts. For multi-attendant
+ *   services (`requiredHosts` > 1) each booking occupies N staff at once, so the
+ *   slot is offered only when ≥ N are free and seatsRemaining is how many such
+ *   N-staff bookings fit, i.e. floor(freeHosts / N).
  * - "collective": a slot is offered only if EVERY host is free
  *   (intersection), since all hosts attend together.
  */
 export function mergeTeamSlots(
   schedulingType: SchedulingType,
   hosts: HostSlots[],
+  requiredHosts = 1,
 ): TeamSlot[] {
   if (hosts.length === 0) return [];
 
@@ -39,13 +44,17 @@ export function mergeTeamSlots(
   }
 
   const requireAll = schedulingType === "collective";
+  // How many free hosts a single booking consumes. Collective takes the whole
+  // team; otherwise it's the multi-attendant count, clamped to the roster size.
+  const needed = requireAll ? hosts.length : Math.min(Math.max(1, requiredHosts), hosts.length);
+
   const result: TeamSlot[] = [];
   for (const [time, entry] of byTime) {
-    if (requireAll && entry.hostIds.length < hosts.length) continue;
+    if (entry.hostIds.length < needed) continue;
     result.push({
       time,
       hostIds: entry.hostIds,
-      seatsRemaining: requireAll ? Math.min(...hosts.map(() => 1)) : entry.seats,
+      seatsRemaining: needed > 1 ? Math.floor(entry.hostIds.length / needed) : entry.seats,
     });
   }
   result.sort((a, b) => a.time.localeCompare(b.time));

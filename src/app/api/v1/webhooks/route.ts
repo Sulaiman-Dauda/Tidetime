@@ -3,9 +3,15 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { webhooks, webhookTrigger } from "@/db/schema";
-import { authenticateApiKey, unauthorized, jsonError, parsePage } from "@/server/api-auth";
+import {
+  authenticateApiKey,
+  unauthorized,
+  jsonError,
+  parsePage,
+  enforceApiRateLimit,
+} from "@/server/api-auth";
 import { randomToken } from "@/lib/crypto";
-import { httpUrlSchema } from "@/lib/schemas";
+import { webhookUrlSchema } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +32,9 @@ export async function GET(req: NextRequest) {
 }
 
 const createSchema = z.object({
-  subscriberUrl: httpUrlSchema,
+  subscriberUrl: webhookUrlSchema,
   triggers: z.array(z.enum(TRIGGERS as [string, ...string[]])).min(1),
-  secret: z.string().min(8).optional(),
+  secret: z.string().min(8).max(256).optional(),
   eventTypeId: z.number().int().positive().optional(),
   active: z.boolean().optional(),
 });
@@ -37,6 +43,8 @@ const createSchema = z.object({
 export async function POST(req: NextRequest) {
   const user = await authenticateApiKey(req);
   if (!user) return unauthorized();
+  const limited = enforceApiRateLimit(user);
+  if (limited) return limited;
 
   let body: unknown;
   try {

@@ -1,10 +1,17 @@
 import "server-only";
-import { and, eq, gte, lt, inArray } from "drizzle-orm";
+import { and, eq, gte, lt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, attendees, eventTypes, eventTypeHosts, teams, users, bookingReferences, type BookingField } from "@/db/schema";
+import { bookings, attendees, bookingHosts, eventTypes, eventTypeHosts, teams, users, bookingReferences, type BookingField } from "@/db/schema";
 import { checkTeamCapacity, CAPACITY_MESSAGES, type CapacityRule } from "@/lib/team-availability";
 import { shortId } from "@/lib/crypto";
-import { getPublicEventType, isSlotBookable, type ResolvedEventType } from "./availability";
+import {
+  getPublicEventType,
+  isSlotBookable,
+  hostHasConflict,
+  slotBookingCount,
+  bookingLimitExceeded,
+  type ResolvedEventType,
+} from "./availability";
 import { resolveLocation } from "@/lib/locations";
 import { sendMail } from "./mailer";
 import {
@@ -17,17 +24,29 @@ import { assignTeamHosts } from "./round-robin";
 import { scheduleRemindersForBooking, cancelRemindersForBooking } from "./reminders";
 import { createBookingPayment, refundBookingPayment } from "./stripe";
 import { resolveBookingLink, consumeBookingLink } from "./booking-links";
-import { reserveResourcesForBooking } from "./resources";
 import { getTeamEventType } from "./teams-public";
-import { deleteGoogleCalendarEvent } from "./google-calendar";
+import { deleteCalendarEvent } from "./calendar";
+import { isStandaloneConferenceRef, teardownStandaloneConference } from "@/app-store/conferencing";
+import { isModerationEnabled, moderateFields } from "./moderation";
 import { validateResponses as validateFieldResponses, type FieldValues } from "@/lib/booking-fields";
 import { normalizeRecurringRule, expandRecurrence } from "@/lib/recurrence";
 import { logBookingActivity } from "./activity";
 import { upsertCustomerFromBooking } from "./customers";
 import { env } from "@/lib/env";
-import { isValidTimeZone } from "@/lib/time";
-import { runAcceptedBookingEffects, runPendingApprovalEffects } from "./booking-effects";
+import { isValidTimeZone, formatDateKey, addDaysToKey, zonedTimeToUtc } from "@/lib/time";
+import {
+  runAcceptedBookingEffects,
+  runPendingApprovalEffects,
+  runBookingMovedEffects,
+  rescheduleRootUid,
+} from "./booking-effects";
 import { expireStalePaymentHolds } from "./payment-holds";
+import { generateIcs, bookingIcalUid } from "@/lib/ics";
+
+// Distinct namespaces for the two-argument form of pg_advisory_xact_lock so a
+// host id and an event-type id never collide on the same lock key.
+const BOOKING_HOST_LOCK_NS = 8174;
+const BOOKING_SEAT_LOCK_NS = 8175;
 
 export interface CreateBookingInput {
   username: string;
@@ -48,6 +67,15 @@ export interface CreateBookingInput {
   rescheduleUid?: string;
   /** temporary booking-link token, validated and consumed on success */
   bookingLinkToken?: string;
+  /** booker chose a specific team host instead of "any available" */
+  preferredHostId?: number;
+  /**
+   * Host-initiated manual booking (e.g. dragging on the dashboard calendar).
+   * Skips public guards the host is deliberately overriding — slot availability,
+   * required-field validation, moderation, payment, and approval — and confirms
+   * the booking immediately. Never set from a public/untrusted code path.
+   */
+  force?: boolean;
 }
 
 export interface BookingResult {
@@ -111,10 +139,16 @@ async function teamCapacityUsage(
   teamId: number,
   start: Date,
   end: Date,
+  timeZone: string,
 ): Promise<{ bookingsOnDay: number; concurrentBookings: number }> {
-  const dayStart = new Date(start);
-  dayStart.setUTCHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60000);
+  // "Per day" is measured against the team service's local calendar day, not
+  // the UTC day, so the daily cap resets at local midnight for teams away from UTC.
+  const tz = isValidTimeZone(timeZone) ? timeZone : "UTC";
+  const key = formatDateKey(start, tz);
+  const [y, m, d] = key.split("-").map(Number);
+  const next = addDaysToKey(key, 1).split("-").map(Number);
+  const dayStart = zonedTimeToUtc(y, m, d, 0, 0, tz);
+  const dayEnd = zonedTimeToUtc(next[0], next[1], next[2], 0, 0, tz);
 
   // All active bookings for this team on the target day.
   const rows = await db
@@ -193,13 +227,30 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     return { ok: false, error: "Invalid timezone" };
   }
 
-  const validationError = validateResponses(eventType.bookingFields, input.responses);
-  if (validationError) return { ok: false, error: validationError };
+  if (!input.force) {
+    const validationError = validateResponses(eventType.bookingFields, input.responses);
+    if (validationError) return { ok: false, error: validationError };
+  }
+
+  // Optional AI moderation of public free-text (no-op unless configured). Host
+  // manual bookings are trusted input, so moderation is skipped for them.
+  if (!input.force && isModerationEnabled()) {
+    const freeText = [
+      input.name,
+      ...Object.values(input.responses ?? {}).map((v) =>
+        typeof v === "string" ? v : Array.isArray(v) ? v.join(" ") : "",
+      ),
+    ];
+    const moderation = await moderateFields(freeText);
+    if (moderation.flagged) {
+      return { ok: false, error: "Your submission couldn't be accepted. Please revise and try again." };
+    }
+  }
 
   // Race-safe availability check. Team services validate per-host during assignment.
   const isTeamEvent =
     eventType.schedulingType === "round_robin" || eventType.schedulingType === "collective";
-  if (!isTeamEvent) {
+  if (!isTeamEvent && !input.force) {
     const bookable = await isSlotBookable(eventType, input.start, duration);
     if (!bookable) return { ok: false, error: "That time is no longer available" };
   }
@@ -212,14 +263,26 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 
   // Enforce team capacity limits (max bookings per day / max concurrent).
   if (teamCapacity) {
-    const usage = await teamCapacityUsage(teamCapacity.teamId, start, end);
+    const usage = await teamCapacityUsage(teamCapacity.teamId, start, end, eventType.scheduleTimeZone);
     const capacity = checkTeamCapacity(teamCapacity.rule, usage);
     if (!capacity.ok) return { ok: false, error: CAPACITY_MESSAGES[capacity.reason] };
+  }
+
+  // Enforce the host's per-day/week/month/year frequency caps. Host manual
+  // bookings (force) bypass, matching the availability check above.
+  if (!input.force) {
+    const exceededPeriod = await bookingLimitExceeded(eventType, start, input.rescheduleUid);
+    if (exceededPeriod) {
+      return { ok: false, error: "This service has reached its booking limit for that period" };
+    }
   }
 
   // Team scheduling: pick the host(s) for this slot via round-robin/collective.
   let assignedUserId = eventType.userId;
   let assignedHost = { id: host.id, name: host.name, username: host.username };
+  // Extra staff (collective / multi-attendant) attached to this booking, so
+  // they're marked busy and not double-booked. Empty for solo services.
+  let coHostUserIds: number[] = [];
   if (eventType.schedulingType === "round_robin" || eventType.schedulingType === "collective") {
     const assignment = await assignTeamHosts(
       eventType.id,
@@ -228,9 +291,19 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       start,
       end,
       eventType.scheduleTimeZone,
+      input.preferredHostId,
+      eventType.requiredHosts,
     );
-    if (!assignment) return { ok: false, error: "No host is available for that time" };
+    if (!assignment) {
+      return {
+        ok: false,
+        error: input.preferredHostId
+          ? "That host isn't available for the selected time. Try another time or pick “Any available”."
+          : "No host is available for that time",
+      };
+    }
     assignedUserId = assignment.hostUserId;
+    coHostUserIds = assignment.coHostUserIds;
     const [u] = await db
       .select({ id: users.id, name: users.name, username: users.username })
       .from(users)
@@ -240,15 +313,18 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   }
 
   const attendeePhone = typeof input.responses.phone === "string" ? input.responses.phone : undefined;
-  const { location, meetingUrl } = resolveLocation(eventType.locations[0], attendeePhone);
+  // uid is needed up-front so the built-in Jitsi room can be derived from it.
+  const uid = shortId(12);
+  const { location, meetingUrl } = resolveLocation(eventType.locations[0], attendeePhone, uid);
 
-  const needsPayment = eventType.requiresPayment && eventType.price > 0;
+  // Host manual bookings (force) skip payment + approval and confirm directly.
+  const needsPayment = !input.force && eventType.requiresPayment && eventType.price > 0;
 
   // Paid bookings stay pending until payment succeeds. If confirmation is also
   // required, they remain pending after payment and only move to accepted when
   // the host approves them.
-  const status = needsPayment || eventType.requiresConfirmation ? "pending" : "accepted";
-  const uid = shortId(12);
+  const status =
+    needsPayment || (!input.force && eventType.requiresConfirmation) ? "pending" : "accepted";
   const notes = typeof input.responses.notes === "string" ? (input.responses.notes as string) : null;
 
   // Recurring events fan out into a series of bookings sharing a recurringEventId.
@@ -277,8 +353,45 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     });
   }
 
-  // Persist booking + attendees in a transaction.
-  const bookingId = await db.transaction(async (tx) => {
+  // A reschedule inherits the prior booking's iCalendar SEQUENCE + 1, so the
+  // confirmation .ics supersedes the attendee's existing calendar entry.
+  let sequence = 0;
+  if (input.rescheduleUid) {
+    const [orig] = await db
+      .select({ sequence: bookings.sequence })
+      .from(bookings)
+      .where(eq(bookings.uid, input.rescheduleUid))
+      .limit(1);
+    sequence = (orig?.sequence ?? 0) + 1;
+  }
+
+  // Persist booking + attendees in a transaction. We take a Postgres
+  // transaction-level advisory lock and re-verify availability *inside* it so
+  // the check and the insert are atomic: two concurrent bookers racing for the
+  // same slot serialize on the lock, and the second sees the first's committed
+  // booking and is rejected. The lock auto-releases on commit/rollback. Group
+  // events lock on the event type (seat capacity is per-slot); everything else
+  // locks on the assigned host. `force` (trusted host manual bookings) skips
+  // the re-check, matching the earlier slot check.
+  const seatsPerSlot = eventType.seatsPerTimeSlot ?? 1;
+  const txResult = await db.transaction(async (tx): Promise<{ id: number } | { conflict: true }> => {
+    if (seatsPerSlot > 1) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOKING_SEAT_LOCK_NS}, ${eventType.id})`);
+    } else {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOKING_HOST_LOCK_NS}, ${assignedUserId ?? eventType.id})`);
+    }
+
+    if (!input.force) {
+      if (seatsPerSlot > 1) {
+        if ((await slotBookingCount(eventType.id, start)) >= seatsPerSlot) return { conflict: true };
+      } else if (assignedUserId != null) {
+        if (await hostHasConflict(assignedUserId, start, end)) return { conflict: true };
+        for (const coId of coHostUserIds) {
+          if (await hostHasConflict(coId, start, end)) return { conflict: true };
+        }
+      }
+    }
+
     const [b] = await tx
       .insert(bookings)
       .values({
@@ -295,6 +408,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
         responses: input.responses,
         idempotencyKey: input.idempotencyKey ?? null,
         rescheduledFromUid: input.rescheduleUid ?? null,
+        sequence,
       })
       .returning({ id: bookings.id });
 
@@ -307,19 +421,20 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       }
     }
     await tx.insert(attendees).values(attendeeRows);
-    return b.id;
+
+    // Record co-hosts so collective / multi-attendant staff are marked busy.
+    if (coHostUserIds.length > 0) {
+      await tx
+        .insert(bookingHosts)
+        .values(coHostUserIds.map((userId) => ({ bookingId: b.id, userId })));
+    }
+    return { id: b.id };
   });
 
-  // Reserve any required resources (rooms/equipment/…). The slot engine already
-  // excluded at-capacity windows; this is the race-safe final check.
-  const reserved = await reserveResourcesForBooking(bookingId, eventType.id, start, end);
-  if (!reserved) {
-    await db
-      .update(bookings)
-      .set({ status: "cancelled", cancellationReason: "Resource no longer available" })
-      .where(eq(bookings.id, bookingId));
-    return { ok: false, error: "A required resource is no longer available for that time" };
+  if ("conflict" in txResult) {
+    return { ok: false, error: "That time is no longer available" };
   }
+  const bookingId = txResult.id;
 
   const tasks: Promise<unknown>[] = [
     logBookingActivity(bookingId, input.rescheduleUid ? "rescheduled" : "created", {
@@ -408,10 +523,17 @@ async function createRecurringSeries(args: {
   const recurringEventId = shortId(12);
   const hostName = host.name ?? host.username;
 
-  // Persist all occurrences in a single transaction.
+  // Persist all occurrences in a single transaction, serialized per-host and
+  // re-checking each occurrence inside the lock (same race guard as createBooking).
   const created = await db.transaction(async (tx) => {
+    if (assignedUserId != null) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOKING_HOST_LOCK_NS}, ${assignedUserId})`);
+    }
     const rows: { id: number; uid: string; start: Date; end: Date }[] = [];
     for (const occ of bookable) {
+      if (assignedUserId != null && (await hostHasConflict(assignedUserId, occ.start, occ.end))) {
+        continue;
+      }
       const uid = shortId(12);
       const [b] = await tx
         .insert(bookings)
@@ -445,16 +567,10 @@ async function createRecurringSeries(args: {
     return rows;
   });
 
-  // Per-occurrence side effects: resource reservation + reminders.
+  if (created.length === 0) return { ok: false, error: "That time is no longer available" };
+
+  // Per-occurrence side effects: reminders + activity log.
   for (const row of created) {
-    const reserved = await reserveResourcesForBooking(row.id, eventType.id, row.start, row.end);
-    if (!reserved) {
-      await db
-        .update(bookings)
-        .set({ status: "cancelled", cancellationReason: "Resource no longer available" })
-        .where(eq(bookings.id, row.id));
-      continue;
-    }
     if (assignedUserId && status === "accepted") {
       await scheduleRemindersForBooking(row.id, assignedUserId, eventType.id, row.start);
     }
@@ -489,7 +605,7 @@ async function createRecurringSeries(args: {
   });
 
   const tasks: Promise<unknown>[] = [];
-  const a = bookingSeriesConfirmedAttendee(baseView, seriesDates, input.timeZone, true, status);
+  const a = await bookingSeriesConfirmedAttendee(baseView, seriesDates, input.timeZone, true, status);
   tasks.push(sendMail({ to: input.email, subject: a.subject, html: a.html }));
   if (hostUser) {
     const hostView = buildEmailView({
@@ -505,7 +621,7 @@ async function createRecurringSeries(args: {
       uid: first.uid,
       hour12,
     });
-    const h = bookingSeriesConfirmedAttendee(hostView, seriesDates, eventType.hostTimeZone, hour12, status);
+    const h = await bookingSeriesConfirmedAttendee(hostView, seriesDates, eventType.hostTimeZone, hour12, status);
     tasks.push(sendMail({ to: hostUser.email, subject: `New recurring booking: ${h.subject}`, html: h.html }));
   }
   if (assignedUserId) {
@@ -559,9 +675,18 @@ export async function cancelBooking(
     }
   }
 
+  // Bump the iCalendar SEQUENCE so the CANCEL we email actually supersedes the
+  // attendee's existing calendar entry (lower/equal sequences are ignored).
+  const nextSequence = b.sequence + 1;
   await db
     .update(bookings)
-    .set({ status: "cancelled", cancellationReason: reason ?? null, cancelledByEmail: cancelledByEmail ?? null, updatedAt: new Date() })
+    .set({
+      status: "cancelled",
+      cancellationReason: reason ?? null,
+      cancelledByEmail: cancelledByEmail ?? null,
+      sequence: nextSequence,
+      updatedAt: new Date(),
+    })
     .where(eq(bookings.id, b.id));
 
   await cancelRemindersForBooking(b.id);
@@ -570,15 +695,26 @@ export async function cancelBooking(
     message: reason ? `Cancelled: ${reason}` : "Booking cancelled",
   });
 
-  // Delete Google Calendar event for this booking (best-effort).
+  // Delete external calendar events for this booking across every provider (best-effort).
   if (b.userId) {
-    const [ref] = await db
-      .select({ uid: bookingReferences.uid, externalCalendarId: bookingReferences.externalCalendarId })
+    const refs = await db
+      .select({
+        type: bookingReferences.type,
+        uid: bookingReferences.uid,
+        externalCalendarId: bookingReferences.externalCalendarId,
+      })
       .from(bookingReferences)
-      .where(and(eq(bookingReferences.bookingId, b.id), eq(bookingReferences.type, "google_calendar")))
-      .limit(1);
-    if (ref) {
-      await deleteGoogleCalendarEvent(b.userId, ref.uid, ref.externalCalendarId).catch(() => undefined);
+      .where(eq(bookingReferences.bookingId, b.id));
+    for (const ref of refs) {
+      if (isStandaloneConferenceRef(ref.type)) {
+        await teardownStandaloneConference(b.userId, ref.type, ref.uid);
+        continue;
+      }
+      await deleteCalendarEvent(b.userId, ref.type, ref.uid, ref.externalCalendarId).catch(
+        () => undefined,
+      );
+    }
+    if (refs.length > 0) {
       await db.delete(bookingReferences).where(eq(bookingReferences.bookingId, b.id));
     }
   }
@@ -606,14 +742,71 @@ export async function cancelBooking(
       meetingUrl: b.meetingUrl,
       manageUrl: `${env.appUrl}/booking/${uid}`,
     };
-    const m = bookingCancelledAttendee(view, reason);
-    await sendMail({ to: primary.email, subject: m.subject, html: m.html });
+    const m = await bookingCancelledAttendee(view, reason);
+    // Attach a CANCEL .ics (stable chain UID + bumped SEQUENCE) so the meeting
+    // is actually removed from the attendee's calendar, not just emailed about.
+    const cancelIcs = generateIcs({
+      uid: bookingIcalUid(await rescheduleRootUid(b.uid, b.rescheduledFromUid)),
+      start: b.startTime,
+      end: b.endTime,
+      summary: et?.title ?? b.title,
+      attendees: [{ name: primary.name, email: primary.email }],
+      status: "CANCELLED",
+      sequence: nextSequence,
+    });
+    await sendMail({
+      to: primary.email,
+      subject: m.subject,
+      html: m.html,
+      icalEvent: { method: "CANCEL", content: cancelIcs },
+    });
   }
 
   if (b.userId) {
     await dispatchWebhook(b.userId, "booking_cancelled", { uid, reason: reason ?? null });
   }
 
+  return { ok: true, uid };
+}
+
+/**
+ * Move an accepted/pending booking to a new start time (host action — e.g. drag
+ * on the dashboard calendar). Keeps the duration, validates the host owns it,
+ * bumps the iCalendar SEQUENCE, and refreshes calendar/email/reminders.
+ */
+export async function moveBooking(
+  uid: string,
+  hostUserId: number,
+  newStartIso: string,
+): Promise<BookingResult> {
+  const start = new Date(newStartIso);
+  if (Number.isNaN(start.getTime())) return { ok: false, error: "Invalid time" };
+
+  const [b] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
+  if (!b || b.userId !== hostUserId) return { ok: false, error: "Booking not found" };
+  if (b.status !== "accepted" && b.status !== "pending") {
+    return { ok: false, error: "Only active bookings can be moved" };
+  }
+
+  const durationMs = b.endTime.getTime() - b.startTime.getTime();
+  const end = new Date(start.getTime() + durationMs);
+  if (start.getTime() === b.startTime.getTime()) return { ok: true, uid };
+
+  const nextSequence = b.sequence + 1;
+  await db
+    .update(bookings)
+    .set({ startTime: start, endTime: end, sequence: nextSequence, updatedAt: new Date() })
+    .where(eq(bookings.id, b.id));
+
+  await logBookingActivity(b.id, "rescheduled", {
+    actor: "host",
+    message: "Moved on the calendar",
+    data: { from: b.startTime.toISOString(), to: start.toISOString() },
+  });
+
+  if (b.status === "accepted") {
+    await runBookingMovedEffects(b.id).catch(() => undefined);
+  }
   return { ok: true, uid };
 }
 

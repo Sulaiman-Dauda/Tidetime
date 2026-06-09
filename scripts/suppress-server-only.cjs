@@ -5,7 +5,7 @@ const Module = require("module");
 const path = require("path");
 
 const origResolve = Module._resolveFilename;
-Module._resolveFilename = function (request, parent, ...rest) {
+Module._resolveFilename = function (request) {
   if (request === "server-only") {
     return path.join(__dirname, "noop-server-only.cjs");
   }

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/guard";
+import { getCurrentUser } from "@/lib/auth";
 import Stripe from "stripe";
 import { getStripeConfig } from "@/server/settings";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  await requirePermission("team.manage");
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { secretKey } = await req.json();
   const resolved =

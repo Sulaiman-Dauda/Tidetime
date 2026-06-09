@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { InfoTip } from "@/components/ui/info-tip";
 import { updateReviewSettingsAction, type ReviewSettingsState } from "./review-actions";
 
 export interface ReviewSettingsView {
@@ -30,8 +31,13 @@ export function ReviewSettings({ review }: { review: ReviewSettingsView }) {
   );
 
   useEffect(() => {
-    if (state?.ok) toast({ title: "Review settings saved" });
-    if (state?.error) toast({ title: state.error, variant: "destructive" });
+    if (state?.ok) toast({ title: "Changes saved", description: "Your review settings have been updated." });
+    if (state?.error)
+      toast({
+        title: "Couldn't save changes",
+        description: state.error || "Please check your details and try again.",
+        variant: "destructive",
+      });
   }, [state, toast]);
 
   return (
@@ -64,7 +70,10 @@ export function ReviewSettings({ review }: { review: ReviewSettingsView }) {
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label>Minimum rating for public redirect</Label>
+          <Label>
+            Minimum rating for public redirect{" "}
+            <InfoTip>Ratings at or above this score are sent to your public review link.</InfoTip>
+          </Label>
           <Select name="reviewThreshold" defaultValue={String(review.reviewThreshold)}>
             <SelectTrigger>
               <SelectValue />

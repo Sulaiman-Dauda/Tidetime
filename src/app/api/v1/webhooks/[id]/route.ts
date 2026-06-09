@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { webhooks, webhookTrigger } from "@/db/schema";
 import { authenticateApiKey, unauthorized, jsonError } from "@/server/api-auth";
-import { httpUrlSchema } from "@/lib/schemas";
+import { webhookUrlSchema } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +30,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 const updateSchema = z.object({
-  subscriberUrl: httpUrlSchema.optional(),
+  subscriberUrl: webhookUrlSchema.optional(),
   triggers: z.array(z.enum(TRIGGERS as [string, ...string[]])).min(1).optional(),
-  secret: z.string().min(8).optional(),
+  secret: z.string().min(8).max(256).optional(),
   active: z.boolean().optional(),
 });
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   attendees,
@@ -20,7 +20,15 @@ import {
 } from "./emails";
 import { dispatchWebhook } from "./webhooks";
 import { cancelRemindersForBooking, scheduleRemindersForBooking } from "./reminders";
-import { createGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./google-calendar";
+import { createCalendarEvents, deleteCalendarEvent, updateCalendarEvents } from "./calendar";
+import {
+  isStandaloneConferenceRef,
+  resolveConferencing,
+  teardownStandaloneConference,
+  type ConferencingPlan,
+} from "@/app-store/conferencing";
+import { runCrmBookingCreated } from "@/app-store/crm";
+import { buildRsvpLinks } from "./rsvp";
 
 interface LoadedBookingContext {
   booking: typeof bookings.$inferSelect;
@@ -67,6 +75,33 @@ async function loadBookingContext(bookingId: number): Promise<LoadedBookingConte
   return { booking, eventType, host, attendees: bookingAttendees };
 }
 
+/**
+ * Walk the reschedule chain back to the original booking's uid. Every reschedule
+ * of the same meeting shares one stable iCalendar UID (derived from this root)
+ * so the attendee's calendar UPDATES the event in place — combined with a
+ * strictly increasing SEQUENCE — instead of leaving a stale duplicate behind.
+ * This is the correctness lesson EasyAppointments encodes with its `sequence`
+ * field: without a monotonic SEQUENCE, Outlook/Apple ignore the update entirely.
+ */
+export async function rescheduleRootUid(
+  uid: string,
+  rescheduledFromUid: string | null,
+): Promise<string> {
+  let current = rescheduledFromUid;
+  let root = uid;
+  for (let i = 0; i < 50 && current; i++) {
+    const [prev] = await db
+      .select({ uid: bookings.uid, from: bookings.rescheduledFromUid })
+      .from(bookings)
+      .where(eq(bookings.uid, current))
+      .limit(1);
+    if (!prev) break;
+    root = prev.uid;
+    current = prev.from;
+  }
+  return root;
+}
+
 async function silentlyCancelSupersededBooking(uid: string): Promise<void> {
   const [original] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!original || original.status === "cancelled") return;
@@ -79,21 +114,27 @@ async function silentlyCancelSupersededBooking(uid: string): Promise<void> {
 
   if (!original.userId) return;
 
-  const [ref] = await db
-    .select({ uid: bookingReferences.uid, externalCalendarId: bookingReferences.externalCalendarId })
+  const refs = await db
+    .select({
+      type: bookingReferences.type,
+      uid: bookingReferences.uid,
+      externalCalendarId: bookingReferences.externalCalendarId,
+    })
     .from(bookingReferences)
-    .where(
-      and(
-        eq(bookingReferences.bookingId, original.id),
-        eq(bookingReferences.type, "google_calendar"),
-      ),
-    )
-    .limit(1);
-  if (!ref) return;
+    .where(eq(bookingReferences.bookingId, original.id));
 
-  await deleteGoogleCalendarEvent(original.userId, ref.uid, ref.externalCalendarId).catch(
-    () => undefined,
-  );
+  for (const ref of refs) {
+    if (isStandaloneConferenceRef(ref.type)) {
+      await teardownStandaloneConference(original.userId, ref.type, ref.uid);
+      continue;
+    }
+    await deleteCalendarEvent(
+      original.userId,
+      ref.type,
+      ref.uid,
+      ref.externalCalendarId,
+    ).catch(() => undefined);
+  }
   await db.delete(bookingReferences).where(eq(bookingReferences.bookingId, original.id));
 }
 
@@ -145,17 +186,60 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
   if (!ctx || ctx.booking.status !== "accepted") return;
 
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
-  const attendeeView = buildEmailView(ctx);
-  if (!primary || !attendeeView) return;
+  if (!primary) return;
 
   if (ctx.booking.rescheduledFromUid) {
     await silentlyCancelSupersededBooking(ctx.booking.rescheduledFromUid);
   }
 
+  const conferencing: ConferencingPlan | null = ctx.eventType
+    ? resolveConferencing(ctx.eventType.locations)
+    : null;
+
+  // Standalone providers (Zoom, Daily) mint a link up-front so it lands in the
+  // ICS + confirmation email and exists even without a connected calendar.
+  // Native providers (Meet, Teams) get their link at calendar-event time below.
+  if (ctx.host && conferencing?.standalone && !ctx.booking.meetingUrl) {
+    const meeting = await conferencing.standalone.app
+      .createMeeting({
+        userId: ctx.host.id,
+        topic: ctx.eventType?.title ?? ctx.booking.title,
+        description: ctx.booking.description ?? undefined,
+        start: ctx.booking.startTime,
+        end: ctx.booking.endTime,
+        timeZone: ctx.host.timeZone,
+      })
+      .catch(() => null);
+    if (meeting) {
+      ctx.booking.meetingUrl = meeting.url;
+      await db.update(bookings).set({ meetingUrl: meeting.url }).where(eq(bookings.id, ctx.booking.id));
+      await db.insert(bookingReferences).values({
+        bookingId: ctx.booking.id,
+        type: conferencing.standalone.slug,
+        uid: meeting.id,
+        meetingUrl: meeting.url,
+        externalCalendarId: null,
+        credentialId: null,
+      });
+    }
+  }
+
+  // Build email views AFTER conferencing so the link is included.
+  const attendeeView = buildEmailView(ctx);
+  if (!attendeeView) return;
+  // Signed RSVP links let the attendee answer Accept / Decline / Tentative right
+  // from the confirmation email; the reply lands on their attendee record.
+  attendeeView.rsvp = buildRsvpLinks(ctx.booking.uid, primary.email);
+
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
   const title = ctx.eventType?.title ?? ctx.booking.title;
+  // Stable UID across the whole reschedule chain + the booking's SEQUENCE so the
+  // attendee's calendar treats a reschedule as an in-place update, not a dupe.
+  const icalUid = bookingIcalUid(
+    await rescheduleRootUid(ctx.booking.uid, ctx.booking.rescheduledFromUid),
+  );
   const ics = generateIcs({
-    uid: bookingIcalUid(ctx.booking.uid),
+    uid: icalUid,
     start: ctx.booking.startTime,
     end: ctx.booking.endTime,
     summary: title,
@@ -167,12 +251,13 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
     attendees: [{ name: primary.name, email: primary.email }],
     url: ctx.booking.meetingUrl ?? undefined,
     status: "CONFIRMED",
+    sequence: ctx.booking.sequence,
   });
 
   const tasks: Promise<unknown>[] = [];
   const attendeeMessage = ctx.booking.rescheduledFromUid
-    ? bookingRescheduledAttendee(attendeeView)
-    : bookingConfirmedAttendee(attendeeView);
+    ? await bookingRescheduledAttendee(attendeeView)
+    : await bookingConfirmedAttendee(attendeeView);
   tasks.push(
     sendMail({
       to: primary.email,
@@ -183,7 +268,7 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
   );
 
   if (ctx.host) {
-    const hostMessage = bookingConfirmedHost(buildHostEmailView(ctx, primary.name));
+    const hostMessage = await bookingConfirmedHost(buildHostEmailView(ctx, primary.name));
     tasks.push(
       sendMail({
         to: ctx.host.email,
@@ -222,21 +307,28 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
       ),
     );
 
+    // Best-effort CRM sync (HubSpot, …) for the primary attendee.
+    tasks.push(
+      runCrmBookingCreated(ctx.host.id, {
+        contact: { email: primary.email, name: primary.name, phone: primary.phoneNumber ?? undefined },
+        title,
+        start: ctx.booking.startTime,
+        end: ctx.booking.endTime,
+        description: ctx.booking.description ?? undefined,
+        meetingUrl: ctx.booking.meetingUrl,
+      }),
+    );
+
     tasks.push(
       (async () => {
-        const [existingRef] = await db
-          .select({ id: bookingReferences.id })
+        // A standalone video ref may already exist; only skip if a CALENDAR ref does.
+        const existing = await db
+          .select({ type: bookingReferences.type })
           .from(bookingReferences)
-          .where(
-            and(
-              eq(bookingReferences.bookingId, ctx.booking.id),
-              eq(bookingReferences.type, "google_calendar"),
-            ),
-          )
-          .limit(1);
-        if (existingRef) return;
+          .where(eq(bookingReferences.bookingId, ctx.booking.id));
+        if (existing.some((r) => r.type.endsWith("_calendar"))) return;
 
-        const gEvent = await createGoogleCalendarEvent(ctx.host!.id, {
+        const refs = await createCalendarEvents(ctx.host!.id, {
           summary: title,
           description: ctx.booking.description ?? undefined,
           start: ctx.booking.startTime,
@@ -244,25 +336,179 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
           timeZone: ctx.host!.timeZone,
           location: ctx.booking.meetingUrl ?? ctx.booking.location ?? undefined,
           attendees: ctx.attendees.map((a) => ({ email: a.email, name: a.name })),
+          conferenceProvider: conferencing?.native,
+          icalUid,
+          sequence: ctx.booking.sequence,
         });
-        if (!gEvent) return;
+        if (refs.length === 0) return;
 
-        await db.insert(bookingReferences).values({
-          bookingId: ctx.booking.id,
-          type: "google_calendar",
-          uid: gEvent.eventId,
-          meetingUrl: gEvent.meetingUrl ?? null,
-          externalCalendarId: gEvent.calendarId,
-          credentialId: null,
-        });
+        await db.insert(bookingReferences).values(
+          refs.map((r) => ({
+            bookingId: ctx.booking.id,
+            type: r.integration,
+            uid: r.eventId,
+            meetingUrl: r.meetingUrl ?? null,
+            externalCalendarId: r.calendarId,
+            credentialId: null,
+          })),
+        );
 
-        if (gEvent.meetingUrl && !ctx.booking.meetingUrl) {
+        const meetingUrl = refs.find((r) => r.meetingUrl)?.meetingUrl;
+        if (meetingUrl && !ctx.booking.meetingUrl) {
           await db
             .update(bookings)
-            .set({ meetingUrl: gEvent.meetingUrl })
+            .set({ meetingUrl })
             .where(eq(bookings.id, ctx.booking.id));
         }
       })(),
+    );
+  }
+
+  await Promise.allSettled(tasks);
+}
+
+/**
+ * Side effects when a host moves an accepted booking to a new time (e.g. by
+ * dragging it on the dashboard calendar). Refreshes external calendar events,
+ * emails the attendee an updated invite (stable UID + bumped SEQUENCE so their
+ * calendar updates in place), reschedules reminders, and fires the
+ * booking_rescheduled webhook. The caller must have already persisted the new
+ * times + incremented sequence.
+ */
+export async function runBookingMovedEffects(bookingId: number): Promise<void> {
+  const ctx = await loadBookingContext(bookingId);
+  if (!ctx || ctx.booking.status !== "accepted") return;
+  const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
+  if (!primary) return;
+
+  const title = ctx.eventType?.title ?? ctx.booking.title;
+  const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
+  const icalUid = bookingIcalUid(
+    await rescheduleRootUid(ctx.booking.uid, ctx.booking.rescheduledFromUid),
+  );
+  const ics = generateIcs({
+    uid: icalUid,
+    start: ctx.booking.startTime,
+    end: ctx.booking.endTime,
+    summary: title,
+    description: ctx.booking.description ?? undefined,
+    location: ctx.booking.meetingUrl ?? ctx.booking.location ?? undefined,
+    organizer: ctx.host ? { name: hostName, email: `${ctx.host.username}@tidetime` } : undefined,
+    attendees: [{ name: primary.name, email: primary.email }],
+    url: ctx.booking.meetingUrl ?? undefined,
+    status: "CONFIRMED",
+    sequence: ctx.booking.sequence,
+  });
+
+  const tasks: Promise<unknown>[] = [];
+
+  const view = buildEmailView(ctx);
+  if (view) {
+    const msg = await bookingRescheduledAttendee(view);
+    tasks.push(
+      sendMail({
+        to: primary.email,
+        subject: msg.subject,
+        html: msg.html,
+        icalEvent: { method: "REQUEST", content: ics },
+      }),
+    );
+  }
+
+  if (ctx.host) {
+    // Refresh external calendar events. Preferred path is a true in-place UPDATE
+    // (preserves the event id + any Meet/Teams link); only if a provider can't
+    // update do we fall back to dropping + recreating its event.
+    tasks.push(
+      (async () => {
+        const refs = await db
+          .select()
+          .from(bookingReferences)
+          .where(eq(bookingReferences.bookingId, ctx.booking.id));
+        const calendarRefs = refs.filter((r) => !isStandaloneConferenceRef(r.type));
+
+        const eventInput = {
+          summary: title,
+          description: ctx.booking.description ?? undefined,
+          start: ctx.booking.startTime,
+          end: ctx.booking.endTime,
+          timeZone: ctx.host!.timeZone,
+          location: ctx.booking.meetingUrl ?? ctx.booking.location ?? undefined,
+          attendees: ctx.attendees.map((a) => ({ email: a.email, name: a.name })),
+          icalUid,
+          sequence: ctx.booking.sequence,
+        };
+
+        if (calendarRefs.length > 0) {
+          const updated = await updateCalendarEvents(
+            ctx.host!.id,
+            calendarRefs.map((r) => ({
+              integration: r.type,
+              eventId: r.uid,
+              externalCalendarId: r.externalCalendarId,
+            })),
+            eventInput,
+          );
+          // Every provider updated in place — nothing more to do.
+          if (updated.length > 0 && updated.every(Boolean)) return;
+          // Partial failure: tear every calendar event down so the recreate below
+          // can't leave a duplicate next to an already-updated one.
+          for (const ref of calendarRefs) {
+            await deleteCalendarEvent(
+              ctx.host!.id,
+              ref.type,
+              ref.uid,
+              ref.externalCalendarId,
+            ).catch(() => undefined);
+          }
+          await db
+            .delete(bookingReferences)
+            .where(inArray(bookingReferences.id, calendarRefs.map((r) => r.id)));
+        }
+
+        const conferencing: ConferencingPlan | null = ctx.eventType
+          ? resolveConferencing(ctx.eventType.locations)
+          : null;
+        const created = await createCalendarEvents(ctx.host!.id, {
+          ...eventInput,
+          conferenceProvider: conferencing?.native,
+        });
+        if (created.length > 0) {
+          await db.insert(bookingReferences).values(
+            created.map((r) => ({
+              bookingId: ctx.booking.id,
+              type: r.integration,
+              uid: r.eventId,
+              meetingUrl: r.meetingUrl ?? null,
+              externalCalendarId: r.calendarId,
+              credentialId: null,
+            })),
+          );
+        }
+      })(),
+    );
+
+    tasks.push(
+      cancelRemindersForBooking(ctx.booking.id).then(() =>
+        scheduleRemindersForBooking(
+          ctx.booking.id,
+          ctx.host!.id,
+          ctx.booking.eventTypeId ?? 0,
+          ctx.booking.startTime,
+        ),
+      ),
+    );
+
+    tasks.push(
+      dispatchWebhook(ctx.host.id, "booking_rescheduled", {
+        uid: ctx.booking.uid,
+        eventTypeId: ctx.booking.eventTypeId,
+        title,
+        startTime: ctx.booking.startTime.toISOString(),
+        endTime: ctx.booking.endTime.toISOString(),
+        attendee: { name: primary.name, email: primary.email, timeZone: primary.timeZone },
+        status: ctx.booking.status,
+      }),
     );
   }
 
@@ -282,7 +528,7 @@ export async function runPendingApprovalEffects(bookingId: number): Promise<void
   if (!primary || !attendeeView) return;
 
   const tasks: Promise<unknown>[] = [];
-  const attendeeMessage = bookingPendingAttendee(attendeeView);
+  const attendeeMessage = await bookingPendingAttendee(attendeeView);
   tasks.push(
     sendMail({
       to: primary.email,
@@ -292,7 +538,7 @@ export async function runPendingApprovalEffects(bookingId: number): Promise<void
   );
 
   if (ctx.host) {
-    const hostMessage = bookingConfirmedHost(buildHostEmailView(ctx, primary.name));
+    const hostMessage = await bookingConfirmedHost(buildHostEmailView(ctx, primary.name));
     tasks.push(
       sendMail({
         to: ctx.host.email,

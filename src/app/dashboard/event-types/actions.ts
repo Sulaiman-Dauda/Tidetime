@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { eventTypes, type BookingField, type EventLocation } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { setEventTypeResources } from "@/server/resources";
+import { getCompanySettings } from "@/server/company-settings";
 import {
   bookingFieldsSchema,
   bookingLimitsSchema,
@@ -76,6 +76,10 @@ export async function createEventTypeAction(formData: FormData) {
     slug = `${base}-${++n}`;
   }
 
+  // Pre-fill the price currency from the company default so new paid services
+  // don't silently default to USD.
+  const companyCurrency = (await getCompanySettings()).profile.defaultCurrency;
+
   const [created] = await db
     .insert(eventTypes)
     .values({
@@ -84,6 +88,10 @@ export async function createEventTypeAction(formData: FormData) {
       title,
       slug,
       length,
+      currency: companyCurrency,
+      // Start as a draft: hidden from the public booking pages until the first
+      // save promotes it to live. Abandoned drafts are auto-cleaned by listEventTypes.
+      draft: true,
       position: await nextEventTypePosition(user.id),
       locations: [] satisfies EventLocation[],
       bookingFields: DEFAULT_FIELDS,
@@ -130,7 +138,6 @@ const updateSchema = z.object({
   requiresPayment: z.boolean().optional(),
   depositAmount: z.coerce.number().int().min(0).optional(),
   successRedirectUrl: z.union([httpUrlSchema, z.literal(""), z.null()]).optional(),
-  resourceIds: z.array(z.coerce.number().int().positive()).optional(),
 });
 
 export type UpdateEventTypeInput = z.infer<typeof updateSchema>;
@@ -186,13 +193,11 @@ export async function updateEventTypeAction(input: UpdateEventTypeInput): Promis
       requiresPayment: data.requiresPayment ?? false,
       depositAmount: data.depositAmount ?? 0,
       successRedirectUrl: data.successRedirectUrl ? data.successRedirectUrl : null,
+      // The first save promotes a draft to a live, publicly bookable service.
+      draft: false,
       updatedAt: new Date(),
     })
     .where(eq(eventTypes.id, data.id));
-
-  if (data.resourceIds) {
-    await setEventTypeResources(data.id, data.resourceIds);
-  }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/event-types");
@@ -254,7 +259,26 @@ export async function duplicateEventTypeAction(formData: FormData) {
   revalidatePath("/dashboard/event-types");
 }
 
+/**
+ * Remove draft services that were created but never saved and have since been
+ * abandoned. The 24-hour window guarantees a draft the user is still editing is
+ * never deleted out from under them. Runs lazily on each services-list load so
+ * no scheduled job is required.
+ */
+async function deleteStaleDrafts(userId: number): Promise<void> {
+  await db
+    .delete(eventTypes)
+    .where(
+      and(
+        eq(eventTypes.userId, userId),
+        eq(eventTypes.draft, true),
+        lt(eventTypes.createdAt, sql`now() - interval '24 hours'`),
+      ),
+    );
+}
+
 export async function listEventTypes(userId: number) {
+  await deleteStaleDrafts(userId);
   await normalizeEventTypePositions(userId);
   return db
     .select()

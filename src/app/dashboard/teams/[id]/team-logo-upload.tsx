@@ -47,9 +47,13 @@ export function TeamLogoUpload({
         if (data.error) throw new Error(data.error);
         setPreview(data.logoUrl);
         onUploaded?.(data.logoUrl);
-        toast({ title: "Logo updated" });
+        toast({ title: "Team logo updated" });
       } catch (err) {
-        toast({ title: err instanceof Error ? err.message : "Upload failed", variant: "destructive" });
+        toast({
+          title: "Couldn't upload logo",
+          description: err instanceof Error ? err.message : "Please check your details and try again.",
+          variant: "destructive",
+        });
         setPreview(currentUrl);
       }
     });
@@ -63,9 +67,9 @@ export function TeamLogoUpload({
         if (data.error) throw new Error(data.error);
         setPreview(null);
         onUploaded?.(null);
-        toast({ title: "Logo removed" });
+        toast({ title: "Team logo removed" });
       } catch {
-        toast({ title: "Failed to remove logo", variant: "destructive" });
+        toast({ title: "Couldn't remove logo", variant: "destructive" });
       }
     });
   }

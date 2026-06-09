@@ -26,6 +26,13 @@ const config = [
       ],
     },
   }),
+  {
+    // CommonJS preload helpers run outside the bundler and must use require().
+    files: ["**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ];
 
 export default config;

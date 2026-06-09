@@ -2,9 +2,12 @@ import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanySettings } from "@/server/company-settings";
+import { getFeatureFlags } from "@/server/feature-flags";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { SettingsHub } from "./settings-hub";
+import { FeatureFlagsCard } from "./feature-flags-card";
 
 export const metadata = { title: "Settings" };
 
@@ -14,23 +17,22 @@ export default async function SettingsPage() {
   // Settings is the company-wide admin hub. Personal preferences live in /dashboard/account.
   if (!user.isAdmin) redirect("/dashboard/account");
 
-  const [settings, keys] = await Promise.all([
+  const [settings, keys, features] = await Promise.all([
     getCompanySettings(),
     db
       .select({ id: apiKeys.id, note: apiKeys.note, lastUsedAt: apiKeys.lastUsedAt, createdAt: apiKeys.createdAt })
       .from(apiKeys)
       .where(eq(apiKeys.userId, user.id))
       .orderBy(desc(apiKeys.createdAt)),
+    getFeatureFlags(),
   ]);
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Configure branding, booking defaults, email, Google Calendar, Stripe checkout, reviews, API keys, and legal pages.
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Configure branding, booking defaults, email, Google Calendar, Stripe checkout, reviews, API keys, and legal pages."
+      />
       <SettingsHub
         settings={settings}
         review={{
@@ -40,6 +42,7 @@ export default async function SettingsPage() {
         }}
         apiKeys={keys}
       />
+      <FeatureFlagsCard flags={features} />
     </div>
   );
 }

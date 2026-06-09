@@ -158,19 +158,23 @@ This helps you confirm:
 - the booking form is easy to understand
 - confirmations and reminders behave as expected
 - the booking appears in your dashboard
-- Google Calendar and payments work if you enabled them
+- calendar sync and payments work if you enabled them
 
 ## 8. Optional next steps
 
 Once the basics are working, you can improve your setup with:
 
-- **Google Calendar** in **Settings → Calendar**
-- **email sending** in **Settings → Email**
-- **Stripe payments** in **Settings → Stripe**
-- **reviews** in **Settings → Reviews**
+- **Calendar sync** in **Dashboard → Integrations → Calendars** (Google Calendar, Microsoft 365/Outlook, or Apple/CalDAV)
+- **email sending** in **Dashboard → Integrations → Email**
+- **Stripe payments** in **Dashboard → Integrations → Payments**
+- **video meetings** in **Dashboard → Integrations → Video**
+- **reviews** in **Dashboard → Settings → Reviews**
 - **teams** in **Dashboard → Teams**
-- **resources** in **Dashboard → Resources**
 - **categories** in **Dashboard → Categories**
+- **meeting polls** in **Dashboard → Meeting Polls**
+- **routing forms** in **Dashboard → Routing Forms**
+
+For a full tour of every dashboard area, see the [User Guide](./USER_GUIDE.md).
 
 If you are the workspace owner or admin, continue with the [Admin Guide](./ADMIN_GUIDE.md).
 

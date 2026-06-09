@@ -12,7 +12,8 @@ export type BookingActivityType =
   | "payment_succeeded"
   | "reminder_sent"
   | "review_submitted"
-  | "no_show";
+  | "no_show"
+  | "rsvp";
 
 /**
  * Append an entry to a booking's activity timeline. Best-effort: failures are

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { eq, or, and, isNull, gt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -9,7 +10,12 @@ import { hashPassword, verifyPassword } from "@/lib/crypto";
 import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
 import { requestPasswordReset, resetPassword } from "@/server/password-reset";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
+
+/** Best-effort client IP for rate-limit keys, from forwarding headers. */
+async function clientIp(): Promise<string> {
+  return clientIpFromHeaders(await headers());
+}
 
 const RESERVED = new Set([
   "api", "app", "dashboard", "login", "signup", "settings", "admin", "auth", "setup",
@@ -52,6 +58,14 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
     for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as string] = issue.message;
     return { fieldErrors };
   }
+
+  // Throttle signups per source IP to curb automated account creation.
+  const signupLimit = checkRateLimit(`signup:${await clientIp()}`, {
+    limit: 10,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!signupLimit.ok) return { error: "Too many attempts. Please try again later." };
+
   const { name, email, username, password, inviteToken } = parsed.data;
   const timeZone = parsed.data.timeZone && isValidTimeZone(parsed.data.timeZone)
     ? parsed.data.timeZone
@@ -122,6 +136,18 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
     const fieldErrors: Record<string, string> = {};
     for (const issue of parsed.error.issues) fieldErrors[issue.path[0] as string] = issue.message;
     return { fieldErrors };
+  }
+
+  // Throttle credential attempts per IP and per targeted email to curb brute
+  // force and credential stuffing without leaking whether an account exists.
+  const ip = await clientIp();
+  const ipLimit = checkRateLimit(`login-ip:${ip}`, { limit: 20, windowMs: 15 * 60 * 1000 });
+  const emailLimit = checkRateLimit(`login-email:${parsed.data.email}`, {
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!ipLimit.ok || !emailLimit.ok) {
+    return { error: "Too many login attempts. Please try again later." };
   }
 
   const [user] = await db

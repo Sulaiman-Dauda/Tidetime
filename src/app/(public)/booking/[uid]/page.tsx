@@ -15,10 +15,18 @@ export const metadata: Metadata = { title: "Your booking · Tidetime" };
 
 interface Props {
   params: Promise<{ uid: string }>;
+  searchParams: Promise<{ rsvp?: string; rsvp_error?: string }>;
 }
 
-export default async function BookingDetailPage({ params }: Props) {
+const RSVP_LABELS: Record<string, string> = {
+  accepted: "Thanks — you're marked as attending.",
+  declined: "Got it — you've declined this invitation.",
+  tentative: "Noted — you're marked as a maybe.",
+};
+
+export default async function BookingDetailPage({ params, searchParams }: Props) {
   const { uid } = await params;
+  const { rsvp, rsvp_error } = await searchParams;
   const data = await getBookingByUid(uid);
   if (!data) notFound();
 
@@ -50,6 +58,16 @@ export default async function BookingDetailPage({ params }: Props) {
     <main className="min-h-screen bg-grid">
       <CompanyBrandHeader />
       <div className="mx-auto flex max-w-lg flex-col px-4 py-16">
+        {rsvp && RSVP_LABELS[rsvp] ? (
+          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-700">
+            {RSVP_LABELS[rsvp]}
+          </div>
+        ) : null}
+        {rsvp_error ? (
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            We couldn&apos;t record your response — the link may have expired.
+          </div>
+        ) : null}
         <div className="rounded-2xl border bg-card p-8 shadow-sm">
           {/* Host info */}
           {host && (

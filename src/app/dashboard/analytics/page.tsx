@@ -1,6 +1,9 @@
 import { requirePermission } from "@/lib/guard";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { getUserAnalytics } from "@/server/analytics";
+import { getCompanySettings } from "@/server/company-settings";
 import { completionRate } from "@/lib/analytics";
+import { formatMoney } from "@/lib/payments";
 import {
   CalendarCheck,
   CalendarX2,
@@ -14,10 +17,6 @@ export const metadata = { title: "Analytics" };
 
 const RANGES = { "30": 30, "90": 90, "365": 365 } as const;
 
-function money(cents: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
-
 export default async function AnalyticsPage({
   searchParams,
 }: {
@@ -28,7 +27,10 @@ export default async function AnalyticsPage({
   const days = RANGES[(range as keyof typeof RANGES) ?? "90"] ?? 90;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const a = await getUserAnalytics(user.id, since);
+  const [a, { profile }] = await Promise.all([
+    getUserAnalytics(user.id, since),
+    getCompanySettings(),
+  ]);
   const rate = Math.round(completionRate(a) * 100);
 
   const stats = [
@@ -37,7 +39,7 @@ export default async function AnalyticsPage({
     { label: "Upcoming", value: a.upcoming, icon: Clock, delta: null },
     { label: "Cancelled", value: a.cancelled, icon: CalendarX2, delta: null },
     { label: "No-shows", value: a.noShows, icon: UserX, delta: null },
-    { label: "Revenue", value: money(a.revenue), icon: DollarSign, delta: null },
+    { label: "Revenue", value: formatMoney(a.revenue, profile.defaultCurrency), icon: DollarSign, delta: null },
   ];
 
   const utilization = Object.entries(a.utilization).sort((x, y) => y[1] - x[1]);
@@ -45,31 +47,33 @@ export default async function AnalyticsPage({
 
   return (
     <div className="animate-fade-in space-y-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Analytics</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Completion rate{" "}
-            <span className="font-medium text-foreground">{rate}%</span>
-          </p>
-        </div>
-        <div className="flex items-center rounded-full border border-border bg-card p-0.5">
-          {(Object.entries(RANGES) as [string, number][]).map(([label, val]) => (
-            <a
-              key={label}
-              href={`/dashboard/analytics?range=${label}`}
-              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-                days === val
-                  ? "bg-secondary text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}d
-            </a>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="Analytics"
+        description={
+          <>
+            Track bookings, revenue, and trends. Completion rate{" "}
+            <span className="font-medium text-foreground">{rate}%</span>.
+          </>
+        }
+        className="flex-wrap"
+        action={
+          <div className="flex items-center rounded-full border border-border bg-card p-0.5">
+            {(Object.entries(RANGES) as [string, number][]).map(([label, val]) => (
+              <a
+                key={label}
+                href={`/dashboard/analytics?range=${label}`}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                  days === val
+                    ? "bg-secondary text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}d
+              </a>
+            ))}
+          </div>
+        }
+      />
 
       {/* Stat grid */}
       <div className="grid gap-px rounded-2xl border border-border/60 bg-border sm:grid-cols-2 lg:grid-cols-3">

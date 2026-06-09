@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidTimeZone } from "@/lib/time";
+import { isBlockedHostname } from "@/lib/ssrf";
 
 function optionalTrimmedString(max: number) {
   return z.preprocess((value) => {
@@ -22,6 +23,43 @@ export const httpUrlSchema = z
   .url("Enter a valid URL")
   .refine((value) => /^https?:\/\//i.test(value), "Only http(s) URLs are supported");
 
+/**
+ * Like `httpUrlSchema` but additionally rejects URLs pointing at internal hosts
+ * (localhost, private IP ranges, cloud metadata). Used for user-registered
+ * outbound targets such as webhook subscriber URLs to block SSRF at the door.
+ * Authoritative DNS-resolving validation still happens at delivery time.
+ */
+export const webhookUrlSchema = httpUrlSchema.refine((value) => {
+  try {
+    return !isBlockedHostname(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}, "URL host is not allowed");
+
+/**
+ * Bounded free-form answers to a service's custom booking questions. The keys,
+ * value sizes, and field count are all capped so an unauthenticated booker
+ * can't stuff megabytes of arbitrary JSON into the `responses` column. Field
+ * semantics are validated separately against the service's configured fields.
+ */
+export const bookingResponsesSchema = z
+  .record(
+    z.string().max(200),
+    z.union([
+      z.string().max(5000),
+      z.boolean(),
+      z.number(),
+      z.array(z.string().max(500)).max(100),
+    ]),
+  )
+  .refine((value) => Object.keys(value).length <= 100, "Too many response fields");
+
+/** Additional guest invitees on a booking, capped to a sane maximum. */
+export const bookingGuestsSchema = z
+  .array(z.string().email())
+  .max(20, "Too many guests (maximum 20)");
+
 export const eventLocationSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("in_person"),
@@ -36,7 +74,10 @@ export const eventLocationSchema = z.discriminatedUnion("type", [
     type: z.literal("link"),
     link: httpUrlSchema,
   }),
+  z.object({ type: z.literal("jitsi") }),
   z.object({ type: z.literal("google_meet") }),
+  z.object({ type: z.literal("office365_video") }),
+  z.object({ type: z.literal("daily_video") }),
   z.object({ type: z.literal("zoom") }),
 ]);
 

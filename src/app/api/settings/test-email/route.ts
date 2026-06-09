@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/guard";
+import { getCurrentUser } from "@/lib/auth";
 import { createTransport } from "nodemailer";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  await requirePermission("team.manage");
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!currentUser.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { config } = await req.json();
   const { host, port, user, pass } = config;

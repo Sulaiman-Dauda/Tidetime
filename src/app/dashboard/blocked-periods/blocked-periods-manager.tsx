@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { EmptyState } from "@/components/empty-state";
 import { Loader2, Plus, CalendarOff } from "lucide-react";
 import {
   createBlockedPeriodAction,
@@ -34,10 +35,10 @@ export function BlockedPeriodsManager({ periods }: { periods: Period[] }) {
 
   useEffect(() => {
     if (state.ok) {
-      toast({ title: "Blocked period added" });
+      toast({ title: "Blocked period created" });
       router.refresh();
     } else if (state.error) {
-      toast({ title: "Could not save", description: state.error, variant: "destructive" });
+      toast({ title: "Couldn't create blocked period", description: state.error, variant: "destructive" });
     }
   }, [state, toast, router]);
 
@@ -72,10 +73,11 @@ export function BlockedPeriodsManager({ periods }: { periods: Period[] }) {
       <Card className="p-5">
         <h2 className="mb-4 font-medium">Scheduled closures</h2>
         {periods.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-sm text-muted-foreground">
-            <CalendarOff className="h-8 w-8 opacity-50" />
-            No blocked periods yet.
-          </div>
+          <EmptyState
+            icon={CalendarOff}
+            title="No blocked periods yet"
+            description="Add a closure to make every provider unavailable for a date range."
+          />
         ) : (
           <ul className="divide-y">
             {periods.map((p) => (

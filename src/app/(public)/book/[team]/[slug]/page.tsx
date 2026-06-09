@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AlertTriangle } from "lucide-react";
-import { getTeamEventType } from "@/server/teams-public";
-import { isBookingDisabled } from "@/server/company-settings";
+import { getTeamEventType, getTeamHosts } from "@/server/teams-public";
+import { getCompanySettings } from "@/server/company-settings";
 import { getStripeConfig } from "@/server/settings";
+import { issueBotChallenge } from "@/lib/bot-challenge";
+import { env } from "@/lib/env";
 import { BookingFlow } from "../../../[username]/[slug]/booking-flow";
 import { PublicLegal } from "../../../_components/public-legal";
 import { CompanyBrandHeader } from "../../../_components/company-brand-header";
+import { EmbedBridge } from "../../../embed-bridge";
 
 interface Props {
   params: Promise<{ team: string; slug: string }>;
@@ -33,15 +36,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TeamBookingPage({ params, searchParams }: Props) {
   const { team, slug } = await params;
   const { embed, reschedule, booking, payment_intent: paymentIntentId } = await searchParams;
-  const [data, disabled, stripeConfig] = await Promise.all([
+  const [data, settings, stripeConfig] = await Promise.all([
     getTeamEventType(team, slug),
-    isBookingDisabled(),
+    getCompanySettings(),
     getStripeConfig(),
   ]);
   if (!data) notFound();
 
   const { team: teamRow, eventType } = data;
   const isEmbed = embed === "1";
+  const disabled = settings.booking.bookingDisabled;
+  // Let bookers pick a provider on rotating team services ("any available" stays default).
+  const allowsHostPick =
+    eventType.schedulingType === "round_robin" || eventType.schedulingType === "managed";
+  const teamHosts = allowsHostPick ? await getTeamHosts(eventType.id) : [];
 
   if (disabled) {
     return (
@@ -91,8 +99,11 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
           successRedirectUrl: eventType.successRedirectUrl,
         }}
         host={{ name: teamRow.name, username: teamRow.slug, avatarUrl: teamRow.logoUrl }}
+        spamProtection={settings.booking.spamProtectionEnabled}
+        botChallenge={issueBotChallenge(env.authSecret)}
+        teamHosts={teamHosts}
       />
-      {isEmbed ? null : <PublicLegal />}
+      {isEmbed ? <EmbedBridge /> : <PublicLegal />}
     </main>
   );
 }

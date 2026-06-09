@@ -130,6 +130,6 @@ export async function userEventTypesForLinks(
   return db
     .select({ id: eventTypes.id, title: eventTypes.title })
     .from(eventTypes)
-    .where(eq(eventTypes.userId, userId))
+    .where(and(eq(eventTypes.userId, userId), eq(eventTypes.draft, false)))
     .orderBy(eventTypes.title);
 }

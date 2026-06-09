@@ -3,15 +3,19 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { buildImageDataUrl, MAX_IMAGE_BYTES } from "@/lib/image-upload";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
-
-// 1 MB max
-const MAX_SIZE = 1 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const limit = checkRateLimit(`avatar:${user.id}`, { limit: 20, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json({ error: "Too many uploads. Please slow down." }, { status: 429 });
+  }
 
   let body: ArrayBuffer;
   try {
@@ -26,19 +30,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ avatarUrl: null });
   }
 
-  if (body.byteLength > MAX_SIZE) {
+  if (body.byteLength > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Image must be under 1 MB" }, { status: 400 });
   }
 
-  const contentType = req.headers.get("content-type") || "image/png";
-  if (!contentType.startsWith("image/")) {
-    return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
+  // Validate by content (magic bytes), not the client-supplied Content-Type.
+  const result = buildImageDataUrl(new Uint8Array(body));
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const base64 = Buffer.from(body).toString("base64");
-  const dataUrl = `data:${contentType};base64,${base64}`;
+  await db.update(users).set({ avatarUrl: result.dataUrl }).where(eq(users.id, user.id));
 
-  await db.update(users).set({ avatarUrl: dataUrl }).where(eq(users.id, user.id));
-
-  return NextResponse.json({ avatarUrl: dataUrl });
+  return NextResponse.json({ avatarUrl: result.dataUrl });
 }

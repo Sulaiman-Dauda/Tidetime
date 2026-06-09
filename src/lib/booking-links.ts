@@ -3,7 +3,7 @@
  * link may currently be used to make a booking, independent of the database.
  */
 
-export type BookingLinkKind = "one_time" | "expiring" | "limited" | "invite";
+export type BookingLinkKind = "one_time" | "expiring" | "limited" | "invite" | "static";
 
 export interface BookingLinkState {
   kind: BookingLinkKind;

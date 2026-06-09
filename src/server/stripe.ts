@@ -1,6 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { payments, bookings, eventTypes } from "@/db/schema";
 import { getStripeConfig } from "@/server/settings";
@@ -112,17 +112,27 @@ export async function markPaymentPaid(externalId: string): Promise<void> {
 
   const nextStatus = bookingRow.requiresConfirmation ? "pending" : "accepted";
 
-  await db.transaction(async (tx) => {
-    await tx
+  // Atomically claim the paid transition. The browser (`/api/stripe/complete`)
+  // and the Stripe webhook both call this on success, so without a conditional
+  // flip both could pass the read-guard above and run the booking effects twice
+  // (duplicate emails, calendar invites, conferencing rooms). Only the caller
+  // whose UPDATE actually changes a row from non-paid → paid proceeds.
+  const claimed = await db.transaction(async (tx) => {
+    const updated = await tx
       .update(payments)
       .set({ status: "paid", success: true })
-      .where(eq(payments.id, pay.id));
+      .where(and(eq(payments.id, pay.id), ne(payments.status, "paid")))
+      .returning({ id: payments.id });
+    if (updated.length === 0) return false;
 
     await tx
       .update(bookings)
       .set({ paid: true, status: nextStatus, updatedAt: new Date() })
       .where(eq(bookings.id, pay.bookingId));
+    return true;
   });
+
+  if (!claimed) return;
 
   await logBookingActivity(pay.bookingId, "payment_succeeded", {
     message:

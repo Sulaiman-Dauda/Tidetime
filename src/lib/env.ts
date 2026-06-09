@@ -18,6 +18,18 @@ const rawEnvSchema = z.object({
   AUTH_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  ZOOM_CLIENT_ID: z.string().optional(),
+  ZOOM_CLIENT_SECRET: z.string().optional(),
+  DAILY_API_KEY: z.string().optional(),
+  DAILY_SUBDOMAIN: z.string().optional(),
+  HUBSPOT_CLIENT_ID: z.string().optional(),
+  HUBSPOT_CLIENT_SECRET: z.string().optional(),
+  CRON_SECRET: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  LICENSE_KEY: z.string().optional(),
+  LICENSE_PUBLIC_KEY: z.string().optional(),
 });
 
 const validated = rawEnvSchema.safeParse(process.env);
@@ -41,6 +53,9 @@ const databaseUrl = raw.DATABASE_URL ?? DEFAULT_DATABASE_URL;
 if (isProd) {
   const startupErrors: string[] = [];
 
+  // These secrets are only needed at runtime. `next build` runs with
+  // NODE_ENV=production but doesn't connect to anything, so we skip them during
+  // the build command — this keeps real secrets out of image build layers.
   if (!isBuildCommand) {
     if (!raw.APP_URL || appUrl === DEFAULT_APP_URL) {
       startupErrors.push("APP_URL must be set explicitly in production.");
@@ -48,16 +63,15 @@ if (isProd) {
     if (!raw.DATABASE_URL || databaseUrl === DEFAULT_DATABASE_URL) {
       startupErrors.push("DATABASE_URL must be set explicitly in production.");
     }
-  }
-
-  if (!raw.AUTH_SECRET) {
-    startupErrors.push("AUTH_SECRET must be set in production.");
-  } else {
-    if (authSecret === DEFAULT_AUTH_SECRET) {
-      startupErrors.push("AUTH_SECRET cannot use the development default in production.");
-    }
-    if (authSecret.length < 32) {
-      startupErrors.push("AUTH_SECRET must be at least 32 characters in production.");
+    if (!raw.AUTH_SECRET) {
+      startupErrors.push("AUTH_SECRET must be set in production.");
+    } else {
+      if (authSecret === DEFAULT_AUTH_SECRET) {
+        startupErrors.push("AUTH_SECRET cannot use the development default in production.");
+      }
+      if (authSecret.length < 32) {
+        startupErrors.push("AUTH_SECRET must be at least 32 characters in production.");
+      }
     }
   }
 

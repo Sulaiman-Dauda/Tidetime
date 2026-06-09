@@ -1,7 +1,9 @@
 "use server";
 
 import { z } from "zod";
+import { headers } from "next/headers";
 import { submitReview } from "@/server/reviews";
+import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
 import type { ReviewOutcome } from "@/lib/reviews";
 
 const schema = z.object({
@@ -26,6 +28,11 @@ export async function submitReviewAction(
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const ip = clientIpFromHeaders(await headers());
+  if (!checkRateLimit(`review:ip:${ip}`, { limit: 15, windowMs: 60 * 1000 }).ok) {
+    return { error: "Too many submissions. Please slow down and try again." };
   }
 
   const res = await submitReview(parsed.data.uid, parsed.data.rating, parsed.data.feedback);

@@ -6,20 +6,27 @@ import { db } from "@/db";
 import { credentials, selectedCalendars, destinationCalendars } from "@/db/schema";
 import { encrypt, decrypt, hmacSign } from "@/lib/crypto";
 import { env } from "@/lib/env";
+import { getGoogleCreds } from "./integration-credentials";
 
 /* -------------------------------------------------------------------------- */
 /*  OAuth2 client helpers                                                      */
 /* -------------------------------------------------------------------------- */
 
-function oauth2Client() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    throw new Error("Google OAuth is not configured — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET");
+/** Whether Google OAuth credentials are configured (DB or env). */
+export async function isGoogleConfigured(): Promise<boolean> {
+  return (await getGoogleCreds()) !== null;
+}
+
+async function getOAuthClient() {
+  const creds = await getGoogleCreds();
+  if (!creds) {
+    throw new Error(
+      "Google OAuth is not configured — add it in Settings → Integrations (or set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)",
+    );
   }
   return new google.auth.OAuth2(
-    clientId,
-    clientSecret,
+    creds.clientId,
+    creds.clientSecret,
     `${env.appUrl}/api/google-calendar/callback`,
   );
 }
@@ -49,8 +56,8 @@ export function parseGoogleOAuthState(state: string): number | null {
 }
 
 /** Build the Google OAuth consent URL for a user. */
-export function getGoogleAuthUrl(userId: number): string {
-  const oauth = oauth2Client();
+export async function getGoogleAuthUrl(userId: number): Promise<string> {
+  const oauth = await getOAuthClient();
   return oauth.generateAuthUrl({
     access_type: "offline",
     scope: [
@@ -64,7 +71,7 @@ export function getGoogleAuthUrl(userId: number): string {
 
 /** Exchange an OAuth code for tokens and persist the credential. */
 export async function exchangeGoogleCode(code: string, userId: number): Promise<void> {
-  const oauth = oauth2Client();
+  const oauth = await getOAuthClient();
   const { tokens } = await oauth.getToken(code);
   if (!tokens.access_token) throw new Error("Google returned no access token");
 
@@ -80,7 +87,7 @@ export async function exchangeGoogleCode(code: string, userId: number): Promise<
 }
 
 /** Retrieve and refresh the Google credential for a user. */
-export async function getGoogleCredential(userId: number): Promise<{ oauth: ReturnType<typeof oauth2Client>; tokens: { access_token?: string; refresh_token?: string } } | null> {
+export async function getGoogleCredential(userId: number): Promise<{ oauth: Awaited<ReturnType<typeof getOAuthClient>>; tokens: { access_token?: string; refresh_token?: string } } | null> {
   const [cred] = await db
     .select()
     .from(credentials)
@@ -89,7 +96,7 @@ export async function getGoogleCredential(userId: number): Promise<{ oauth: Retu
   if (!cred) return null;
 
   const tokens = JSON.parse(decrypt(cred.key));
-  const oauth = oauth2Client();
+  const oauth = await getOAuthClient();
   oauth.setCredentials(tokens);
 
   // Auto-refresh access token if needed.

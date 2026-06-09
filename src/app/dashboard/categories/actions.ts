@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import {
   createServiceCategory,
   deleteServiceCategory,
@@ -20,7 +20,7 @@ const categorySchema = z.object({
 });
 
 export async function createCategoryAction(_prev: CategoryState, formData: FormData): Promise<CategoryState> {
-  await requireUser();
+  await requirePermission("eventType.manage");
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description") || undefined,
@@ -37,7 +37,7 @@ export async function createCategoryAction(_prev: CategoryState, formData: FormD
 }
 
 export async function updateCategoryAction(_prev: CategoryState, formData: FormData): Promise<CategoryState> {
-  await requireUser();
+  await requirePermission("eventType.manage");
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { error: "Invalid category" };
   const parsed = categorySchema.safeParse({
@@ -56,7 +56,7 @@ export async function updateCategoryAction(_prev: CategoryState, formData: FormD
 }
 
 export async function deleteCategoryAction(formData: FormData): Promise<void> {
-  await requireUser();
+  await requirePermission("eventType.manage");
   const id = Number(formData.get("id"));
   if (Number.isInteger(id) && id > 0) await deleteServiceCategory(id);
   revalidatePath("/dashboard/categories");

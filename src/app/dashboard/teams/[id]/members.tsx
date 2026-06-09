@@ -63,16 +63,25 @@ export function TeamMembers({
       toast({ title: "Invitation sent" });
       router.refresh();
     } else if (inviteState?.error) {
-      toast({ title: inviteState.error, variant: "destructive" });
+      toast({
+        title: "Couldn't send invitation",
+        description: inviteState.error,
+        variant: "destructive",
+      });
     }
   }, [inviteState, toast, router]);
 
   useEffect(() => {
     if (importState?.ok) {
-      toast({ title: `Imported ${importState.added ?? 0} member(s)` });
+      const n = importState.added ?? 0;
+      toast({ title: `Imported ${n} member${n === 1 ? "" : "s"}` });
       router.refresh();
     } else if (importState?.error) {
-      toast({ title: importState.error, variant: "destructive" });
+      toast({
+        title: "Couldn't import members",
+        description: importState.error,
+        variant: "destructive",
+      });
     }
   }, [importState, toast, router]);
 
@@ -199,7 +208,7 @@ function RoleSelect({
       toast({ title: "Role updated" });
       onDone();
     } else if (state?.error) {
-      toast({ title: state.error, variant: "destructive" });
+      toast({ title: "Couldn't update role", description: state.error, variant: "destructive" });
     }
   }, [state, toast, onDone]);
 
@@ -249,7 +258,7 @@ function RemoveButton({
       toast({ title: "Member removed" });
       onDone();
     } else if (state?.error) {
-      toast({ title: state.error, variant: "destructive" });
+      toast({ title: "Couldn't remove member", description: state.error, variant: "destructive" });
     }
   }, [state, toast, onDone]);
 

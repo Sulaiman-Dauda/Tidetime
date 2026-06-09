@@ -9,23 +9,54 @@ export const LOCATION_OPTIONS: { type: EventLocation["type"]; label: string; ico
   { type: "link", label: "Custom link", icon: Link2 },
 ];
 
-export const LEGACY_LOCATION_OPTIONS: { type: EventLocation["type"]; label: string; icon: LucideIcon }[] = [
-  { type: "google_meet", label: "Google Meet (not connected)", icon: Video },
-  { type: "zoom", label: "Zoom (not connected)", icon: Video },
+/** Video providers backed by the App Store. Shown only when connected. */
+export const VIDEO_LOCATION_OPTIONS: {
+  type: EventLocation["type"];
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { type: "jitsi", label: "Jitsi Meet (built-in)", icon: Video },
+  { type: "google_meet", label: "Google Meet", icon: Video },
+  { type: "office365_video", label: "Microsoft Teams", icon: Video },
+  { type: "zoom", label: "Zoom", icon: Video },
+  { type: "daily_video", label: "Daily video", icon: Video },
 ];
 
-export function locationOption(type: EventLocation["type"]) {
-  return [...LOCATION_OPTIONS, ...LEGACY_LOCATION_OPTIONS].find((o) => o.type === type);
+/** Default Jitsi instance for the built-in, connection-free video option. */
+export const JITSI_BASE_URL = "https://meet.jit.si";
+
+/**
+ * Build a Jitsi room URL for a booking. The room id (a booking uid) is unique
+ * and unguessable, giving every meeting its own private room with no API,
+ * OAuth or provider connection — the always-available video fallback.
+ */
+export function jitsiRoomUrl(roomId: string): string {
+  return `${JITSI_BASE_URL}/Tidetime-${roomId}`;
 }
 
-export function isUnsupportedLocationType(type: EventLocation["type"]): boolean {
-  return type === "google_meet" || type === "zoom";
+const VIDEO_TYPES = new Set<EventLocation["type"]>(
+  VIDEO_LOCATION_OPTIONS.map((o) => o.type),
+);
+
+export function isVideoLocationType(type: EventLocation["type"]): boolean {
+  return VIDEO_TYPES.has(type);
+}
+
+export function locationOption(type: EventLocation["type"]) {
+  return [...LOCATION_OPTIONS, ...VIDEO_LOCATION_OPTIONS].find((o) => o.type === type);
 }
 
 export function locationLabel(loc: EventLocation): string {
   switch (loc.type) {
+    case "jitsi":
+      return "Jitsi Meet";
     case "google_meet":
+      return "Google Meet";
+    case "office365_video":
+      return "Microsoft Teams";
     case "zoom":
+      return "Zoom";
+    case "daily_video":
       return "Video call";
     case "in_person":
       return loc.address ? `In person · ${loc.address}` : "In person";
@@ -45,13 +76,16 @@ export function locationIcon(type: EventLocation["type"]): LucideIcon {
 }
 
 /**
- * Resolve the concrete meeting location string + URL stored on a booking.
- * Managed video providers are not connected yet, so they fall back to an
- * honest manual hand-off message instead of implying a join link exists.
+ * Resolve the concrete meeting location string + URL stored on a booking at
+ * creation time. For App Store video providers the join URL is provisioned
+ * asynchronously by booking-effects, so we record "Video call" with no URL yet.
+ * Jitsi is the exception: its room is a pure function of the booking id, so the
+ * link is minted here immediately — no provider, no API, no async step.
  */
 export function resolveLocation(
   loc: EventLocation | undefined,
   attendeePhone?: string,
+  roomId?: string,
 ): { location: string; meetingUrl: string | null } {
   if (!loc) return { location: "Online", meetingUrl: null };
   switch (loc.type) {
@@ -63,9 +97,13 @@ export function resolveLocation(
       return { location: attendeePhone ? `Call: ${attendeePhone}` : "Phone call", meetingUrl: null };
     case "link":
       return { location: "Online", meetingUrl: loc.link };
+    case "jitsi":
+      return { location: "Video call", meetingUrl: roomId ? jitsiRoomUrl(roomId) : null };
     case "google_meet":
+    case "office365_video":
     case "zoom":
-      return { location: "Video call details will be shared separately", meetingUrl: null };
+    case "daily_video":
+      return { location: "Video call", meetingUrl: null };
     default:
       return { location: "Online", meetingUrl: null };
   }

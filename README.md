@@ -37,38 +37,39 @@ Tidetime helps people and teams publish booking pages, manage availability, orga
 
 ## What Tidetime does
 
-Tidetime is built for booking-driven work such as consultations, appointments, classes, team schedules, shared resources, and paid sessions.
+Tidetime is built for booking-driven work such as consultations, appointments, classes, group sessions, team schedules, and paid sessions.
 
 With Tidetime you can:
 
-- create one or many bookable services
+- create one or many bookable services, including recurring and group (seated) services
 - share personal and team booking pages
 - set weekly hours and date-specific overrides
-- prevent conflicts with Google Calendar sync
+- prevent conflicts with calendar sync (Google Calendar, Microsoft 365/Outlook, and Apple/CalDAV)
+- generate meeting links automatically (Google Meet, Microsoft Teams, Zoom, Daily, or built-in Jitsi)
 - send confirmations, cancellations, and reminders
-- accept paid bookings with Stripe
-- organize customers, teams, categories, resources, and reviews
+- accept paid bookings and deposits with Stripe
+- organize customers, teams, categories, and reviews
+- collect availability with meeting polls and route enquiries with routing forms
 - create special booking links for invites, expiry dates, or limited use
 
 ## What is included today
 
 ### Ready to use now
 
-- personal and team scheduling
-- public booking pages and embeddable widget
-- Google Calendar sync
-- paid bookings with Stripe checkout
-- API keys and developer API access
-- outgoing webhooks
+- personal and team scheduling (round-robin, collective, and multi-attendant)
+- public booking pages and an embeddable widget
+- calendar sync: Google Calendar, Microsoft 365/Outlook, Apple/CalDAV
+- meeting links: Google Meet, Microsoft Teams, Zoom, Daily, built-in Jitsi
+- paid bookings and deposits with Stripe
+- meeting polls and routing forms
+- reviews, customer management, categories, and teams with role-based access
+- API keys, a developer REST API, and outgoing webhooks
 - email notifications and reminders
 - the ability to pause public bookings
-- customer management, reviews, resources, and teams
 
-### Not shipped yet
+### Deliberately not included
 
-- built-in Google Meet connection flow
-- built-in Zoom connection flow
-- Outlook calendar sync
+- SMS notifications (email-first by design)
 - hosted file uploads in booking forms
 
 ## Main areas of the product
@@ -81,11 +82,48 @@ With Tidetime you can:
 | **Bookings** | View, confirm, cancel, reschedule, and track appointments |
 | **Calendar** | See upcoming accepted and pending bookings in one place |
 | **Customers** | Keep a clean list of people who have booked with you |
-| **Payments** | Charge for paid services with Stripe |
-| **Resources** | Prevent double-booking of rooms, equipment, or shared assets |
+| **Payments** | Charge for paid services and deposits with Stripe |
+| **Meeting polls** | Propose times and let invitees vote on the best slot |
+| **Routing forms** | Ask a few questions, then send each person to the right service, link, or message |
+| **Integrations** | Connect calendars, video providers, CRM, and payments |
 | **Reviews** | Collect private feedback and send happy customers to your public review page |
 | **Teams** | Work together with shared services and team roles |
 | **Automation** | Use booking links, API keys, webhooks, and health checks |
+
+## Install in one command
+
+The fastest way to self-host. On any Linux server with Docker (the script offers
+to install Docker for you if it's missing), run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/tidetime/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
+
+That's it — no `.env` editing. The installer generates secure secrets, builds and
+launches PostgreSQL + the app + the reminders worker with Docker Compose, runs
+migrations, waits until the app is healthy, and prints the URL to open. When it
+finishes, visit `/setup` to create your owner account.
+
+Re-running the script updates an existing install in place and preserves your
+generated secrets. Unattended installs can skip the prompts:
+
+```bash
+TIDETIME_URL=https://book.example.com TIDETIME_YES=1 ./install.sh
+```
+
+| Override | Purpose |
+| --- | --- |
+| `TIDETIME_URL` | Public URL (else it uses `http://<server-ip>:<port>`) |
+| `TIDETIME_PORT` | Host port to expose (default `3000`) |
+| `TIDETIME_DIR` | Install directory (default `/opt/tidetime` or `~/tidetime`) |
+| `TIDETIME_BRANCH` | Git branch to deploy (default `main`) |
+| `TIDETIME_YES` | Assume "yes" to all prompts |
+
+> Once you have a domain, point it at the server, put a reverse proxy
+> (Caddy/Traefik/Nginx) in front for HTTPS, set `TIDETIME_URL` to the `https://`
+> address, and re-run the installer.
 
 ## Quick start for self-hosting
 
@@ -246,7 +284,7 @@ For reporting guidance, see [SECURITY.md](./SECURITY.md).
 npm run check
 ```
 
-The automated test suite covers core scheduling logic, validations, payments, reminders, permissions, reviews, resources, and other business rules.
+The automated test suite covers core scheduling logic, validations, payments, reminders, permissions, reviews, and other business rules.
 
 ## Contributing
 

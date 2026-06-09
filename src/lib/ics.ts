@@ -20,8 +20,17 @@ function fmt(date: Date): string {
   return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
+// Control characters (except those normalised below) are stripped so they can't
+// break out of an iCalendar value or inject extra lines.
+const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
 function escape(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r\n|\r|\n/g, "\\n") // normalise + escape all newlines (prevents CRLF injection)
+    .replace(CONTROL_CHARS, "");
 }
 
 /** Fold long lines to 75 octets per RFC 5545. */

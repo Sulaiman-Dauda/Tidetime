@@ -69,15 +69,15 @@ Yes, if Stripe is configured and the service is set to require payment.
 
 If you do not use paid bookings, you can leave Stripe disabled.
 
-## Can Tidetime sync with Google Calendar?
+## Can Tidetime sync with my calendar?
 
 Yes.
 
-Tidetime can read busy time from Google Calendar and create events for new bookings.
+Tidetime supports Google Calendar, Microsoft 365/Outlook, and Apple/CalDAV. Once a calendar is connected, Tidetime reads your busy time so it does not double-book you, and it creates events for new bookings on the connected calendar.
 
-This requires Google Calendar to be connected in the app and the server-side Google credentials to be configured.
+Connect a calendar under **Dashboard → Integrations → Calendars**. Some providers also need server-side credentials, which your admin sets up.
 
-## Do I need Stripe or Google Calendar to use Tidetime?
+## Do I need Stripe or a calendar to use Tidetime?
 
 No.
 
@@ -89,7 +89,7 @@ Tidetime can still be useful without them.
 
 Tidetime logs emails to the server console instead of sending them.
 
-For real customer communication, configure SMTP in **Settings → Email**.
+For real customer communication, configure SMTP in **Dashboard → Integrations → Email**.
 
 ## What is a booking link?
 
@@ -102,14 +102,17 @@ Examples:
 - a link that expires
 - a link with limited uses
 
-## What is the difference between Profile settings and Settings?
+## What is the difference between Profile settings, Settings, and Integrations?
 
 - **Profile settings** are for your personal account
-- **Settings** are for workspace-wide company configuration
+- **Settings** is for workspace setup and has five tabs: Brand, Booking, Reviews, API keys, and Legal
+- **Integrations** is where you connect outside services and has tabs for Calendars, Video, CRM, Payments, Email, and Setup
 
 If you want to change your name or password, use **Profile settings**.
 
-If you want to change branding, email, or payment setup, use **Settings**.
+If you want to change branding, booking defaults, reviews, or legal pages, use **Settings**.
+
+If you want to connect a calendar, email, payments, or video, use **Integrations**.
 
 ## Can I manage a team inside Tidetime?
 
@@ -117,17 +120,35 @@ Yes.
 
 You can create teams, invite members, assign roles, and run shared services.
 
-## What are resources used for?
+## Can several people book the same time?
 
-Resources are shared items that should not be overbooked.
+Yes. Turn on **Seats per slot** for a service and set how many seats each slot has. Multiple attendees can then book the same time until the slot is full. This is how you run classes and group sessions.
 
-Examples include rooms, equipment, and other limited assets.
+## Can a service repeat?
+
+Yes. A service can recur weekly or monthly. Choose the interval (1 to 12) and the number of occurrences (up to 52). The attendee books the whole series in one step.
+
+## Can bookers bring guests?
+
+Yes. On the booking form, bookers can invite extra guests by email, unless the service turns guests off.
+
+## Can I add my own questions to the booking form?
+
+Yes. A service's **Booking form** tab lets you add custom questions. There are nine field types: short text, long text, email, phone, number, dropdown, single choice, checkbox, and multiple choice. Each question can be required or hidden, and can appear only when an earlier answer matches a value you set. Name and email are always asked.
+
+## What is a meeting poll?
+
+A meeting poll lets you propose several times and have people vote yes, no, or if-need-be on each one. When you pick the winning time, Tidetime books it for everyone who said yes or if-need-be and emails them. You can also choose how much voters can see and whether their names are hidden. See the [User Guide](./USER_GUIDE.md#meeting-polls).
+
+## What is a routing form?
+
+A routing form is a public form that sends each respondent to the right place based on their answers. The first matching rule decides whether they book a service, go to a URL, or see a message, with a fallback for when nothing matches. See the [User Guide](./USER_GUIDE.md#routing-forms).
 
 ## What are reviews used for?
 
 Tidetime can send feedback requests after a booking.
 
-Positive ratings can be sent to your public review page, while lower ratings stay private inside the app.
+Each host sets a star threshold (4 or higher, or 5 only) and a Google review URL under **Settings → Reviews**. Ratings that meet the threshold send the attendee to your public Google review link. Lower ratings stay private inside the app as feedback.
 
 ## I only want to use the app. Which docs should I read?
 

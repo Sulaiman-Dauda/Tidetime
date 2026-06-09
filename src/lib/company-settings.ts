@@ -25,6 +25,37 @@ export interface CompanyProfile {
   logoUrl: string;
   /** Brand colour applied across the app (hex, e.g. #4f46e5). */
   brandColor: string;
+  /** Default currency (ISO 4217, lowercase) for new services + price display. */
+  defaultCurrency: string;
+}
+
+/** Currencies offered in the settings picker. Lowercase ISO 4217 (Stripe style). */
+export const SUPPORTED_CURRENCIES = [
+  "usd",
+  "eur",
+  "gbp",
+  "cad",
+  "aud",
+  "nzd",
+  "ngn",
+  "zar",
+  "inr",
+  "jpy",
+  "cny",
+  "brl",
+  "mxn",
+  "chf",
+  "sek",
+  "aed",
+] as const;
+
+export function isSupportedCurrency(value: unknown): boolean {
+  return typeof value === "string" && (SUPPORTED_CURRENCIES as readonly string[]).includes(value.toLowerCase());
+}
+
+export function normalizeCurrency(value: string | null | undefined): string {
+  const v = (value ?? "").trim().toLowerCase();
+  return isSupportedCurrency(v) ? v : "usd";
 }
 
 export interface CompanyLocalization {
@@ -46,6 +77,8 @@ export interface CompanyBookingDefaults {
   rescheduleCancelTimeoutMinutes: number;
   /** When true the public booking page is disabled for everyone. */
   bookingDisabled: boolean;
+  /** Require a privacy-friendly ALTCHA proof-of-work on the public booking form. */
+  spamProtectionEnabled: boolean;
   /** Available appointment status labels; first is the default. */
   appointmentStatuses: string[];
 }
@@ -80,6 +113,7 @@ export const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   websiteUrl: "",
   logoUrl: "",
   brandColor: "#4f46e5",
+  defaultCurrency: "usd",
 };
 
 export const DEFAULT_COMPANY_LOCALIZATION: CompanyLocalization = {
@@ -95,6 +129,7 @@ export const DEFAULT_COMPANY_BOOKING: CompanyBookingDefaults = {
   minimumBookingNoticeMinutes: 120,
   rescheduleCancelTimeoutMinutes: 30,
   bookingDisabled: false,
+  spamProtectionEnabled: false,
   appointmentStatuses: ["Booked", "Confirmed", "Rescheduled", "Cancelled", "Draft"],
 };
 

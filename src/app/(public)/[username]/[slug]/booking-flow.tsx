@@ -17,8 +17,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDuration, initials, WEEKDAY_SHORT } from "@/lib/format";
-import { isUnsupportedLocationType, locationLabel } from "@/lib/locations";
-import { guessTimeZone, listTimeZones } from "@/lib/timezones";
+import { isVideoLocationType, locationLabel } from "@/lib/locations";
+import { clearSavedBooker, loadSavedBooker, saveBooker } from "@/lib/booking-prefill";
+import { AltchaWidget } from "@/components/altcha-widget";
+import { guessTimeZone, listTimeZones, formatTimeZoneLabel } from "@/lib/timezones";
 import {
   visibleFields,
   validateResponses,
@@ -27,6 +29,7 @@ import {
 } from "@/lib/booking-fields";
 import type { BookingField, EventLocation } from "@/db/schema";
 import { describeRecurrence } from "@/lib/recurrence";
+import { formatMoney } from "@/lib/payments";
 import { cn } from "@/lib/utils";
 import { bookAction, type BookActionState } from "../../actions";
 import { StripeProvider } from "@/components/stripe-provider";
@@ -82,6 +85,12 @@ interface Props {
   paymentReturnIntentId?: string;
   eventType: EventTypeView;
   host: HostView;
+  /** require an ALTCHA proof-of-work before booking (company setting) */
+  spamProtection?: boolean;
+  /** server-signed bot challenge token, verified on submit (tamper-proof timing) */
+  botChallenge?: string;
+  /** team service host roster — enables booker-facing "any available / pick a host" */
+  teamHosts?: { id: number; name: string | null; username: string; avatarUrl: string | null }[];
 }
 
 interface SlotsResponse {
@@ -149,9 +158,14 @@ export function BookingFlow({
   paymentReturnIntentId,
   eventType,
   host,
+  spamProtection,
+  botChallenge,
+  teamHosts,
 }: Props) {
   const router = useRouter();
   const hostName = host.name ?? host.username;
+  const canPickHost = Boolean(teamSlug) && (teamHosts?.length ?? 0) > 1;
+  const [selectedHostId, setSelectedHostId] = useState<number | null>(null);
 
   const [timeZone, setTimeZone] = useState(eventType.scheduleTimeZone);
   const [duration, setDuration] = useState(eventType.length);
@@ -177,6 +191,11 @@ export function BookingFlow({
   );
 
   const finishBooking = useCallback((uid: string) => {
+    // When running inside an embed, tell the host page so it can close the
+    // modal / fire its callback before we navigate the iframe.
+    if (_embed && typeof window !== "undefined" && window.parent !== window) {
+      window.parent.postMessage({ type: "tidetime:bookingSuccessful", uid }, "*");
+    }
     if (eventType.successRedirectUrl && typeof window !== "undefined") {
       try {
         const url = new URL(eventType.successRedirectUrl);
@@ -189,7 +208,7 @@ export function BookingFlow({
       }
     }
     router.push(`/booking/${uid}` as Route);
-  }, [eventType.successRedirectUrl, router]);
+  }, [eventType.successRedirectUrl, router, _embed]);
 
   useEffect(() => {
     if (!paymentReturnBookingUid || !paymentReturnIntentId) return;
@@ -242,6 +261,7 @@ export function BookingFlow({
       timeZone,
       start,
       end,
+      selectedHostId ? `host:${selectedHostId}` : "host:any",
     ].join("|");
 
     const cached = slotsCacheRef.current[cacheKey];
@@ -257,6 +277,7 @@ export function BookingFlow({
     const qs = teamSlug
       ? new URLSearchParams({ team: teamSlug, slug, start, end, duration: String(duration), tz: timeZone })
       : new URLSearchParams({ username, slug, start, end, duration: String(duration), tz: timeZone });
+    if (teamSlug && selectedHostId) qs.set("host", String(selectedHostId));
     const endpoint = teamSlug ? "/api/slots/team" : "/api/slots";
     fetch(`${endpoint}?${qs}`, { signal: controller.signal })
       .then(async (r) => {
@@ -277,7 +298,7 @@ export function BookingFlow({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [username, slug, teamSlug, duration, timeZone, viewDate, reloadNonce, finalizingPayment]);
+  }, [username, slug, teamSlug, duration, timeZone, viewDate, reloadNonce, finalizingPayment, selectedHostId]);
 
   const rows = monthMatrix(viewDate.getFullYear(), viewDate.getMonth());
   const todayKeyStr = dayKey(new Date());
@@ -350,10 +371,7 @@ export function BookingFlow({
               ) : null}
               {eventType.requiresPayment && eventType.price > 0 ? (
                 <li className="flex items-center gap-2.5 font-medium">
-                  {(eventType.price / 100).toLocaleString(undefined, {
-                    style: "currency",
-                    currency: eventType.currency.toUpperCase(),
-                  })}
+                  {formatMoney(eventType.price, eventType.currency)}
                 </li>
               ) : null}
               {eventType.recurringEvent && eventType.recurringEvent.count > 1 ? (
@@ -371,7 +389,7 @@ export function BookingFlow({
                   <SelectContent>
                     {tzList.map((tz) => (
                       <SelectItem key={tz} value={tz}>
-                        {tz.replace(/_/g, " ")}
+                        {formatTimeZoneLabel(tz)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -379,10 +397,41 @@ export function BookingFlow({
               </li>
             </ul>
 
-            {loc && isUnsupportedLocationType(loc.type) ? (
-              <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                Video links are arranged manually for this service. The host will share the final join details separately.
+            {loc && isVideoLocationType(loc.type) ? (
+              <p className="mt-4 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+                A video meeting link will be included in your confirmation email.
               </p>
+            ) : null}
+
+            {canPickHost && step === "pick" ? (
+              <div className="mt-6">
+                <Label className="text-xs text-muted-foreground">Provider</Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedHostId(null)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
+                      selectedHostId === null
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                    }`}
+                  >
+                    Any available
+                  </button>
+                  {teamHosts!.map((th) => (
+                    <button
+                      key={th.id}
+                      onClick={() => setSelectedHostId(th.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
+                        selectedHostId === th.id
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border/60 hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                      }`}
+                    >
+                      {th.name ?? th.username}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : null}
 
             {durations.length > 1 && step === "pick" ? (
@@ -436,6 +485,9 @@ export function BookingFlow({
                 timeZone={timeZone}
                 slot={selectedSlot}
                 stripePublishableKey={stripePublishableKey}
+                spamProtection={spamProtection}
+                botChallenge={botChallenge}
+                preferredHostId={selectedHostId ?? undefined}
                 onBack={() => setStep("pick")}
                 onBooked={finishBooking}
               />
@@ -480,6 +532,7 @@ export function BookingFlow({
                       return (
                         <button
                           key={i}
+                          data-testid={has && !isPast ? "day-available" : undefined}
                           disabled={!has || isPast}
                           onClick={() => {
                             setSelectedDay(key);
@@ -547,6 +600,7 @@ export function BookingFlow({
                       daySlots.map((s) => (
                         <button
                           key={s.time}
+                          data-testid="slot"
                           onClick={() => pickSlot(s.time)}
                           className="w-full rounded-xl border border-border/60 py-3 text-sm font-medium transition-all duration-150 hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-sm active:scale-[0.98]"
                         >
@@ -581,6 +635,9 @@ function BookingForm({
   timeZone,
   slot,
   stripePublishableKey,
+  spamProtection,
+  botChallenge,
+  preferredHostId,
   onBack,
   onBooked,
 }: {
@@ -594,6 +651,9 @@ function BookingForm({
   timeZone: string;
   slot: string;
   stripePublishableKey?: string | null;
+  spamProtection?: boolean;
+  botChallenge?: string;
+  preferredHostId?: number;
   onBack: () => void;
   onBooked: (uid: string) => void;
 }) {
@@ -604,7 +664,41 @@ function BookingForm({
   const [step, setStep] = useState<"form" | "pay">("form");
   const [bookingUid, setBookingUid] = useState<string | null>(null);
   const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(null);
+  const [prefilled, setPrefilled] = useState(false);
+  const [altchaToken, setAltchaToken] = useState<string | null>(null);
   const renderedAtRef = useRef(Date.now());
+  const valuesRef = useRef<FieldValues>(values);
+  valuesRef.current = values;
+
+  // First phone-typed booking field, if any — its value is remembered too.
+  const phoneFieldName = useMemo(
+    () => eventType.bookingFields.find((f) => f.type === "phone")?.name ?? null,
+    [eventType.bookingFields],
+  );
+
+  // Prefill a returning booker's saved details (browser-local only).
+  useEffect(() => {
+    const saved = loadSavedBooker();
+    if (!saved) return;
+    setValues((v) => {
+      const next = { ...v };
+      if (saved.name && !next.name) next.name = saved.name;
+      if (saved.email && !next.email) next.email = saved.email;
+      if (saved.phone && phoneFieldName && !next[phoneFieldName]) next[phoneFieldName] = saved.phone;
+      return next;
+    });
+    setPrefilled(Boolean(saved.name || saved.email || saved.phone));
+  }, [phoneFieldName]);
+
+  function forgetSavedBooker() {
+    clearSavedBooker();
+    setPrefilled(false);
+    setValues((v) => {
+      const next: FieldValues = { ...v, name: "", email: "" };
+      if (phoneFieldName) next[phoneFieldName] = "";
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!state) return;
@@ -615,7 +709,19 @@ function BookingForm({
     } else if (state.uid) {
       onBooked(state.uid);
     }
-  }, [state, onBooked]);
+    // Persist contact details for next time on any successful submission.
+    if (state.uid) {
+      const current = valuesRef.current;
+      saveBooker({
+        name: typeof current.name === "string" ? current.name : undefined,
+        email: typeof current.email === "string" ? current.email : undefined,
+        phone:
+          phoneFieldName && typeof current[phoneFieldName] === "string"
+            ? (current[phoneFieldName] as string)
+            : undefined,
+      });
+    }
+  }, [state, onBooked, phoneFieldName]);
 
   const shownFields = visibleFields(eventType.bookingFields, values).filter(
     (f) => f.name !== "name" && f.name !== "email",
@@ -630,6 +736,9 @@ function BookingForm({
       ...validateContactDetails(values),
       ...validateResponses(eventType.bookingFields, values),
       ...(guestError ? { guests: guestError } : {}),
+      ...(spamProtection && !altchaToken
+        ? { altcha: "Please wait for the human-verification check to finish." }
+        : {}),
     };
     if (Object.keys(errors).length) {
       setClientErrors(errors);
@@ -650,8 +759,11 @@ function BookingForm({
       responses,
       rescheduleUid,
       bookingLinkToken,
+      preferredHostId,
       hp: typeof formData.get("company") === "string" ? (formData.get("company") as string) : "",
       ts: renderedAtRef.current,
+      bc: botChallenge,
+      altcha: altchaToken ?? undefined,
     };
     formData.set("payload", JSON.stringify(payload));
     formAction(formData);
@@ -764,6 +876,18 @@ function BookingForm({
           <label htmlFor="company">Company</label>
           <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
         </div>
+        {prefilled ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+            <span>We filled in your saved details.</span>
+            <button
+              type="button"
+              onClick={forgetSavedBooker}
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              Not you? Clear
+            </button>
+          </div>
+        ) : null}
         <div className="space-y-1.5">
           <Label htmlFor="name">Your name *</Label>
           <Input
@@ -941,9 +1065,18 @@ function BookingForm({
           );
         })}
 
+        {spamProtection ? (
+          <div className="space-y-1.5">
+            <AltchaWidget onChange={setAltchaToken} />
+            {clientErrors.altcha ? (
+              <p className="text-xs text-destructive">{clientErrors.altcha}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" data-testid="confirm-booking" className="w-full" disabled={pending}>
           {pending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (

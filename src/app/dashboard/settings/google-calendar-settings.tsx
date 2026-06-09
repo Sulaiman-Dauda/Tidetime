@@ -69,7 +69,11 @@ export function GoogleCalendarSettings() {
       setDestinationCalendarId(null);
       toast({ title: "Google Calendar disconnected" });
     } else {
-      toast({ title: "Failed to disconnect", variant: "destructive" });
+      toast({
+        title: "Couldn't disconnect Google Calendar",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -83,7 +87,11 @@ export function GoogleCalendarSettings() {
         body: JSON.stringify({ calendarIds: next }),
       });
       if (!res.ok) {
-        toast({ title: "Could not save calendars", variant: "destructive" });
+        toast({
+          title: "Couldn't save calendars",
+          description: "Please try again.",
+          variant: "destructive",
+        });
         await loadStatus();
       }
     });
@@ -99,7 +107,11 @@ export function GoogleCalendarSettings() {
         body: JSON.stringify({ destinationCalendarId: calendarId }),
       });
       if (!res.ok) {
-        toast({ title: "Could not save destination calendar", variant: "destructive" });
+        toast({
+          title: "Couldn't save destination calendar",
+          description: "Please try again.",
+          variant: "destructive",
+        });
         await loadStatus();
       }
     });

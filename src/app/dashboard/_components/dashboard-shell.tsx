@@ -19,7 +19,6 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard/calendar": "Calendar",
   "/dashboard/availability": "Availability",
   "/dashboard/links": "Booking Links",
-  "/dashboard/resources": "Resources",
   "/dashboard/analytics": "Analytics",
   "/dashboard/reviews": "Reviews",
   "/dashboard/teams": "Teams",

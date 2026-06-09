@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicEventType } from "@/server/availability";
-import { isBookingDisabled } from "@/server/company-settings";
+import { getCompanySettings } from "@/server/company-settings";
 import { getStripeConfig } from "@/server/settings";
+import { issueBotChallenge } from "@/lib/bot-challenge";
+import { env } from "@/lib/env";
 import { BookingFlow } from "./booking-flow";
 import { PublicLegal } from "../../_components/public-legal";
 import { CompanyBrandHeader } from "../../_components/company-brand-header";
+import { EmbedBridge } from "../../embed-bridge";
 import { AlertTriangle } from "lucide-react";
 
 interface Props {
@@ -42,7 +45,8 @@ export default async function BookingPage({ params, searchParams }: Props) {
 
   const { eventType, host } = data;
   const isEmbed = embed === "1";
-  const disabled = await isBookingDisabled();
+  const settings = await getCompanySettings();
+  const disabled = settings.booking.bookingDisabled;
 
   if (disabled) {
     return (
@@ -93,8 +97,10 @@ export default async function BookingPage({ params, searchParams }: Props) {
           recurringEvent: eventType.recurringEvent,
         }}
         host={{ name: host.name, username: host.username, avatarUrl: host.avatarUrl }}
+        spamProtection={settings.booking.spamProtectionEnabled}
+        botChallenge={issueBotChallenge(env.authSecret)}
       />
-      {isEmbed ? null : <PublicLegal />}
+      {isEmbed ? <EmbedBridge /> : <PublicLegal />}
     </main>
   );
 }

@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarX2, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarX2, ExternalLink, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WEEKDAY_SHORT } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getZonedParts, zonedTimeToUtc } from "@/lib/time";
+import { useToast } from "@/hooks/use-toast";
+import { moveBookingAction } from "./actions";
+import { QuickBookingDialog, type CalendarService } from "./quick-booking-dialog";
 
 export interface CalendarEvent {
   uid: string;
@@ -24,6 +29,7 @@ interface Props {
   month: number;
   events: CalendarEvent[];
   timeZone: string;
+  services: CalendarService[];
 }
 
 /** YYYY-MM-DD for an instant rendered in a specific timezone (en-CA → ISO order). */
@@ -64,8 +70,52 @@ function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function CalendarView({ year, month, events, timeZone }: Props) {
+export function CalendarView({ year, month, events, timeZone, services }: Props) {
   const rows = useMemo(() => monthMatrix(year, month), [year, month]);
+  const router = useRouter();
+  const { toast } = useToast();
+  const [pending, startMove] = useTransition();
+  const [dragUid, setDragUid] = useState<string | null>(null);
+  const [dropKey, setDropKey] = useState<string | null>(null);
+  // Drag-to-create: dragging from an empty day cell (not a booking chip) arms a
+  // create gesture; dropping on a day opens the quick-create dialog for it.
+  const [createFrom, setCreateFrom] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDate, setCreateDate] = useState<string | null>(null);
+
+  function openCreate(dayKey: string) {
+    setCreateFrom(null);
+    setCreateDate(dayKey);
+    setCreateOpen(true);
+  }
+
+  // Drag an event onto another day to reschedule it, preserving the time-of-day
+  // in the host's timezone. The booking's calendar invite + attendee email are
+  // refreshed server-side with a bumped SEQUENCE.
+  function handleDrop(targetDayKey: string) {
+    const uid = dragUid;
+    setDragUid(null);
+    setDropKey(null);
+    if (!uid) return;
+    const ev = events.find((e) => e.uid === uid);
+    if (!ev) return;
+    const sourceDayKey = dayKeyInTz(ev.start, timeZone);
+    if (sourceDayKey === targetDayKey) return;
+
+    const parts = getZonedParts(new Date(ev.start), timeZone);
+    const [ty, tm, td] = targetDayKey.split("-").map(Number);
+    const newStart = zonedTimeToUtc(ty, tm, td, parts.hour, parts.minute, timeZone);
+
+    startMove(async () => {
+      const res = await moveBookingAction(uid, newStart.toISOString());
+      if (res?.ok) {
+        toast({ title: "Booking moved", description: "An updated invite was sent to the attendee." });
+        router.refresh();
+      } else {
+        toast({ title: "Couldn't move booking", description: res?.error, variant: "destructive" });
+      }
+    });
+  }
 
   // Bucket events by their day in the host's timezone.
   const byDay = useMemo(() => {
@@ -116,7 +166,8 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            A month-at-a-glance view of every scheduled meeting.
+            A month-at-a-glance view — drag a booking to reschedule, or drag (or tap +) on a day to
+            add one.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -156,37 +207,96 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
               const dayEvents = byDay.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selected;
+              const isDropTarget = dropKey === key && (dragUid !== null || createFrom !== null);
               return (
-                <button
+                <div
                   key={i}
+                  role="button"
+                  tabIndex={0}
+                  // Dragging from empty space on a day arms a create gesture
+                  // (booking chips stop propagation so their drag reschedules).
+                  draggable
+                  onDragStart={(ev) => {
+                    if (dragUid) return;
+                    setCreateFrom(key);
+                    ev.dataTransfer.effectAllowed = "copy";
+                  }}
                   onClick={() => setSelected(key)}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      setSelected(key);
+                    }
+                  }}
+                  onDragOver={(ev) => {
+                    if (dragUid || createFrom) {
+                      ev.preventDefault();
+                      if (dropKey !== key) setDropKey(key);
+                    }
+                  }}
+                  onDragLeave={() => setDropKey((cur) => (cur === key ? null : cur))}
+                  onDrop={(ev) => {
+                    ev.preventDefault();
+                    if (dragUid) handleDrop(key);
+                    else if (createFrom) openCreate(key);
+                  }}
+                  onDragEnd={() => {
+                    setCreateFrom(null);
+                    setDropKey(null);
+                  }}
                   className={cn(
-                    "group min-h-[104px] border-b border-r border-border/50 p-1.5 text-left align-top transition-all last:border-r-0 hover:bg-primary/8",
+                    "group relative min-h-[104px] cursor-pointer border-b border-r border-border/50 p-1.5 text-left align-top transition-all last:border-r-0 hover:bg-primary/8",
                     isSelected && "bg-primary/12 ring-1 ring-inset ring-primary/20",
+                    isDropTarget && "bg-primary/15 ring-2 ring-inset ring-primary/50",
+                    pending && "opacity-60",
                     (i + 1) % 7 === 0 && "border-r-0",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
-                      isToday
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-foreground/70 group-hover:text-foreground",
-                    )}
-                  >
-                    {date.getDate()}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={cn(
+                        "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
+                        isToday
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-foreground/70 group-hover:text-foreground",
+                      )}
+                    >
+                      {date.getDate()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        openCreate(key);
+                      }}
+                      aria-label={`Add booking on ${key}`}
+                      className="flex h-5 w-5 items-center justify-center rounded-md text-foreground/40 opacity-0 transition-all hover:bg-primary/15 hover:text-primary focus:opacity-100 group-hover:opacity-100"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <div className="mt-1 space-y-1">
                     {dayEvents.slice(0, 3).map((e) => (
                       <div
                         key={e.uid}
+                        draggable
+                        onDragStart={(ev) => {
+                          ev.stopPropagation();
+                          setDragUid(e.uid);
+                          ev.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => {
+                          setDragUid(null);
+                          setDropKey(null);
+                        }}
                         className={cn(
-                          "truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight",
+                          "cursor-grab truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight active:cursor-grabbing",
+                          dragUid === e.uid && "opacity-40",
                           e.status === "pending"
                             ? "bg-amber-500/20 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200"
                             : "bg-primary/20 text-foreground dark:bg-primary/25 dark:text-foreground",
                         )}
-                        title={e.title}
+                        title={`${e.title} — drag to another day to reschedule`}
                       >
                         <span className="tabular-nums opacity-70">{timeInTz(e.start, timeZone)}</span>{" "}
                         {e.title}
@@ -198,7 +308,7 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
                       </div>
                     ) : null}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -206,12 +316,27 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
 
         {/* Day detail rail */}
         <aside className="rounded-2xl border border-border/60 bg-card p-4">
-          <h2 className="text-sm font-semibold">{selectedLabel ?? "Select a day"}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {selectedEvents.length === 0
-              ? "No meetings"
-              : `${selectedEvents.length} meeting${selectedEvents.length === 1 ? "" : "s"}`}
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">{selectedLabel ?? "Select a day"}</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {selectedEvents.length === 0
+                  ? "No meetings"
+                  : `${selectedEvents.length} meeting${selectedEvents.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            {selected ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 gap-1 px-2 text-xs"
+                onClick={() => openCreate(selected)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New
+              </Button>
+            ) : null}
+          </div>
 
           <div className="mt-4 space-y-2">
             {selectedEvents.length === 0 ? (
@@ -262,6 +387,13 @@ export function CalendarView({ year, month, events, timeZone }: Props) {
           </div>
         </aside>
       </div>
+
+      <QuickBookingDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        date={createDate}
+        services={services}
+      />
     </div>
   );
 }

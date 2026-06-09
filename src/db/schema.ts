@@ -52,15 +52,7 @@ export const workflowTrigger = pgEnum("workflow_trigger", [
   "event_cancelled",
   "event_rescheduled",
 ]);
-export const workflowAction = pgEnum("workflow_action", ["email_attendee", "email_host", "sms_attendee"]);
-export const resourceType = pgEnum("resource_type", [
-  "room",
-  "studio",
-  "equipment",
-  "vehicle",
-  "desk",
-  "other",
-]);
+export const workflowAction = pgEnum("workflow_action", ["email_attendee", "email_host"]);
 
 /* -------------------------------------------------------------------------- */
 /*  Auth: users, sessions, verification tokens                                */
@@ -232,6 +224,28 @@ export const availabilities = pgTable(
   (t) => [index("availabilities_schedule_idx").on(t.scheduleId)],
 );
 
+/**
+ * Travel schedules (stolen from cal.diy): "while I'm in Tokyo from the 3rd to
+ * the 10th, treat my availability as Asia/Tokyo". Each row is a date-bounded
+ * timezone override on the user. When a booking window overlaps a travel period,
+ * slots for those days are computed in the travel timezone instead of the user's
+ * home timezone — so a consultant on the road never has to re-edit their hours.
+ */
+export const travelSchedules = pgTable(
+  "travel_schedules",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    timeZone: varchar("time_zone", { length: 64 }).notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("travel_schedules_user_idx").on(t.userId, t.startDate)],
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Service categories (group services)                                        */
 /* -------------------------------------------------------------------------- */
@@ -276,6 +290,8 @@ export const eventTypes = pgTable(
     /** additional offered durations, minutes */
     durations: integer("durations").array().notNull().default([]),
     hidden: boolean("hidden").notNull().default(false),
+    /** newly created, never saved — hidden from the public and auto-cleaned if abandoned */
+    draft: boolean("draft").notNull().default(false),
     position: integer("position").notNull().default(0),
     color: varchar("color", { length: 9 }),
 
@@ -321,6 +337,13 @@ export const eventTypes = pgTable(
     schedulingType: schedulingType("scheduling_type"),
     /** distribution strategy for round-robin team services */
     roundRobinMode: roundRobinMode("round_robin_mode").notNull().default("sequential"),
+    /**
+     * Multi-attendant: how many team hosts a single booking occupies at once.
+     * 1 = ordinary round-robin; N>1 needs N staff free simultaneously (e.g. a
+     * procedure that always requires two clinicians). Ignored for collective
+     * (which books every host) and solo services.
+     */
+    requiredHosts: integer("required_hosts").notNull().default(1),
 
     /** deposit charged up-front (in cents); 0 = full price or free */
     depositAmount: integer("deposit_amount").notNull().default(0),
@@ -388,6 +411,14 @@ export const bookings = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 64 }),
     paid: boolean("paid").notNull().default(false),
 
+    /**
+     * iCalendar SEQUENCE counter. Bumped on every reschedule/cancel so the
+     * .ics we email (and the events we write back to external calendars) carry
+     * a strictly increasing SEQUENCE — without it Outlook/Apple Calendar ignore
+     * update/cancel invites and the attendee's calendar drifts out of sync.
+     */
+    sequence: integer("sequence").notNull().default(0),
+
     /** set when a post-booking review request email has been sent (dedup) */
     reviewRequestSentAt: timestamp("review_request_sent_at", { withTimezone: true }),
 
@@ -417,6 +448,13 @@ export const attendees = pgTable(
     noShow: boolean("no_show").notNull().default(false),
     /** true for the primary booker, false for additional guests */
     isPrimary: boolean("is_primary").notNull().default(true),
+    /**
+     * RSVP round-trip: when an attendee clicks Accept / Decline / Tentative in
+     * the calendar invite (or the confirmation email), their reply lands here.
+     * "needs_action" until they respond. Mirrors the iCalendar PARTSTAT values.
+     */
+    rsvpStatus: varchar("rsvp_status", { length: 16 }).notNull().default("needs_action"),
+    rsvpRespondedAt: timestamp("rsvp_responded_at", { withTimezone: true }),
   },
   (t) => [index("attendees_booking_idx").on(t.bookingId)],
 );
@@ -436,6 +474,28 @@ export const bookingReferences = pgTable(
     credentialId: integer("credential_id"),
   },
   (t) => [index("booking_references_booking_idx").on(t.bookingId)],
+);
+
+/**
+ * Co-hosts attached to a booking beyond the primary host (`bookings.userId`).
+ * Used by collective and multi-attendant team services so every assigned staff
+ * member is marked busy and won't be double-booked. The primary host is NOT
+ * duplicated here — busy-time computation unions this with `bookings.userId`.
+ */
+export const bookingHosts = pgTable(
+  "booking_hosts",
+  {
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("booking_hosts_idx").on(t.bookingId, t.userId),
+    index("booking_hosts_user_idx").on(t.userId),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -473,6 +533,29 @@ export const selectedCalendars = pgTable(
   (t) => [uniqueIndex("selected_calendars_idx").on(t.userId, t.integration, t.externalId)],
 );
 
+/**
+ * Read-through cache of merged provider busy-times for a user, keyed by the
+ * window that was fetched. A row "covers" a query when its range is a superset
+ * and it hasn't expired — the booking page hammers the same month repeatedly,
+ * so this turns N provider round-trips into one cheap Postgres read. Busted
+ * whenever we mutate the user's calendar (create/delete event, connect/disconnect).
+ */
+export const calendarCache = pgTable(
+  "calendar_cache",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rangeStart: timestamp("range_start", { withTimezone: true }).notNull(),
+    rangeEnd: timestamp("range_end", { withTimezone: true }).notNull(),
+    busy: jsonb("busy").$type<{ start: string; end: string }[]>().notNull().default([]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("calendar_cache_user_idx").on(t.userId, t.expiresAt)],
+);
+
 export const destinationCalendars = pgTable(
   "destination_calendars",
   {
@@ -485,7 +568,7 @@ export const destinationCalendars = pgTable(
     primaryEmail: varchar("primary_email", { length: 255 }),
   },
   (t) => [
-    uniqueIndex("destination_calendars_user_idx").on(t.userId),
+    uniqueIndex("destination_calendars_user_idx").on(t.userId, t.integration),
     uniqueIndex("destination_calendars_event_idx").on(t.eventTypeId),
   ],
 );
@@ -580,6 +663,13 @@ export const customers = pgTable(
     phoneNumber: varchar("phone_number", { length: 32 }),
     timeZone: varchar("time_zone", { length: 64 }),
     notes: text("notes"),
+    /**
+     * Answers to the instance's custom customer fields, keyed by field id. Field
+     * definitions live in app_settings → "customer_custom_fields", so adding a
+     * field never needs a migration and the set isn't capped at a fixed number
+     * of columns.
+     */
+    customFields: jsonb("custom_fields").$type<Record<string, string>>().notNull().default({}),
     /** denormalised stats for cheap listing */
     bookingsCount: integer("bookings_count").notNull().default(0),
     noShowCount: integer("no_show_count").notNull().default(0),
@@ -620,65 +710,6 @@ export const bookingLinks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("booking_links_token_idx").on(t.token)],
-);
-
-/* -------------------------------------------------------------------------- */
-/*  Resource scheduling (rooms, studios, equipment, vehicles, desks)          */
-/* -------------------------------------------------------------------------- */
-
-export const resources = pgTable(
-  "resources",
-  {
-    id: serial("id").primaryKey(),
-    /** owned by a user OR a team */
-    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-    teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }),
-    name: varchar("name", { length: 128 }).notNull(),
-    type: resourceType("type").notNull().default("room"),
-    description: text("description"),
-    /** how many concurrent bookings this resource supports; 1 = exclusive */
-    capacity: integer("capacity").notNull().default(1),
-    color: varchar("color", { length: 9 }),
-    active: boolean("active").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("resources_user_idx").on(t.userId), index("resources_team_idx").on(t.teamId)],
-);
-
-/** services that require / use a given resource */
-export const eventTypeResources = pgTable(
-  "event_type_resources",
-  {
-    eventTypeId: integer("event_type_id")
-      .notNull()
-      .references(() => eventTypes.id, { onDelete: "cascade" }),
-    resourceId: integer("resource_id")
-      .notNull()
-      .references(() => resources.id, { onDelete: "cascade" }),
-    /** when true the slot is unavailable unless the resource is free */
-    required: boolean("required").notNull().default(true),
-  },
-  (t) => [
-    uniqueIndex("event_type_resources_idx").on(t.eventTypeId, t.resourceId),
-    index("event_type_resources_resource_idx").on(t.resourceId),
-  ],
-);
-
-/** resources reserved by a specific booking */
-export const bookingResources = pgTable(
-  "booking_resources",
-  {
-    bookingId: integer("booking_id")
-      .notNull()
-      .references(() => bookings.id, { onDelete: "cascade" }),
-    resourceId: integer("resource_id")
-      .notNull()
-      .references(() => resources.id, { onDelete: "cascade" }),
-  },
-  (t) => [
-    uniqueIndex("booking_resources_idx").on(t.bookingId, t.resourceId),
-    index("booking_resources_resource_idx").on(t.resourceId),
-  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -736,7 +767,7 @@ export const outOfOffice = pgTable("out_of_office", {
   toUserId: integer("to_user_id").references(() => users.id, { onDelete: "set null" }),
 });
 
-/** global key/value configuration (mirrors EasyAppointments settings table) */
+/** Global key/value configuration store for instance-wide settings + flags. */
 export const appSettings = pgTable("app_settings", {
   name: varchar("name", { length: 128 }).primaryKey(),
   value: jsonb("value"),
@@ -808,6 +839,131 @@ export const bookingActivity = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("booking_activity_booking_idx").on(t.bookingId, t.createdAt)],
+);
+
+/**
+ * Routing forms — a public questionnaire that sends each respondent to the right
+ * destination (a specific service, an external URL, or a message) based on their
+ * answers. Cal.com-style "routing forms", the high-value gap for non-trivial
+ * scheduling (sales triage, support tiers, intake).
+ */
+export const routingForms = pgTable(
+  "routing_forms",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+    teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 128 }).notNull(),
+    slug: varchar("slug", { length: 128 }).notNull(),
+    description: text("description"),
+    fields: jsonb("fields").$type<RoutingField[]>().notNull().default([]),
+    routes: jsonb("routes").$type<RoutingRoute[]>().notNull().default([]),
+    /** destination when no route matches */
+    fallback: jsonb("fallback").$type<RoutingAction | null>(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("routing_forms_slug_idx").on(t.slug),
+    index("routing_forms_user_idx").on(t.userId),
+    index("routing_forms_team_idx").on(t.teamId),
+  ],
+);
+
+/** Append-only log of routing form submissions (analytics + lead capture). */
+export const routingFormResponses = pgTable(
+  "routing_form_responses",
+  {
+    id: serial("id").primaryKey(),
+    formId: integer("form_id")
+      .notNull()
+      .references(() => routingForms.id, { onDelete: "cascade" }),
+    /** answers keyed by field id */
+    answers: jsonb("answers").$type<Record<string, string>>().notNull().default({}),
+    /** serialized RoutingAction that the respondent was routed to */
+    routedTo: jsonb("routed_to").$type<RoutingAction | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("routing_form_responses_form_idx").on(t.formId, t.createdAt)],
+);
+
+/**
+ * Meeting polls ("find a time") — a Doodle-style group availability vote that
+ * finalizes into a real Tidetime booking. The differentiator vs. pure 1:1
+ * scheduling tools: propose several time options, let participants vote
+ * yes / if-need-be / no, then book the winning slot for everyone.
+ */
+export const meetingPolls = pgTable(
+  "meeting_polls",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    teamId: integer("team_id").references(() => teams.id, { onDelete: "cascade" }),
+    /** opaque public token used in the vote URL */
+    token: varchar("token", { length: 64 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    location: text("location"),
+    durationMinutes: integer("duration_minutes").notNull().default(30),
+    timeZone: varchar("time_zone", { length: 64 }).notNull().default("UTC"),
+    /** "open" | "finalized" | "cancelled" */
+    status: varchar("status", { length: 16 }).notNull().default("open"),
+    /**
+     * Who can see what on the public poll (stolen from Rallly):
+     * - "full": everyone sees every participant's individual votes (default)
+     * - "scores_only": voters see aggregate tallies but not who voted what
+     * - "limited": voters see only their own vote; the host sees everything
+     */
+    visibility: varchar("visibility", { length: 16 }).notNull().default("full"),
+    /** hide participant names entirely from other voters (host still sees them) */
+    hideParticipants: boolean("hide_participants").notNull().default(false),
+    finalizedOptionId: integer("finalized_option_id"),
+    finalizedBookingUid: varchar("finalized_booking_uid", { length: 32 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("meeting_polls_token_idx").on(t.token),
+    index("meeting_polls_user_idx").on(t.userId),
+  ],
+);
+
+export const meetingPollOptions = pgTable(
+  "meeting_poll_options",
+  {
+    id: serial("id").primaryKey(),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => meetingPolls.id, { onDelete: "cascade" }),
+    startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+    endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("meeting_poll_options_poll_idx").on(t.pollId)],
+);
+
+export const meetingPollVotes = pgTable(
+  "meeting_poll_votes",
+  {
+    id: serial("id").primaryKey(),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => meetingPolls.id, { onDelete: "cascade" }),
+    optionId: integer("option_id")
+      .notNull()
+      .references(() => meetingPollOptions.id, { onDelete: "cascade" }),
+    voterName: varchar("voter_name", { length: 128 }).notNull(),
+    voterEmail: varchar("voter_email", { length: 255 }).notNull(),
+    /** "yes" | "if_need_be" | "no" */
+    choice: varchar("choice", { length: 12 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("meeting_poll_votes_poll_idx").on(t.pollId),
+    uniqueIndex("meeting_poll_votes_unique_idx").on(t.optionId, t.voterEmail),
+  ],
 );
 
 export const invites = pgTable("invites", {
@@ -886,7 +1042,11 @@ export type EventLocation =
   | { type: "attendee_phone" }
   | { type: "link"; link: string }
   | { type: "google_meet" }
-  | { type: "zoom" };
+  | { type: "office365_video" }
+  | { type: "daily_video" }
+  | { type: "zoom" }
+  // Built-in Jitsi Meet room — always available, no provider connection needed.
+  | { type: "jitsi" };
 
 export type BookingFieldType =
   | "text"
@@ -927,6 +1087,45 @@ export type RecurringRule = {
   count: number;
 };
 
+/* ---- Routing forms -------------------------------------------------------- */
+
+export type RoutingFieldType =
+  | "short_text"
+  | "long_text"
+  | "email"
+  | "phone"
+  | "number"
+  | "select";
+
+export interface RoutingField {
+  id: string;
+  label: string;
+  type: RoutingFieldType;
+  required: boolean;
+  options?: string[];
+}
+
+export type RoutingOperator = "equals" | "not_equals" | "contains" | "is_any_of";
+
+export interface RoutingCondition {
+  fieldId: string;
+  operator: RoutingOperator;
+  /** comparison value; for is_any_of, a comma-separated list */
+  value: string;
+}
+
+export type RoutingAction =
+  | { type: "event_type"; eventTypeId: number }
+  | { type: "external_url"; url: string }
+  | { type: "message"; message: string };
+
+export interface RoutingRoute {
+  id: string;
+  /** all conditions must match (AND) for this route to fire */
+  conditions: RoutingCondition[];
+  action: RoutingAction;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Inferred types                                                            */
 /* -------------------------------------------------------------------------- */
@@ -948,14 +1147,34 @@ export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 export type BookingLink = typeof bookingLinks.$inferSelect;
 export type NewBookingLink = typeof bookingLinks.$inferInsert;
-export type Resource = typeof resources.$inferSelect;
-export type NewResource = typeof resources.$inferInsert;
 export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;
-export type BookingActivity = typeof bookingActivity.$inferSelect;export type ResourceType = (typeof resourceType.enumValues)[number];
+export type BookingActivity = typeof bookingActivity.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
 export type Workflow = typeof workflows.$inferSelect;
 export type ScheduledReminder = typeof scheduledReminders.$inferSelect;
 export type MembershipRole = (typeof membershipRole.enumValues)[number];
 export type SchedulingType = (typeof schedulingType.enumValues)[number];
+export type RoutingForm = typeof routingForms.$inferSelect;
+export type NewRoutingForm = typeof routingForms.$inferInsert;
+export type RoutingFormResponse = typeof routingFormResponses.$inferSelect;
+export type MeetingPoll = typeof meetingPolls.$inferSelect;
+export type NewMeetingPoll = typeof meetingPolls.$inferInsert;
+export type MeetingPollOption = typeof meetingPollOptions.$inferSelect;
+export type MeetingPollVote = typeof meetingPollVotes.$inferSelect;
+export type TravelSchedule = typeof travelSchedules.$inferSelect;
+export type NewTravelSchedule = typeof travelSchedules.$inferInsert;
+
+/** Visibility modes for a meeting poll's public results. */
+export type PollVisibility = "full" | "scores_only" | "limited";
+
+/** A custom customer field definition (stored in app_settings, not a column). */
+export interface CustomerFieldDef {
+  /** stable key used in customers.customFields */
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "phone" | "select";
+  required: boolean;
+  options?: string[];
+}

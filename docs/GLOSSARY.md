@@ -2,9 +2,9 @@
 
 This page explains common Tidetime terms in plain English.
 
-## Admin
+## Admin (role)
 
-A person with permission to manage workspace-wide settings.
+A team role with full access except deleting the team and managing billing.
 
 ## API key
 
@@ -40,15 +40,23 @@ A label used to group services together on the booking page.
 
 ## Collective scheduling
 
-A team booking style where more than one team member is needed for the same appointment.
+A team booking style where every listed host must be free and all of them attend the appointment.
+
+## Custom booking field
+
+An extra question you add to a service's booking form, beyond the built-in name and email.
 
 ## Customer
 
-A person who has booked with you. Tidetime shows customers in a de-duplicated list.
+A person who has booked with you. Tidetime groups bookings into one record per email, so the list has no duplicates.
 
 ## Destination calendar
 
-The Google Calendar where new bookings should be created after someone books.
+The connected calendar where new bookings are created after someone books. It can be a Google, Microsoft/Outlook, or Apple/CalDAV calendar.
+
+## Guest
+
+An extra person a booker invites to an appointment by adding their email on the booking form. A guest is added to an existing booking, unlike an attendee who makes the booking.
 
 ## Invite-only link
 
@@ -58,21 +66,49 @@ A booking link meant for a specific person, usually tied to their email address.
 
 A workspace setting that pauses public bookings without removing services.
 
-## Owner
+## Manager (role)
 
-The highest-control role in a workspace or team.
+A team role that can invite and remove members, manage services and availability, view and manage bookings, and see analytics, but cannot make structural or billing changes.
 
-## Provider
+## Meeting poll
 
-A team member who delivers the booked service.
+A way to propose several times and let people vote yes, no, or if-need-be on each. The owner books the winning time once voting settles.
 
-## Receptionist
+## Member (role)
 
-A team role focused on viewing and managing bookings rather than changing system setup.
+A team role with read-only access.
 
-## Resource
+## Multi-attendant
 
-A shared room, tool, piece of equipment, or other asset needed for a booking.
+A team scheduling style where a single booking takes a set number of staff. Tidetime fills the roster with the least-busy available hosts.
+
+## Owner (role)
+
+The highest-control role in a workspace or team, with full access.
+
+## Provider (role)
+
+A team role that can manage its own services and availability and view its own bookings.
+
+## Receptionist (role)
+
+A team role that can view and manage bookings but cannot change configuration.
+
+## Recurring service
+
+A service that repeats for the booker, weekly or monthly, for a set number of occurrences. The booker reserves the whole series at once.
+
+## Routing form
+
+A public form that sends each respondent to a service, a URL, or a message based on their answers, using the first matching rule.
+
+## RSVP
+
+An attendee's reply to a booking from their email link: attending, declined, or tentative.
+
+## Seats per slot
+
+A service setting that lets several attendees book the same time, used for classes and group sessions.
 
 ## Review threshold
 
@@ -80,7 +116,7 @@ The minimum rating that counts as positive enough to send someone to your public
 
 ## Round-robin scheduling
 
-A team booking style where Tidetime rotates bookings across available team members.
+A team booking style where Tidetime assigns each booking to one available host, rotating across the team. Distribution can be sequential, least-busy, or random.
 
 ## Self-hosted
 

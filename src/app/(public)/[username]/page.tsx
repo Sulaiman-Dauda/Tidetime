@@ -38,7 +38,7 @@ async function loadProfile(username: string) {
     .select({ et: eventTypes, scheduleTz: schedules.timeZone })
     .from(eventTypes)
     .leftJoin(schedules, eq(eventTypes.scheduleId, schedules.id))
-    .where(and(eq(eventTypes.userId, user.id), eq(eventTypes.hidden, false)))
+    .where(and(eq(eventTypes.userId, user.id), eq(eventTypes.hidden, false), eq(eventTypes.draft, false)))
     .orderBy(asc(eventTypes.position), asc(eventTypes.id));
 
   const categories = await db

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
+import { normalizeCurrency } from "@/lib/company-settings";
 import {
   setCompanyBookingDefaults,
   setCompanyLegalContents,
@@ -24,6 +25,7 @@ const profileSchema = z.object({
     .string()
     .trim()
     .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Enter a hex colour, e.g. #4f46e5"),
+  defaultCurrency: z.string().trim().default("usd"),
 });
 
 export async function updateCompanyProfileAction(
@@ -37,9 +39,13 @@ export async function updateCompanyProfileAction(
     websiteUrl: formData.get("websiteUrl") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
     brandColor: formData.get("brandColor"),
+    defaultCurrency: formData.get("defaultCurrency") ?? "usd",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  await setCompanyProfile(parsed.data);
+  await setCompanyProfile({
+    ...parsed.data,
+    defaultCurrency: normalizeCurrency(parsed.data.defaultCurrency),
+  });
   revalidatePath("/dashboard/settings");
   revalidatePath("/", "layout");
   return { ok: true };
@@ -84,6 +90,7 @@ const bookingSchema = z.object({
   minimumBookingNoticeMinutes: z.coerce.number().int().min(0).max(525600),
   rescheduleCancelTimeoutMinutes: z.coerce.number().int().min(0).max(525600),
   bookingDisabled: z.coerce.boolean(),
+  spamProtectionEnabled: z.coerce.boolean(),
   appointmentStatuses: z.string().trim().min(1, "Add at least one status"),
 });
 
@@ -97,6 +104,7 @@ export async function updateCompanyBookingAction(
     minimumBookingNoticeMinutes: formData.get("minimumBookingNoticeMinutes"),
     rescheduleCancelTimeoutMinutes: formData.get("rescheduleCancelTimeoutMinutes"),
     bookingDisabled: formData.get("bookingDisabled") === "on",
+    spamProtectionEnabled: formData.get("spamProtectionEnabled") === "on",
     appointmentStatuses: formData.get("appointmentStatuses"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -110,6 +118,7 @@ export async function updateCompanyBookingAction(
     minimumBookingNoticeMinutes: parsed.data.minimumBookingNoticeMinutes,
     rescheduleCancelTimeoutMinutes: parsed.data.rescheduleCancelTimeoutMinutes,
     bookingDisabled: parsed.data.bookingDisabled,
+    spamProtectionEnabled: parsed.data.spamProtectionEnabled,
     appointmentStatuses: statuses,
   });
   revalidatePath("/dashboard/settings");

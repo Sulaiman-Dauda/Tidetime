@@ -12,7 +12,7 @@ import { env } from "@/lib/env";
 
 const createSchema = z.object({
   eventTypeId: z.coerce.number().int().positive(),
-  kind: z.enum(["one_time", "expiring", "limited", "invite"]),
+  kind: z.enum(["one_time", "expiring", "limited", "invite", "static"]),
   maxUses: z.coerce.number().int().positive().optional(),
   expiresAt: z.string().optional(),
   inviteEmail: z.string().email().optional(),

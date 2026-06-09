@@ -56,7 +56,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const slots = await getTeamSlots({ eventType: resolved.eventType, rangeStart, rangeEnd, duration });
+  const hostParam = sp.get("host");
+  const preferredHostId = hostParam ? Number(hostParam) : undefined;
+  const slots = await getTeamSlots({
+    eventType: resolved.eventType,
+    rangeStart,
+    rangeEnd,
+    duration,
+    preferredHostId:
+      preferredHostId && Number.isInteger(preferredHostId) ? preferredHostId : undefined,
+  });
   const byDay = groupTeamSlotsByDay(slots, viewerTz);
 
   return NextResponse.json({ slots, byDay }, { headers: { "Cache-Control": "no-store" } });

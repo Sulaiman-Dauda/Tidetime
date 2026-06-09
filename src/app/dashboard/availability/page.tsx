@@ -3,6 +3,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { schedules, availabilities } from "@/db/schema";
 import { AvailabilityEditor, type WeeklyRule, type DateOverride } from "./editor";
+import { listTravelSchedules } from "@/server/travel-schedules";
+import { listTimeZones } from "@/lib/timezones";
+import { TravelManager } from "./travel-manager";
 
 export default async function AvailabilityPage() {
   const user = (await getCurrentUser())!;
@@ -35,11 +38,25 @@ export default async function AvailabilityPage() {
 
   const overrides = Array.from(overridesMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
+  const travels = await listTravelSchedules(user.id);
+
   return (
-    <AvailabilityEditor
-      schedule={{ id: active?.id ?? 0, name: active?.name ?? "Working Hours", timeZone: active?.timeZone ?? user.timeZone }}
-      initialWeekly={weekly}
-      initialOverrides={overrides}
-    />
+    <div className="space-y-8">
+      <AvailabilityEditor
+        schedule={{ id: active?.id ?? 0, name: active?.name ?? "Working Hours", timeZone: active?.timeZone ?? user.timeZone }}
+        initialWeekly={weekly}
+        initialOverrides={overrides}
+      />
+      <TravelManager
+        travels={travels.map((t) => ({
+          id: t.id,
+          timeZone: t.timeZone,
+          startDate: t.startDate,
+          endDate: t.endDate,
+        }))}
+        timeZones={listTimeZones()}
+        homeTimeZone={active?.timeZone ?? user.timeZone}
+      />
+    </div>
   );
 }

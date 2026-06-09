@@ -6,7 +6,7 @@ import { bookings, attendees } from "@/db/schema";
 import { authenticateApiKey, unauthorized, jsonError, parsePage, enforceApiRateLimit } from "@/server/api-auth";
 import { createBooking } from "@/server/bookings";
 import { getPublicEventType } from "@/server/availability";
-import { timeZoneSchema } from "@/lib/schemas";
+import { timeZoneSchema, bookingResponsesSchema, bookingGuestsSchema } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +64,8 @@ const createSchema = z.object({
   timeZone: timeZoneSchema,
   name: z.string().min(1),
   email: z.string().email(),
-  responses: z.record(z.unknown()).optional(),
-  guests: z.array(z.string().email()).optional(),
+  responses: bookingResponsesSchema.optional(),
+  guests: bookingGuestsSchema.optional(),
 });
 
 /** POST /api/v1/bookings — create a booking on behalf of an attendee. */

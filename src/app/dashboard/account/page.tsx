@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { SettingsForms } from "./forms";
 import { listTimeZones } from "@/lib/timezones";
 
@@ -10,12 +11,10 @@ export default async function AccountPage() {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Profile settings</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Your personal account — name, sign-in details, preferences and security.
-        </p>
-      </div>
+      <PageHeader
+        title="Profile settings"
+        description="Your personal account — name, sign-in details, preferences and security."
+      />
       <SettingsForms
         timeZones={timeZones}
         user={{

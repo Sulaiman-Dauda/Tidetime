@@ -1,0 +1,1 @@
+ALTER TABLE "event_types" ADD COLUMN "draft" boolean DEFAULT false NOT NULL;

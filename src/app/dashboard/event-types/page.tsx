@@ -10,6 +10,7 @@ import {
 } from "./actions";
 import { NewEventTypeButton } from "../_components/new-event-type-button";
 import { DeleteEventButton } from "../_components/delete-event-button";
+import { PageHeader } from "../_components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration } from "@/lib/format";
 import { env } from "@/lib/env";
@@ -28,15 +29,11 @@ export default async function EventTypesPage({ searchParams }: Props) {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Services</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Create the services people can book with you — like a 30-minute consultation.
-          </p>
-        </div>
-        <NewEventTypeButton />
-      </div>
+      <PageHeader
+        title="Services"
+        description="Create the services people can book with you — like a 30-minute consultation."
+        action={<NewEventTypeButton />}
+      />
 
       {items.length === 0 ? (
         <EmptyState firstRun={welcome === "1"} />
@@ -56,7 +53,12 @@ export default async function EventTypesPage({ searchParams }: Props) {
                   className="min-w-0 flex-1"
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[14px] font-medium text-foreground">{et.title}</span>
+                    <span className="text-sm font-medium text-foreground">{et.title}</span>
+                    {et.draft && (
+                      <Badge variant="outline" className="border-amber-500/30 text-[11px] text-amber-700 dark:text-amber-400">
+                        Draft
+                      </Badge>
+                    )}
                     {et.hidden && (
                       <Badge variant="secondary" className="gap-1 text-[11px]">
                         <EyeOff className="h-2.5 w-2.5" />
@@ -165,7 +167,7 @@ export default async function EventTypesPage({ searchParams }: Props) {
 
 function EmptyState({ firstRun = false }: { firstRun?: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
       {firstRun ? <Badge variant="secondary" className="mb-4">Step 2 of 2</Badge> : null}
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
         <Zap className="h-6 w-6 text-primary" />

@@ -33,6 +33,18 @@ export function computeCharge(config: PriceConfig): ChargePlan | null {
   return { amount: price, currency, isDeposit: false, balanceDue: 0 };
 }
 
+/**
+ * Format a minor-unit amount (e.g. cents) as a localized currency string.
+ * Centralizes money rendering so the currency is never hardcoded at call sites
+ * — pass the per-service or company default currency through here.
+ */
+export function formatMoney(minorUnits: number, currency: string, locale?: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: (currency || "usd").toUpperCase(),
+  }).format(minorUnits / 100);
+}
+
 /** Refund amount given a payment and an optional partial request. */
 export function computeRefund(paidAmount: number, requested?: number): number {
   if (paidAmount <= 0) return 0;

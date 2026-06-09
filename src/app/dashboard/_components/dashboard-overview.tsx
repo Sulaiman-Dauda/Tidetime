@@ -7,6 +7,7 @@ import type { Route } from "next";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { NewEventTypeButton } from "./new-event-type-button";
+import { InstantMeetingButton } from "./instant-meeting-button";
 
 interface OverviewEvent {
   uid: string;
@@ -87,7 +88,10 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
             {todayLabel()}
           </p>
         </div>
-        <NewEventTypeButton size="sm" />
+        <div className="flex items-center gap-2">
+          <InstantMeetingButton />
+          <NewEventTypeButton size="sm" />
+        </div>
       </div>
 
       {/* Quick actions */}

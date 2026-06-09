@@ -32,8 +32,18 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tidetime}
       PORT: 3100
     command: sh -c "npm run db:migrate:runtime && npm run start"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     ports:
-      - "3000:3100"
+      - "${APP_PORT:-3000}:3100"
 
   reminders:
     build:

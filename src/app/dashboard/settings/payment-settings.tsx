@@ -55,10 +55,14 @@ export function PaymentSettings() {
         body: JSON.stringify({ key: "stripe", config: form }),
       });
       if (res.ok) {
-        toast({ title: "Payment settings saved" });
+        toast({ title: "Changes saved", description: "Your payment settings have been updated." });
       } else {
         const err = await res.json();
-        toast({ title: err.error || "Failed to save", variant: "destructive" });
+        toast({
+          title: "Couldn't save changes",
+          description: err.error || "Please check your details and try again.",
+          variant: "destructive",
+        });
       }
     });
   }

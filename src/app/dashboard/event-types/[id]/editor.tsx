@@ -20,19 +20,21 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip } from "@/components/ui/tooltip";
+import { InfoTip } from "@/components/ui/info-tip";
 import { DeleteEventButton } from "../../_components/delete-event-button";
 import { CopyLinkButton } from "../../_components/copy-link-button";
 import { useToast } from "@/hooks/use-toast";
-import { LOCATION_OPTIONS, isUnsupportedLocationType, locationOption } from "@/lib/locations";
+import { LOCATION_OPTIONS, isVideoLocationType, locationOption } from "@/lib/locations";
+import { Video } from "lucide-react";
 import { updateEventTypeAction } from "../actions";
 
 type Props = {
   eventType: EventType;
   username: string;
   appUrl: string;
-  resources: { id: number; name: string; type: string; capacity: number }[];
-  selectedResourceIds: number[];
   categories: { id: number; name: string }[];
+  /** video providers the host has connected, offered in the location picker */
+  availableVideo: { type: string; label: string }[];
 };
 
 const BOOKING_FIELD_TYPE_OPTIONS: Array<{ value: BookingField["type"]; label: string }> = [
@@ -75,7 +77,7 @@ function parseAdditionalDurations(value: string, defaultLength: number): number[
   ).sort((a, b) => a - b);
 }
 
-export function EventTypeEditor({ eventType, username, appUrl, resources, selectedResourceIds, categories }: Props) {
+export function EventTypeEditor({ eventType, username, appUrl, categories, availableVideo }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -112,13 +114,16 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
   const [form, setForm] = useState(initialForm);
   const [locations, setLocations] = useState<EventLocation[]>(eventType.locations ?? []);
   const [fields, setFields] = useState<BookingField[]>(eventType.bookingFields ?? []);
-  const [resourceIds, setResourceIds] = useState<number[]>(selectedResourceIds);
+
+  // A draft has been created but never saved; the first save publishes it.
+  const isDraft = eventType.draft;
+  const saveLabel = isDraft ? "Create service" : "Save changes";
 
   const publicUrl = `${appUrl}/${username}/${form.slug}`;
 
   // Track whether the form is dirty (different from initial)
-  const initial = JSON.stringify({ form: initialForm, locations: eventType.locations ?? [], fields: eventType.bookingFields ?? [], resourceIds: selectedResourceIds });
-  const dirty = JSON.stringify({ form, locations, fields, resourceIds }) !== initial;
+  const initial = JSON.stringify({ form: initialForm, locations: eventType.locations ?? [], fields: eventType.bookingFields ?? [] });
+  const dirty = JSON.stringify({ form, locations, fields }) !== initial;
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -149,19 +154,22 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
           locations,
           bookingFields: fields,
           bookingLimits: eventType.bookingLimits ?? null,
-          resourceIds,
         });
         if (!result.ok) {
           throw new Error(result.error);
         }
-        toast({ title: "Saved", description: "Your service has been updated." });
+        toast(
+          isDraft
+            ? { title: "Service created", description: "It's now live and ready to book." }
+            : { title: "Changes saved", description: "Your service has been updated." },
+        );
         router.refresh();
       } catch (error) {
         toast({
           variant: "destructive",
-          title: "Couldn't save",
+          title: "Couldn't save service",
           description:
-            error instanceof Error ? error.message : "Please check your inputs and try again.",
+            error instanceof Error ? error.message : "Please check your details and try again.",
         });
       }
     });
@@ -183,21 +191,29 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
             <div>
               <h1 className="text-xl font-semibold tracking-tight">{form.title}</h1>
               <p className="text-sm text-muted-foreground">
-                This is the page people book from.
+                {isDraft
+                  ? "Set up your service, then create it to make it bookable."
+                  : "This is the page people book from."}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <CopyLinkButton url={publicUrl} label={`/${username}/${form.slug}`} />
-            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${form.hidden ? "bg-secondary text-muted-foreground" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
-              {form.hidden ? "Hidden from public page" : "Publicly bookable"}
-            </span>
+            {isDraft ? (
+              <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                Draft — not yet published
+              </span>
+            ) : (
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${form.hidden ? "bg-secondary text-muted-foreground" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
+                {form.hidden ? "Hidden from public page" : "Publicly bookable"}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 self-start">
           <DeleteEventButton id={eventType.id} label={form.title} />
           <Button onClick={save} loading={pending}>
-            <Check className="h-4 w-4" /> Save
+            <Check className="h-4 w-4" /> {saveLabel}
           </Button>
         </div>
       </div>
@@ -216,7 +232,10 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
             <Field label="Title">
               <Input value={form.title} onChange={(e) => setTitle(e.target.value)} placeholder="30 Minute Consultation" />
             </Field>
-            <Field label="URL slug">
+            <Field
+              label="URL slug"
+              hint="The unique part of this service's public link. Lowercase letters, numbers, and hyphens only."
+            >
               <div className="flex items-center rounded-md border border-input pl-3 text-sm text-muted-foreground">
                 <span className="select-none">/{username}/</span>
                 <input
@@ -302,17 +321,28 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
 
           <Section
             title="Location"
-            description="Choose from the location types Tidetime supports today. Use a custom link for video calls."
+            description="Pick how you'll meet. Connect a video app in Connections to auto-attach a meeting link to every booking."
           >
             <div className="space-y-3">
               {locations.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No location yet. Add one so attendees know where to meet.</p>
               ) : null}
               {locations.map((loc, i) => {
+                const videoOptions = availableVideo.map((v) => ({
+                  type: v.type as EventLocation["type"],
+                  label: v.label,
+                  icon: Video,
+                }));
+                const baseOptions = [...LOCATION_OPTIONS, ...videoOptions];
+                // A connected video type that's no longer available (or saved
+                // before connecting) is shown as-is so it isn't silently dropped.
                 const currentOption = locationOption(loc.type);
-                const options = currentOption && isUnsupportedLocationType(loc.type)
-                  ? [currentOption, ...LOCATION_OPTIONS]
-                  : LOCATION_OPTIONS;
+                const videoUnavailable =
+                  isVideoLocationType(loc.type) && !availableVideo.some((v) => v.type === loc.type);
+                const options =
+                  currentOption && videoUnavailable
+                    ? [{ type: loc.type, label: currentOption.label, icon: Video }, ...baseOptions]
+                    : baseOptions;
                 return (
                   <div key={i} className="space-y-2 rounded-xl border border-border/60 p-3">
                     <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -379,9 +409,13 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
                         <div className="flex-1 rounded-md border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
                           The attendee provides the call number during booking.
                         </div>
+                      ) : isVideoLocationType(loc.type) && !videoUnavailable ? (
+                        <div className="flex-1 rounded-md border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                          A {currentOption?.label ?? "video"} link is created automatically for each booking.
+                        </div>
                       ) : (
                         <div className="flex-1 rounded-md border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
-                          This provider is kept for legacy data only and is not connected in Tidetime.
+                          This provider isn&apos;t connected. Connect it under Connections, or pick another location.
                         </div>
                       )}
                       <Tooltip content="Remove location">
@@ -390,11 +424,12 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
                         </Button>
                       </Tooltip>
                     </div>
-                    {isUnsupportedLocationType(loc.type) ? (
+                    {videoUnavailable ? (
                       <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <p>
-                          Google Meet and Zoom accounts are not connected in Tidetime yet. Replace this with a custom link or a phone/in-person location.
+                          {currentOption?.label ?? "This video provider"} isn&apos;t connected yet. Connect it under
+                          Connections to auto-attach meeting links, or choose another location.
                         </p>
                       </div>
                     ) : null}
@@ -416,10 +451,10 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
         <TabsContent value="availability" className="space-y-5">
           <Section title="Buffers" description="Block time around your meetings.">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Before event (min)">
+              <Field label="Before event (min)" hint="Padding blocked on your calendar before each booking.">
                 <Input type="number" min={0} value={form.beforeEventBuffer} onChange={(e) => set("beforeEventBuffer", Number(e.target.value))} />
               </Field>
-              <Field label="After event (min)">
+              <Field label="After event (min)" hint="Padding blocked on your calendar after each booking.">
                 <Input type="number" min={0} value={form.afterEventBuffer} onChange={(e) => set("afterEventBuffer", Number(e.target.value))} />
               </Field>
             </div>
@@ -427,10 +462,13 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
 
           <Section title="Notice & slots">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Minimum notice (min)">
+              <Field label="Minimum notice (min)" hint="How far in advance a booking must be made.">
                 <Input type="number" min={0} value={form.minimumBookingNotice} onChange={(e) => set("minimumBookingNotice", Number(e.target.value))} />
               </Field>
-              <Field label="Slot interval (min, optional)">
+              <Field
+                label="Slot interval (min, optional)"
+                hint="Spacing between offered start times. Leave blank to match the duration."
+              >
                 <Input
                   type="number"
                   min={5}
@@ -456,7 +494,7 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
 
           <Section title="Future bookings" description="How far ahead people can book.">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Window">
+              <Field label="Window" hint="How far into the future people can book.">
                 <Select value={form.periodType} onValueChange={(v) => set("periodType", v as typeof form.periodType)}>
                   <SelectTrigger>
                     <SelectValue />
@@ -476,7 +514,10 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
           </Section>
 
           <Section title="Group bookings" description="Allow multiple attendees per slot (e.g. classes).">
-            <Field label="Seats per slot (blank = 1)">
+            <Field
+              label="Seats per slot (blank = 1)"
+              hint="Let several attendees book the same time slot, e.g. for a class."
+            >
               <Input
                 type="number"
                 min={1}
@@ -625,6 +666,7 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
                             onCheckedChange={(c) => setFields((fs) => fs.map((x, j) => (j === i ? { ...x, hidden: c || undefined } : x)))}
                           />
                           Hidden
+                          <InfoTip>Keep this field but don&apos;t show it on the booking form.</InfoTip>
                         </label>
                       ) : null}
                     </div>
@@ -750,10 +792,10 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
             description="Set a price and require payment before the booking is confirmed. Attendees pay securely via Stripe at checkout."
           >
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Price in cents (0 = free)">
+              <Field label="Price in cents (0 = free)" hint="Amount in the smallest currency unit — e.g. 5000 = $50.00. Set 0 to keep this service free.">
                 <Input type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} />
               </Field>
-              <Field label="Currency">
+              <Field label="Currency" hint="Three-letter ISO code, e.g. usd, eur, gbp.">
                 <Input value={form.currency} maxLength={3} onChange={(e) => set("currency", e.target.value.toLowerCase())} />
               </Field>
             </div>
@@ -797,58 +839,25 @@ export function EventTypeEditor({ eventType, username, appUrl, resources, select
               </p>
             </Field>
           </Section>
-
-          {resources.length > 0 ? (
-            <Section
-              title="Resources"
-              description="Require shared resources for this service. Tidetime blocks times when they're fully booked."
-            >
-              <div className="space-y-2">
-                {resources.map((r) => {
-                  const checked = resourceIds.includes(r.id);
-                  return (
-                    <label
-                      key={r.id}
-                      className="flex items-center justify-between rounded-md border p-3 text-sm cursor-pointer"
-                    >
-                      <span>
-                        <span className="font-medium">{r.name}</span>{" "}
-                        <span className="text-muted-foreground">
-                          ({r.type} · capacity {r.capacity})
-                        </span>
-                      </span>
-                      <Switch
-                        checked={checked}
-                        onCheckedChange={(c) =>
-                          setResourceIds((ids) =>
-                            c ? [...ids, r.id] : ids.filter((id) => id !== r.id),
-                          )
-                        }
-                      />
-                    </label>
-                  );
-                })}
-              </div>
-            </Section>
-          ) : null}
         </TabsContent>
       </Tabs>
 
       {/* Sticky save bar */}
       {dirty && (
         <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 border-t border-border bg-card/95 px-6 py-3 backdrop-blur-sm md:left-[220px]">
-          <p className="text-sm text-muted-foreground">You have unsaved changes</p>
+          <p className="text-sm text-muted-foreground">
+            {isDraft ? "This service isn't created yet" : "You have unsaved changes"}
+          </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => {
               setForm(initialForm);
               setLocations(eventType.locations ?? []);
               setFields(eventType.bookingFields ?? []);
-              setResourceIds(selectedResourceIds);
             }}>
               Discard
             </Button>
             <Button size="sm" onClick={save} loading={pending}>
-              <Check className="h-4 w-4" /> Save changes
+              <Check className="h-4 w-4" /> {saveLabel}
             </Button>
           </div>
         </div>
@@ -867,10 +876,21 @@ function Section({ title, description, children }: { title: string; description?
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      <Label className="flex items-center gap-1.5">
+        {label}
+        {hint ? <InfoTip>{hint}</InfoTip> : null}
+      </Label>
       {children}
     </div>
   );

@@ -7,13 +7,14 @@ Use this page to find the right guide quickly.
 ### I am using an existing Tidetime workspace
 
 - [Getting Started](./GETTING_STARTED.md) — first steps, first service, and first booking
-- [User Guide](./USER_GUIDE.md) — everyday use of the dashboard
+- [User Guide](./USER_GUIDE.md) — everyday use of the dashboard, including [routing forms](./USER_GUIDE.md#routing-forms) and [meeting polls](./USER_GUIDE.md#meeting-polls)
 - [FAQ](./FAQ.md) — quick answers to common questions
 - [Glossary](./GLOSSARY.md) — simple definitions of Tidetime terms
 
 ### I manage the workspace or company settings
 
-- [Admin Guide](./ADMIN_GUIDE.md) — branding, booking defaults, email, calendar, payments, reviews, teams, and legal settings
+- [Admin Guide](./ADMIN_GUIDE.md) — branding, booking defaults, reviews, teams, roles, and legal settings
+- [Integrations Guide](./INTEGRATIONS.md) — connect calendars, video, CRM, Stripe payments, and email (credentials, redirect URIs, gotchas)
 - [Troubleshooting](./TROUBLESHOOTING.md) — common problems and how to fix them
 
 ### I host Tidetime myself

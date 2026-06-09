@@ -38,6 +38,36 @@ describe("mergeTeamSlots", () => {
     expect(out).toHaveLength(3);
   });
 
+  it("multi-attendant: only offers slots with enough free hosts (requiredHosts=2)", () => {
+    const out = mergeTeamSlots("round_robin", [hostA, hostB], 2);
+    // 09:00 has only host A free, 11:00 only host B — neither reaches 2.
+    expect(out.map((s) => s.time)).toEqual(["2025-01-01T10:00:00Z"]);
+    expect(out[0].hostIds.sort()).toEqual([1, 2]);
+    // Two free hosts, needing two each → exactly one bookable seat.
+    expect(out[0].seatsRemaining).toBe(1);
+  });
+
+  it("multi-attendant: seatsRemaining is floor(freeHosts / requiredHosts)", () => {
+    const at10 = (id: number): HostSlots => ({ hostId: id, slots: [{ time: "2025-01-01T10:00:00Z" }] });
+    // Five hosts free at 10:00, a service needing two staff → floor(5/2) = 2.
+    const out = mergeTeamSlots("round_robin", [at10(1), at10(2), at10(3), at10(4), at10(5)], 2);
+    expect(out).toHaveLength(1);
+    expect(out[0].seatsRemaining).toBe(2);
+  });
+
+  it("multi-attendant: requiredHosts is clamped to the roster size", () => {
+    // Asking for 3 staff with only 2 hosts collapses to 'all hosts free'.
+    const out = mergeTeamSlots("round_robin", [hostA, hostB], 3);
+    expect(out.map((s) => s.time)).toEqual(["2025-01-01T10:00:00Z"]);
+    expect(out[0].seatsRemaining).toBe(1);
+  });
+
+  it("requiredHosts=1 keeps ordinary round-robin behaviour", () => {
+    expect(mergeTeamSlots("round_robin", [hostA, hostB], 1)).toEqual(
+      mergeTeamSlots("round_robin", [hostA, hostB]),
+    );
+  });
+
   it("sorts slots chronologically", () => {
     const out = mergeTeamSlots("round_robin", [
       { hostId: 3, slots: [{ time: "2025-01-01T15:00:00Z" }, { time: "2025-01-01T08:00:00Z" }] },

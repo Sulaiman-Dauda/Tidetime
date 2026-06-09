@@ -1,6 +1,16 @@
 // Tidetime service worker — minimal offline shell + network-first navigation.
-const CACHE = "tidetime-v1";
-const OFFLINE_URLS = ["/", "/dashboard"];
+const CACHE = "tidetime-v2";
+// Only the public shell is precached. Authenticated pages are never cached.
+const OFFLINE_URLS = ["/"];
+
+// Personalised / sensitive areas that must always come from the network and
+// must never be written to the cache (avoids leaking one user's content to the
+// next person on a shared device).
+const NO_CACHE_PREFIXES = ["/dashboard", "/setup", "/login", "/signup", "/reset-password", "/forgot-password"];
+
+function isNoCachePath(pathname) {
+  return NO_CACHE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -34,7 +44,13 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
 
   if (req.mode === "navigate") {
-    // Network-first for pages, fall back to cache when offline.
+    // Authenticated/personalised pages: network-only, never cached.
+    if (isNoCachePath(url.pathname)) {
+      event.respondWith(fetch(req).catch(() => caches.match("/")));
+      return;
+    }
+
+    // Public pages: network-first, fall back to cache when offline.
     event.respondWith(
       fetch(req)
         .then((res) => {
@@ -50,7 +66,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for static assets.
+  // Cache-first for static assets only.
   event.respondWith(
     caches.match(req).then(
       (cached) =>

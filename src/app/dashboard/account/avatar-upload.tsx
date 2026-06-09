@@ -26,7 +26,11 @@ export function AvatarUpload({
     if (!file) return;
 
     if (file.size > 1_000_000) {
-      toast({ title: "Image must be under 1 MB", variant: "destructive" });
+      toast({
+        title: "Couldn't upload photo",
+        description: "Image must be under 1 MB.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -47,9 +51,13 @@ export function AvatarUpload({
         if (data.error) throw new Error(data.error);
         setPreview(data.avatarUrl);
         onUploaded?.(data.avatarUrl);
-        toast({ title: "Photo updated" });
+        toast({ title: "Profile photo updated" });
       } catch (err) {
-        toast({ title: err instanceof Error ? err.message : "Upload failed", variant: "destructive" });
+        toast({
+          title: "Couldn't upload photo",
+          description: err instanceof Error ? err.message : "Please try again.",
+          variant: "destructive",
+        });
         setPreview(currentUrl);
       }
     });
@@ -63,9 +71,13 @@ export function AvatarUpload({
         if (data.error) throw new Error(data.error);
         setPreview(null);
         onUploaded?.(null);
-        toast({ title: "Photo removed" });
+        toast({ title: "Profile photo removed" });
       } catch {
-        toast({ title: "Failed to remove photo", variant: "destructive" });
+        toast({
+          title: "Couldn't remove photo",
+          description: "Please try again.",
+          variant: "destructive",
+        });
       }
     });
   }

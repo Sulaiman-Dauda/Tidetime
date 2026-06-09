@@ -44,7 +44,7 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
       {categories.length === 0 ? (
         <EmptyState
           title="No categories yet"
-          description="Create your first category above to start organising your services."
+          description="Create a category to start organising your services."
         />
       ) : (
         <div className="space-y-2">
@@ -98,7 +98,8 @@ function CreateForm() {
       toast({ title: "Category created" });
       setOpen(false);
     }
-    if (state?.error) toast({ title: state.error, variant: "destructive" });
+    if (state?.error)
+      toast({ title: "Couldn't create category", description: state.error, variant: "destructive" });
   }, [state, toast]);
 
   if (!open) {
@@ -146,7 +147,8 @@ function EditForm({ category, onDone }: { category: Category; onDone: () => void
       toast({ title: "Category updated" });
       onDone();
     }
-    if (state?.error) toast({ title: state.error, variant: "destructive" });
+    if (state?.error)
+      toast({ title: "Couldn't update category", description: state.error, variant: "destructive" });
   }, [state, toast, onDone]);
 
   return (

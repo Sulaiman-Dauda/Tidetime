@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { DeleteScheduleButton } from "./delete-schedule-button";
 import { weekdayLabel } from "@/lib/format";
 import { listTimeZones } from "@/lib/timezones";
@@ -90,25 +91,29 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
     start(async () => {
       try {
         await saveScheduleAction({ scheduleId: schedule.id, name, timeZone, weekly, overrides });
-        toast({ title: "Availability saved" });
+        toast({ title: "Changes saved", description: "Your availability has been updated." });
         router.refresh();
       } catch {
-        toast({ variant: "destructive", title: "Couldn’t save availability" });
+        toast({
+          variant: "destructive",
+          title: "Couldn't save changes",
+          description: "Please try again.",
+        });
       }
     });
   }
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Availability</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Set the hours people can book you.</p>
-        </div>
-        <Button onClick={save} loading={pending}>
-          <Check className="h-4 w-4" /> Save
-        </Button>
-      </div>
+      <PageHeader
+        title="Availability"
+        description="Set the hours people can book you."
+        action={
+          <Button onClick={save} loading={pending}>
+            <Check className="h-4 w-4" /> Save
+          </Button>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="rounded-2xl border border-border/60 bg-card p-5">

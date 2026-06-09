@@ -1,32 +1,20 @@
 /**
- * Reminder worker. Processes all due reminder jobs once and exits.
+ * One-shot job runner. Processes all due reminders, review requests and webhook
+ * deliveries once, then exits. Suitable for a classic cron entry:
  *
- * Run on a schedule (cron / systemd timer / container sidecar), e.g. every
- * minute:
  *   * * * * * cd /app && npm run jobs:reminders
  *
- * Usage:
- *   npm run jobs:reminders
+ * For a self-managed loop use `npm run jobs:worker`; for a platform scheduler
+ * use the POST /api/cron endpoint. All three share an advisory lock.
  */
-import { processDueReminders } from "@/server/reminders";
-import { sendReviewRequests } from "@/server/reviews";
-import { processDueWebhookDeliveries } from "@/server/webhooks";
+import { runDueJobs, formatJobSummary } from "@/server/jobs";
 
 async function main() {
-  const result = await processDueReminders();
-  console.log(
-    `[reminders] processed=${result.processed} sent=${result.sent} failed=${result.failed}`,
-  );
-  const reviews = await sendReviewRequests();
-  console.log(`[reviews] processed=${reviews.processed} sent=${reviews.sent}`);
-  const webhooks = await processDueWebhookDeliveries();
-  console.log(
-    `[webhooks] processed=${webhooks.processed} delivered=${webhooks.delivered} failed=${webhooks.failed}`,
-  );
+  console.log(formatJobSummary(await runDueJobs()));
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error("[reminders] fatal", err);
+  console.error("[jobs] fatal", err);
   process.exit(1);
 });

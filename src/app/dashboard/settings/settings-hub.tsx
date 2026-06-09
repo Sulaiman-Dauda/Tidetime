@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import type { CompanySettings } from "@/lib/company-settings";
-import { EmailSettings } from "./email-settings";
-import { PaymentSettings } from "./payment-settings";
+import { SUPPORTED_CURRENCIES, type CompanySettings } from "@/lib/company-settings";
+import { CompanyLogoUpload } from "./company-logo-upload";
 import { ReviewSettings, type ReviewSettingsView } from "./review-settings";
 import { ApiKeys, type ApiKeyRow } from "./api-keys";
-import { GoogleCalendarSettings } from "./google-calendar-settings";
 import {
   updateCompanyLegalAction,
   updateCompanyProfileAction,
@@ -56,12 +55,17 @@ function SaveButton({ label = "Save changes" }: { label?: string }) {
   );
 }
 
-function useSavedToast(state: CompanySettingsState) {
+function useSavedToast(state: CompanySettingsState, area: string) {
   const { toast } = useToast();
   useEffect(() => {
-    if (state?.ok) toast({ title: "Settings saved" });
-    if (state?.error) toast({ title: state.error, variant: "destructive" });
-  }, [state, toast]);
+    if (state?.ok) toast({ title: "Changes saved", description: `Your ${area} have been updated.` });
+    if (state?.error)
+      toast({
+        title: "Couldn't save changes",
+        description: state.error || "Please check your details and try again.",
+        variant: "destructive",
+      });
+  }, [state, toast, area]);
 }
 
 export function SettingsHub({
@@ -78,9 +82,6 @@ export function SettingsHub({
       <TabsList className="flex-wrap">
         <TabsTrigger value="general">Brand</TabsTrigger>
         <TabsTrigger value="booking">Booking</TabsTrigger>
-        <TabsTrigger value="email">Email</TabsTrigger>
-        <TabsTrigger value="calendar">Calendar</TabsTrigger>
-        <TabsTrigger value="payments">Stripe</TabsTrigger>
         <TabsTrigger value="reviews">Reviews</TabsTrigger>
         <TabsTrigger value="api">API keys</TabsTrigger>
         <TabsTrigger value="legal">Legal</TabsTrigger>
@@ -91,15 +92,6 @@ export function SettingsHub({
       </TabsContent>
       <TabsContent value="booking">
         <BookingSection booking={settings.booking} />
-      </TabsContent>
-      <TabsContent value="email">
-        <EmailSettings />
-      </TabsContent>
-      <TabsContent value="calendar">
-        <GoogleCalendarSettings />
-      </TabsContent>
-      <TabsContent value="payments">
-        <PaymentSettings />
       </TabsContent>
       <TabsContent value="reviews">
         <ReviewSettings review={review} />
@@ -121,7 +113,8 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
     updateCompanyProfileAction,
     null,
   );
-  useSavedToast(state);
+  const [logoUrl, setLogoUrl] = useState(profile.logoUrl);
+  useSavedToast(state, "brand settings");
   return (
     <Card className="p-6">
       <form action={action} className="space-y-5">
@@ -151,11 +144,39 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
           <Input id="websiteUrl" name="websiteUrl" type="url" defaultValue={profile.websiteUrl} placeholder="https://example.com" />
         </Field>
         <Field
-          label="Company logo URL"
+          label="Company logo"
           htmlFor="logoUrl"
-          hint="Displayed on the public booking page and notification emails."
+          hint="Upload an image (under 1 MB) or paste a URL. Shown on the public booking page and emails."
         >
-          <Input id="logoUrl" name="logoUrl" type="url" defaultValue={profile.logoUrl} placeholder="https://example.com/logo.png" />
+          <div className="space-y-2">
+            <CompanyLogoUpload value={logoUrl} onChange={setLogoUrl} />
+            <Input
+              id="logoUrl"
+              name="logoUrl"
+              type="text"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="https://example.com/logo.png"
+            />
+          </div>
+        </Field>
+        <Field
+          label="Default currency"
+          htmlFor="defaultCurrency"
+          hint="Used for new paid services and price display. Match your Stripe account currency."
+        >
+          <Select name="defaultCurrency" defaultValue={profile.defaultCurrency}>
+            <SelectTrigger id="defaultCurrency">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c.toUpperCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Field
           label="Brand colour"
@@ -190,7 +211,7 @@ function BookingSection({ booking }: { booking: CompanySettings["booking"] }) {
     updateCompanyBookingAction,
     null,
   );
-  useSavedToast(state);
+  useSavedToast(state, "booking defaults");
   return (
     <Card className="p-6">
       <form action={action} className="space-y-6">
@@ -208,6 +229,16 @@ function BookingSection({ booking }: { booking: CompanySettings["booking"] }) {
               </p>
             </div>
             <Switch name="bookingDisabled" defaultChecked={booking.bookingDisabled} />
+          </label>
+          <label className="mt-4 flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm font-medium">Spam protection (ALTCHA)</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Adds a privacy-friendly proof-of-work check to the booking form. No third-party
+                services, no tracking — it just makes automated spam bookings expensive.
+              </p>
+            </div>
+            <Switch name="spamProtectionEnabled" defaultChecked={booking.spamProtectionEnabled} />
           </label>
         </div>
 
@@ -252,7 +283,7 @@ function LegalSection({ legal }: { legal: CompanySettings["legal"] }) {
     updateCompanyLegalAction,
     null,
   );
-  useSavedToast(state);
+  useSavedToast(state, "legal settings");
   return (
     <Card className="p-6">
       <form action={action} className="space-y-6">

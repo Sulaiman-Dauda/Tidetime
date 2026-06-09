@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { InfoTip } from "@/components/ui/info-tip";
 import { Loader2, Mail, CheckCircle2, XCircle } from "lucide-react";
 
 export function EmailSettings() {
@@ -58,10 +59,14 @@ export function EmailSettings() {
         body: JSON.stringify({ key: "smtp", config: { ...form, port: Number(form.port) } }),
       });
       if (res.ok) {
-        toast({ title: "Email settings saved" });
+        toast({ title: "Changes saved", description: "Your email settings have been updated." });
       } else {
         const err = await res.json();
-        toast({ title: err.error || "Failed to save", variant: "destructive" });
+        toast({
+          title: "Couldn't save changes",
+          description: err.error || "Please check your details and try again.",
+          variant: "destructive",
+        });
       }
     });
   }
@@ -100,7 +105,9 @@ export function EmailSettings() {
           <Input value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} placeholder="smtp.example.com" />
         </div>
         <div className="space-y-1.5">
-          <Label>Port</Label>
+          <Label>
+            Port <InfoTip>Common values: 587 (TLS) or 465 (SSL).</InfoTip>
+          </Label>
           <Input value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} placeholder="587" />
         </div>
         <div className="space-y-1.5">
@@ -112,7 +119,10 @@ export function EmailSettings() {
           <Input value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} type="password" placeholder="••••••••" autoComplete="off" />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label>From address</Label>
+          <Label>
+            From address{" "}
+            <InfoTip>The sender shown on outgoing emails, e.g. Tidetime &lt;noreply@example.com&gt;.</InfoTip>
+          </Label>
           <Input value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} placeholder="Tidetime <noreply@example.com>" />
         </div>
       </div>

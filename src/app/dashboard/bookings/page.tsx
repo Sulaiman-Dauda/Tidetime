@@ -5,7 +5,10 @@ import { db } from "@/db";
 import { bookings, attendees, eventTypes } from "@/db/schema";
 import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "../_components/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
 import { CalendarX2, Clock, CreditCard, MapPin, User, X } from "lucide-react";
 import { expireStalePaymentHolds } from "@/server/payment-holds";
@@ -106,12 +109,10 @@ export default async function BookingsPage({ searchParams }: Props) {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Bookings</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Upcoming, pending, and historical meetings.
-        </p>
-      </div>
+      <PageHeader
+        title="Bookings"
+        description="Upcoming, pending, and historical meetings."
+      />
 
       <Tabs value={active}>
         <TabsList>
@@ -124,7 +125,22 @@ export default async function BookingsPage({ searchParams }: Props) {
 
         <TabsContent value={active} className="mt-6">
           {rows.length === 0 ? (
-            <EmptyState filter={active} />
+            <EmptyState
+              icon={CalendarX2}
+              title={`No ${active} bookings`}
+              description={
+                active === "upcoming"
+                  ? "Share your booking link to start receiving meetings."
+                  : "Nothing to show here yet."
+              }
+              action={
+                active === "upcoming" ? (
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/links">Create a booking link</Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
               {rows.map((b) => (
@@ -134,20 +150,6 @@ export default async function BookingsPage({ searchParams }: Props) {
           )}
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function EmptyState({ filter }: { filter: Filter }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20 text-center">
-      <CalendarX2 className="h-8 w-8 text-muted-foreground/50" />
-      <p className="mt-3 text-sm font-medium text-foreground">No {filter} bookings</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {filter === "upcoming"
-          ? "Share your booking link to start receiving meetings."
-          : "Nothing to show here."}
-      </p>
     </div>
   );
 }
@@ -174,7 +176,7 @@ function BookingRow({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/dashboard/bookings/${booking.uid}`}
-            className="text-[14px] font-medium text-foreground hover:underline"
+            className="text-sm font-medium text-foreground hover:underline"
           >
             {booking.title}
           </Link>
@@ -199,18 +201,18 @@ function BookingRow({
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-3 w-3" />
+            <Clock className="h-3.5 w-3.5" />
             {when}
           </span>
           {attendeeSummary && (
             <span className="inline-flex items-center gap-1.5">
-              <User className="h-3 w-3" />
+              <User className="h-3.5 w-3.5" />
               {attendeeSummary}
             </span>
           )}
           {booking.location && (
             <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-3 w-3" />
+              <MapPin className="h-3.5 w-3.5" />
               {booking.meetingUrl ? (
                 <a
                   href={booking.meetingUrl}

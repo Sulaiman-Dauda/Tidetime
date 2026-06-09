@@ -99,3 +99,24 @@ export async function deleteScheduleAction(formData: FormData) {
   await db.delete(schedules).where(and(eq(schedules.id, id), eq(schedules.userId, user.id)));
   revalidatePath("/dashboard/availability");
 }
+
+/* ---- Travel schedules (timezone overrides) -------------------------------- */
+
+export async function addTravelScheduleAction(input: {
+  timeZone: string;
+  startDate: string;
+  endDate: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  const { addTravelSchedule } = await import("@/server/travel-schedules");
+  const res = await addTravelSchedule(user.id, input);
+  if (res.ok) revalidatePath("/dashboard/availability");
+  return res;
+}
+
+export async function deleteTravelScheduleAction(id: number): Promise<void> {
+  const user = await requireUser();
+  const { deleteTravelSchedule } = await import("@/server/travel-schedules");
+  await deleteTravelSchedule(user.id, id);
+  revalidatePath("/dashboard/availability");
+}

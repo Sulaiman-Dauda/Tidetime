@@ -87,7 +87,7 @@ export function CancelBookingButton({ uid }: { uid: string }) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Keep it</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           <form
             action={async (formData) => {
               start(async () => {
@@ -103,7 +103,7 @@ export function CancelBookingButton({ uid }: { uid: string }) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
               disabled={pending}
             >
-              {pending ? "Cancelling…" : "Yes, cancel booking"}
+              {pending ? "Cancelling…" : "Cancel booking"}
             </AlertDialogAction>
           </form>
         </AlertDialogFooter>

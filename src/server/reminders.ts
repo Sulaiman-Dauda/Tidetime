@@ -9,6 +9,7 @@ import {
   users,
 } from "@/db/schema";
 import { planReminders, type ReminderRule } from "@/lib/reminders";
+import { t } from "@/lib/i18n";
 import { sendMail } from "./mailer";
 import { logBookingActivity } from "./activity";
 import { formatRange } from "@/lib/format";
@@ -103,8 +104,9 @@ export async function processDueReminders(now: Date = new Date()): Promise<Remin
       const recipients = await resolveRecipients(reminder.action, booking.id, booking.userId);
       const when = formatRange(booking.startTime, booking.endTime, recipients.timeZone, true);
       const html = reminderHtml(booking.title, when, recipients.timeZone, `${env.appUrl}/booking/${booking.uid}`);
+      const subject = `${t(recipients.locale, "email.reminderSubject")} — ${booking.title}`;
       for (const to of recipients.emails) {
-        await sendMail({ to, subject: `Reminder: ${booking.title}`, html });
+        await sendMail({ to, subject, html });
       }
       await logBookingActivity(booking.id, "reminder_sent", {
         message: `Reminder email sent to ${recipients.emails.length} recipient${
@@ -126,24 +128,28 @@ export async function processDueReminders(now: Date = new Date()): Promise<Remin
 }
 
 async function resolveRecipients(
-  action: "email_attendee" | "email_host" | "sms_attendee",
+  action: "email_attendee" | "email_host",
   bookingId: number,
   hostUserId: number | null,
-): Promise<{ emails: string[]; timeZone: string }> {
+): Promise<{ emails: string[]; timeZone: string; locale: string }> {
   if (action === "email_host" && hostUserId) {
     const [u] = await db
-      .select({ email: users.email, timeZone: users.timeZone })
+      .select({ email: users.email, timeZone: users.timeZone, locale: users.locale })
       .from(users)
       .where(eq(users.id, hostUserId))
       .limit(1);
-    return { emails: u ? [u.email] : [], timeZone: u?.timeZone ?? "UTC" };
+    return { emails: u ? [u.email] : [], timeZone: u?.timeZone ?? "UTC", locale: u?.locale ?? "en" };
   }
-  // default: attendees (sms not implemented — falls back to email)
+  // default: email the attendees
   const ats = await db
-    .select({ email: attendees.email, timeZone: attendees.timeZone })
+    .select({ email: attendees.email, timeZone: attendees.timeZone, locale: attendees.locale })
     .from(attendees)
     .where(eq(attendees.bookingId, bookingId));
-  return { emails: ats.map((a) => a.email), timeZone: ats[0]?.timeZone ?? "UTC" };
+  return {
+    emails: ats.map((a) => a.email),
+    timeZone: ats[0]?.timeZone ?? "UTC",
+    locale: ats[0]?.locale ?? "en",
+  };
 }
 
 function reminderHtml(title: string, when: string, tz: string, manageUrl: string): string {

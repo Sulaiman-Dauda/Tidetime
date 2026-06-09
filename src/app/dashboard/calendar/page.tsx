@@ -1,8 +1,9 @@
-import { and, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
-import { bookings, attendees } from "@/db/schema";
+import { bookings, attendees, eventTypes } from "@/db/schema";
 import { CalendarView, type CalendarEvent } from "./calendar-view";
+import type { CalendarService } from "./quick-booking-dialog";
 
 interface Props {
   searchParams: Promise<{ month?: string }>;
@@ -62,10 +63,33 @@ async function loadEvents(userId: number, year: number, month: number): Promise<
   }));
 }
 
+/** The host's own bookable services, for quick-create from the calendar. */
+async function loadServices(userId: number): Promise<CalendarService[]> {
+  const rows = await db
+    .select({ slug: eventTypes.slug, title: eventTypes.title, length: eventTypes.length, hidden: eventTypes.hidden })
+    .from(eventTypes)
+    .where(eq(eventTypes.userId, userId))
+    .orderBy(asc(eventTypes.position), asc(eventTypes.createdAt));
+  return rows
+    .filter((r) => !r.hidden)
+    .map((r) => ({ slug: r.slug, title: r.title, length: r.length }));
+}
+
 export default async function CalendarPage({ searchParams }: Props) {
   const user = await requireUser();
   const { year, month } = parseMonth((await searchParams).month);
-  const events = await loadEvents(user.id, year, month);
+  const [events, services] = await Promise.all([
+    loadEvents(user.id, year, month),
+    loadServices(user.id),
+  ]);
 
-  return <CalendarView year={year} month={month} events={events} timeZone={user.timeZone} />;
+  return (
+    <CalendarView
+      year={year}
+      month={month}
+      events={events}
+      timeZone={user.timeZone}
+      services={services}
+    />
+  );
 }

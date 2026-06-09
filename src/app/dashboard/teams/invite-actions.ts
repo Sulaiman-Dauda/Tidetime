@@ -71,7 +71,7 @@ export async function createInviteAction(_prev: InviteState, formData: FormData)
   const appUrl = process.env.APP_URL || "http://localhost:3100";
   const inviteUrl = `${appUrl}/signup?invite=${token}`;
 
-  const email = inviteEmail({
+  const email = await inviteEmail({
     teamName: team?.name ?? "the team",
     inviterName: user.name ?? user.username,
     inviteUrl,

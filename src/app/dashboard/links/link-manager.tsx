@@ -18,16 +18,18 @@ import { useToast } from "@/hooks/use-toast";
 import { CopyLinkButton } from "@/app/dashboard/_components/copy-link-button";
 import { createLinkAction, type LinkState } from "./actions";
 import { RevokeLinkButton } from "./revoke-link-button";
+import { EmptyState } from "@/components/empty-state";
 import type { BookingLinkRow } from "@/server/booking-links";
-import { Loader2, Plus } from "lucide-react";
+import { LinkIcon, Loader2, Plus } from "lucide-react";
 
-type Kind = "one_time" | "expiring" | "limited" | "invite";
+type Kind = "one_time" | "expiring" | "limited" | "invite" | "static";
 
 const KIND_LABEL: Record<Kind, string> = {
   one_time: "Single use",
   expiring: "Expiring",
   limited: "Limited uses",
   invite: "Invite only",
+  static: "Reusable (secret link)",
 };
 
 export function LinkManager({
@@ -40,6 +42,7 @@ export function LinkManager({
   const router = useRouter();
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>("one_time");
+  const [eventTypeId, setEventTypeId] = useState<string>("");
   const [state, action, pending] = useActionState<LinkState, FormData>(createLinkAction, {});
 
   useEffect(() => {
@@ -47,7 +50,7 @@ export function LinkManager({
       toast({ title: "Link created", description: state.url });
       router.refresh();
     } else if (state.error) {
-      toast({ title: "Could not create link", description: state.error, variant: "destructive" });
+      toast({ title: "Couldn't create link", description: state.error, variant: "destructive" });
     }
   }, [state, toast, router]);
 
@@ -58,18 +61,19 @@ export function LinkManager({
         <form action={action} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="eventTypeId">Service</Label>
-            <select
-              id="eventTypeId"
-              name="eventTypeId"
-              required
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-            >
-              {eventTypes.map((et) => (
-                <option key={et.id} value={et.id}>
-                  {et.title}
-                </option>
-              ))}
-            </select>
+            <input type="hidden" name="eventTypeId" value={eventTypeId} />
+            <Select value={eventTypeId} onValueChange={setEventTypeId} required>
+              <SelectTrigger id="eventTypeId">
+                <SelectValue placeholder="Select a service" />
+              </SelectTrigger>
+              <SelectContent>
+                {eventTypes.map((et) => (
+                  <SelectItem key={et.id} value={String(et.id)}>
+                    {et.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -119,9 +123,11 @@ export function LinkManager({
 
       <div className="space-y-3">
         {links.length === 0 ? (
-          <p className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-            No booking links yet.
-          </p>
+          <EmptyState
+            icon={LinkIcon}
+            title="No booking links yet"
+            description="Create your first link to start sharing specific availability."
+          />
         ) : (
           links.map((link) => (
             <Card key={link.id} className="flex flex-wrap items-center justify-between gap-3 p-4">

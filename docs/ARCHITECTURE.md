@@ -21,8 +21,12 @@ That split makes the codebase easier to test, easier to change, and easier to un
 ```text
 src/
 ├── app/         Next.js routes, pages, layouts, server actions, API handlers
+├── app-store/   Pluggable conferencing + CRM integrations (registry-based)
 ├── components/  Reusable UI components
 ├── db/          Database schema, migrations, and seed helpers
+├── emails/      React Email templates (rendered to HTML server-side)
+├── hooks/       Shared React hooks for client components
+├── i18n/        Internationalization (ICU message catalogs + helpers)
 ├── lib/         Pure business logic and shared helpers
 └── server/      Server-only coordination and integrations
 ```
@@ -42,6 +46,15 @@ It contains:
 - route-specific UI
 
 Think of this folder as the part that receives input from users and turns it into actions.
+
+### `src/app-store`
+
+A small registry of pluggable integrations, modeled loosely on Cal.com's app store. Each app is declared in `registry.ts` and grouped by category:
+
+- **Conferencing / video:** Daily (`daily/`), Zoom (`zoom/`), Microsoft Teams (`msteams/`). Jitsi Meet is built in as a zero-config default location.
+- **CRM:** HubSpot (`hubspot/`).
+
+Shared plumbing lives alongside the apps: `conferencing.ts`, `crm.ts`, `credentials.ts` (encrypted per-user credential storage), and `types.ts`. New integrations are added by registering an `AppDefinition` rather than by threading provider-specific code through the booking flow.
 
 ### `src/components`
 
@@ -63,6 +76,18 @@ It contains:
 - the Drizzle schema
 - migration helpers
 - seed utilities
+
+### `src/emails`
+
+[React Email](https://react.email) templates that are rendered to HTML on the server before sending. Rendering is **asynchronous** — always `await` the render helper.
+
+### `src/hooks`
+
+Shared React hooks used by client components.
+
+### `src/i18n`
+
+Internationalization: ICU-formatted message catalogs and the helpers that load and format them.
 
 ### `src/lib`
 
@@ -101,6 +126,8 @@ A useful way to think about it:
 
 This keeps important business rules from being trapped inside database code or UI code.
 
+Server-only modules import `"server-only"` at the top, so any accidental import into client bundles fails the build. This enforces the boundary mechanically rather than by convention — credentials, secrets, and direct database access can never leak into the browser.
+
 ## How a booking moves through the system
 
 ### Public booking flow
@@ -122,11 +149,27 @@ For team services:
 3. results are combined based on the team scheduling mode
 4. the final booking is assigned according to the chosen rules
 
-### Reminder flow
+### Reminder and webhook flow
 
-1. when a booking is created, Tidetime creates reminder jobs
-2. the reminder worker checks for due jobs
-3. due reminders are sent and marked as handled
+1. when a booking is created, Tidetime creates reminder jobs and enqueues any matching webhook deliveries
+2. the [job runner](#job-runner) processes due jobs
+3. due reminders and review requests are sent; pending webhook deliveries are retried with backoff; expired data is cleaned up
+
+## Job runner
+
+All recurring background work funnels through a single function, `runDueJobs()` (`src/server/jobs.ts`). Each tick processes, in order:
+
+1. **reminders** — due reminder/notification jobs
+2. **review requests** — post-meeting review emails
+3. **webhook deliveries** — pending rows in `webhook_deliveries` whose backoff window has elapsed (up to 5 attempts, exponential backoff capped at 6 hours)
+4. **retention cleanup** — expired sessions, verification tokens, stale calendar cache, abandoned draft services, and old bookings
+
+A tick is guarded by a **Postgres session-level advisory lock**, so two runners (or a worker plus an external scheduler firing at the same moment) never process the same jobs twice — a contended tick simply returns `{ skipped: true }`.
+
+There are two ways to drive `runDueJobs()`, and they are safe to run together:
+
+- **HTTP trigger** — `POST` or `GET` `/api/cron`, authenticated with a `CRON_SECRET` bearer token (or `?secret=`). The handler hashes both the provided and expected secret and compares them with a **constant-time** check. Wire this to Vercel Cron, Cloud Scheduler, GitHub Actions, etc.
+- **Sidecar worker** — `scripts/worker.ts`, a long-running process that calls `runDueJobs()` on an interval. Use this for plain VM / container deployments without an external scheduler.
 
 ## Validation approach
 
@@ -157,10 +200,12 @@ Tidetime uses:
 
 Tidetime protects sensitive values by:
 
-- encrypting stored credentials
-- hashing API keys before storage
-- verifying Stripe webhook signatures
-- signing outgoing webhooks
+- encrypting stored integration credentials (the app-store apps in `src/app-store`)
+- hashing API keys with SHA-256 before storage (the plaintext is shown once)
+- hashing session tokens before storage
+- verifying inbound Stripe webhook signatures
+- signing **outgoing** webhooks with HMAC-SHA256 (header `X-Tidetime-Signature-256`)
+- running an SSRF guard before every outgoing webhook send
 
 ### Browser and HTTP protections
 
@@ -187,9 +232,12 @@ Main records include:
 - `memberships`
 - `api_keys`
 - `webhooks`
+- `webhook_deliveries`
 - `payments`
 - `workflows`
 - `scheduled_reminders`
+
+`webhook_deliveries` is the **durable retry queue** that sits alongside `webhooks`: every dispatched event is persisted there with its full JSON body, attempt count, status, and next-attempt time, so the job runner can retry failures without losing events.
 
 The schema tries to stay explicit so relationships are easier to follow.
 
@@ -214,4 +262,5 @@ This layout helps because:
 
 - [Contributing](../CONTRIBUTING.md)
 - [API Reference](./API.md)
+- [Embed lifecycle](./EMBED_LIFECYCLE.md)
 - [Deployment](./DEPLOYMENT.md)

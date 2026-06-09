@@ -18,6 +18,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { EmptyState } from "@/components/empty-state";
+import { InfoTip } from "@/components/ui/info-tip";
 import { createApiKeyAction, revokeApiKeyAction, type ApiKeyState } from "./api-keys-actions";
 import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 
@@ -60,7 +62,10 @@ export function ApiKeys({ keys }: { keys: KeyRow[] }) {
       {open ? (
         <form action={action} className="mt-4 flex items-end gap-2">
           <div className="flex-1 space-y-1.5">
-            <Label htmlFor="note">Label</Label>
+            <Label htmlFor="note">
+              Label{" "}
+              <InfoTip>A label to help you recognize this key later. It isn&apos;t sent with requests.</InfoTip>
+            </Label>
             <Input id="note" name="note" placeholder="e.g. Zapier" />
           </div>
           <Button type="submit" loading={pending}>
@@ -94,11 +99,16 @@ export function ApiKeys({ keys }: { keys: KeyRow[] }) {
         </div>
       ) : null}
 
-      <div className="mt-4 divide-y">
-        {keys.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">No API keys yet.</p>
-        ) : (
-          keys.map((k) => (
+      {keys.length === 0 ? (
+        <EmptyState
+          className="mt-4"
+          icon={KeyRound}
+          title="No API keys yet"
+          description="Create a key to access the Tidetime API."
+        />
+      ) : (
+        <div className="mt-4 divide-y">
+          {keys.map((k) => (
             <div key={k.id} className="flex items-center justify-between py-3">
               <div className="flex items-center gap-3">
                 <KeyRound className="h-4 w-4 text-muted-foreground" />
@@ -111,9 +121,9 @@ export function ApiKeys({ keys }: { keys: KeyRow[] }) {
               </div>
               <RevokeKeyButton id={k.id} />
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

@@ -4,6 +4,7 @@ import {
   getTranslator,
   resolveLocale,
   isSupportedLocale,
+  negotiateLocale,
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
 } from "./i18n";
@@ -62,5 +63,35 @@ describe("getTranslator", () => {
   it("falls back like t()", () => {
     const tr = getTranslator("xx");
     expect(tr("booking.cancel")).toBe("Cancel");
+  });
+});
+
+describe("ICU plurals", () => {
+  it("selects the right plural form (en)", () => {
+    expect(t("en", "booking.guestCount", { count: 0 })).toBe("No guests");
+    expect(t("en", "booking.guestCount", { count: 1 })).toBe("1 guest");
+    expect(t("en", "booking.guestCount", { count: 5 })).toBe("5 guests");
+  });
+  it("localizes plurals (de)", () => {
+    expect(t("de", "booking.seatsRemaining", { count: 0 })).toBe("Ausgebucht");
+    expect(t("de", "booking.seatsRemaining", { count: 1 })).toBe("1 Platz frei");
+    expect(t("de", "booking.seatsRemaining", { count: 3 })).toBe("3 Plätze frei");
+  });
+  it("interpolates a simple variable", () => {
+    expect(t("en", "booking.guestCount", { count: 2 })).toContain("2");
+  });
+});
+
+describe("negotiateLocale", () => {
+  it("picks the highest-weighted supported locale", () => {
+    expect(negotiateLocale("fr-CA,fr;q=0.9,en;q=0.8")).toBe("fr");
+    expect(negotiateLocale("en-US,en;q=0.9")).toBe("en");
+  });
+  it("respects q-weights over order", () => {
+    expect(negotiateLocale("en;q=0.3, de;q=0.9")).toBe("de");
+  });
+  it("falls back to default", () => {
+    expect(negotiateLocale("zz,xx;q=0.5")).toBe(DEFAULT_LOCALE);
+    expect(negotiateLocale(null)).toBe(DEFAULT_LOCALE);
   });
 });

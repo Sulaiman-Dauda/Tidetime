@@ -36,7 +36,7 @@ export async function getTeamEventTypes(teamId: number): Promise<TeamEventView[]
     .select({ et: eventTypes, scheduleTz: schedules.timeZone })
     .from(eventTypes)
     .leftJoin(schedules, eq(eventTypes.scheduleId, schedules.id))
-    .where(and(eq(eventTypes.teamId, teamId), eq(eventTypes.hidden, false)))
+    .where(and(eq(eventTypes.teamId, teamId), eq(eventTypes.hidden, false), eq(eventTypes.draft, false)))
     .orderBy(asc(eventTypes.position), asc(eventTypes.id));
 
   const now = new Date();
@@ -84,7 +84,7 @@ export async function getTeamEventType(
     .select({ et: eventTypes, scheduleTz: schedules.timeZone })
     .from(eventTypes)
     .leftJoin(schedules, eq(eventTypes.scheduleId, schedules.id))
-    .where(and(eq(eventTypes.teamId, team.id), eq(eventTypes.slug, eventSlug)))
+    .where(and(eq(eventTypes.teamId, team.id), eq(eventTypes.slug, eventSlug), eq(eventTypes.draft, false)))
     .limit(1);
   if (!row || row.et.hidden) return null;
 
@@ -107,6 +107,30 @@ async function loadHostUserIds(eventTypeId: number): Promise<number[]> {
   return rows.map((r) => r.userId);
 }
 
+export interface TeamHost {
+  id: number;
+  name: string | null;
+  username: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * Public host roster for a team service, used to let bookers pick a specific
+ * provider (or keep "any available"). Only meaningful for round_robin/managed.
+ */
+export async function getTeamHosts(eventTypeId: number): Promise<TeamHost[]> {
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      username: users.username,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(eventTypeHosts)
+    .innerJoin(users, eq(eventTypeHosts.userId, users.id))
+    .where(eq(eventTypeHosts.eventTypeId, eventTypeId));
+}
+
 /**
  * Compute merged team availability for a team service over a window.
  * Each host's slots are computed individually (respecting their own schedule
@@ -118,8 +142,13 @@ export async function getTeamSlots(args: {
   rangeEnd: Date;
   duration?: number;
   now?: Date;
+  /** restrict to a single chosen host (booker picked a specific provider) */
+  preferredHostId?: number;
 }): Promise<TeamSlot[]> {
-  const hostIds = await loadHostUserIds(args.eventType.id);
+  let hostIds = await loadHostUserIds(args.eventType.id);
+  if (args.preferredHostId && hostIds.includes(args.preferredHostId)) {
+    hostIds = [args.preferredHostId];
+  }
   if (hostIds.length === 0) return [];
 
   // Resolve each host's default schedule timezone for accurate computation.
@@ -147,7 +176,11 @@ export async function getTeamSlots(args: {
     perHost.push({ hostId: host.id, slots });
   }
 
-  return mergeTeamSlots(args.eventType.schedulingType ?? "round_robin", perHost);
+  return mergeTeamSlots(
+    args.eventType.schedulingType ?? "round_robin",
+    perHost,
+    args.eventType.requiredHosts ?? 1,
+  );
 }
 
 /** Group team slots by day for the viewer's timezone. */

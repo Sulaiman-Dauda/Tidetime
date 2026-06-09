@@ -8,7 +8,12 @@ import { users, schedules, availabilities, appSettings, teams, memberships } fro
 import { hashPassword } from "@/lib/crypto";
 import { createSession, hasAnyUser } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
-import { COMPANY_SETTING_KEYS, DEFAULT_COMPANY_PROFILE, normalizeBrandColor } from "@/lib/company-settings";
+import {
+  COMPANY_SETTING_KEYS,
+  DEFAULT_COMPANY_PROFILE,
+  normalizeBrandColor,
+  normalizeCurrency,
+} from "@/lib/company-settings";
 
 const RESERVED = new Set([
   "api", "app", "dashboard", "login", "signup", "settings", "admin", "auth", "setup",
@@ -16,22 +21,34 @@ const RESERVED = new Set([
 ]);
 const SETUP_LOCK_ID = 20_260_604;
 
-const setupSchema = z.object({
-  instanceName: z.string().trim().max(128).optional(),
-  companyEmail: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).optional(),
-  companyWebsite: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).optional(),
-  name: z.string().trim().min(1, "Name is required").max(128),
-  email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(3, "Username must be at least 3 characters")
-    .max(48)
-    .regex(/^[a-z0-9_-]+$/, "Use lowercase letters, numbers, - and _ only"),
-  password: z.string().min(8, "Password must be at least 8 characters").max(200),
-  timeZone: z.string().optional(),
-});
+const setupSchema = z
+  .object({
+    instanceName: z.string().trim().max(128).optional(),
+    companyEmail: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).optional(),
+    companyWebsite: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).optional(),
+    defaultCurrency: z.string().trim().optional(),
+    name: z.string().trim().min(1, "Name is required").max(128),
+    email: z.string().trim().toLowerCase().email("Enter a valid email"),
+    password: z.string().min(8, "Password must be at least 8 characters").max(200),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+    timeZone: z.string().optional(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
+  });
+
+/**
+ * Derive a valid, non-reserved username from the owner's email local-part so
+ * onboarding stays a two-field account step. First-run only, so collisions with
+ * other accounts are impossible.
+ */
+function deriveUsername(email: string): string {
+  let base = (email.split("@")[0] ?? "").toLowerCase().replace(/[^a-z0-9_-]+/g, "");
+  if (base.length < 3) base = `user${base}`;
+  base = base.slice(0, 40);
+  return RESERVED.has(base) ? `${base}1` : base;
+}
 
 export type SetupResult = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -43,10 +60,11 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     instanceName: formData.get("instanceName") || undefined,
     companyEmail: formData.get("companyEmail") || undefined,
     companyWebsite: formData.get("companyWebsite") || undefined,
+    defaultCurrency: formData.get("defaultCurrency") || undefined,
     name: formData.get("name"),
     email: formData.get("email"),
-    username: formData.get("username"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
     timeZone: formData.get("timeZone"),
   });
   if (!parsed.success) {
@@ -55,8 +73,8 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     return { fieldErrors };
   }
 
-  const { name, email, username, password, instanceName } = parsed.data;
-  if (RESERVED.has(username)) return { fieldErrors: { username: "That username is reserved" } };
+  const { name, email, password, instanceName } = parsed.data;
+  const username = deriveUsername(email);
 
   const timeZone =
     parsed.data.timeZone && isValidTimeZone(parsed.data.timeZone) ? parsed.data.timeZone : "UTC";
@@ -68,6 +86,7 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     email: parsed.data.companyEmail || "",
     websiteUrl: parsed.data.companyWebsite || "",
     brandColor: normalizeBrandColor(DEFAULT_COMPANY_PROFILE.brandColor),
+    defaultCurrency: normalizeCurrency(parsed.data.defaultCurrency),
   };
 
   const setup = await db.transaction(async (tx) => {
