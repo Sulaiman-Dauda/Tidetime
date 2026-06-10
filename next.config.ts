@@ -59,6 +59,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   typedRoutes: true,
+  experimental: {
+    // Trades a little build speed for a much smaller compile-time memory peak,
+    // so self-hosters on 1–2GB VPSes can build without exotic swap setups.
+    webpackMemoryOptimizations: true,
+  },
   // Emit a standard production build compatible with "next start".
   // output: "standalone",
   async headers() {

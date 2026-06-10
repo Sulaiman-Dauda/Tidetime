@@ -23,11 +23,11 @@ Minimum requirements:
 | Resource | Minimum | Recommended | Why |
 | --- | --- | --- | --- |
 | CPU | 1 vCPU | 2 vCPUs | The first install compiles the app inside Docker. Expect 10–20 minutes on 1 vCPU, roughly 5 on 2. Day-to-day load is light. |
-| RAM | 1 GB **+ 2 GB swap** | 2 GB or more | `next build` peaks around 2 GB. On low-RAM hosts without swap it crashes with "JavaScript heap out of memory" — the installer detects this and offers to create a 2 GB swapfile for you. With 2 GB+ of RAM, swap is optional. |
+| RAM | 1 GB **+ swap** (the installer sizes it) | 4 GB | The first build peaks at ~3 GB (measured). On hosts where RAM + swap is under ~5 GB it crashes with "JavaScript heap out of memory" — the installer detects this and offers to create a swapfile sized to the gap (2–4 GB). With 4 GB+ of RAM, swap is optional. |
 | Disk | 25 GB SSD | 40 GB or more | OS + Docker + the Tidetime images and build cache use roughly 8–10 GB. The rest is headroom for the PostgreSQL volume, backups, and logs (container logs are capped at ~60 MB per service). |
 | OS | Any Linux that runs Docker | Ubuntu 22.04 / 24.04 LTS | The installer can install Docker itself via get.docker.com on any mainstream distribution. |
 
-In practice: the **smallest tier at most cloud providers (1 vCPU / 1 GB, ~$5–6/mo)** works once swap is enabled — the installer handles that — but the build will be slow. A **2 GB instance is the comfortable starting point**. Running Tidetime is much lighter than building it: the whole stack (app + worker + PostgreSQL) idles at roughly 500 MB of RAM, so there's no need to scale up after a successful install.
+In practice: the **smallest tier at most cloud providers (1 vCPU / 1 GB, ~$5–6/mo)** works once swap is enabled — the installer handles that — but the swap-backed build will be slow. A **2 GB instance plus the installer's swapfile is the practical starting point**, and 4 GB builds without touching swap at all. Running Tidetime is much lighter than building it: the whole stack (app + worker + PostgreSQL) idles at roughly 500 MB of RAM, so there's no need to scale up after a successful install.
 
 Optional but common additions, all configured **in the app** after first launch (not in `.env`):
 

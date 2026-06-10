@@ -13,11 +13,13 @@ COPY . .
 # AUTH_SECRET is intentionally NOT provided here — it is a runtime-only secret and
 # must never be baked into image layers. env.ts skips the AUTH_SECRET requirement
 # during `next build`. APP_URL/DATABASE_URL are placeholders for the build only.
-# --max-old-space-size: Node's default heap cap (~50% of RAM, ~512MB on a 1GB VPS)
-# aborts `next build` with SIGABRT; 2GB works on small servers once swap exists.
+# --max-old-space-size: the build needs >2GB of heap (2048 dies with SIGABRT
+# "Ineffective mark-compacts near heap limit"). 4096 is a ceiling, not an
+# allocation — V8 only takes what it needs; swap absorbs the peak on small VPSes
+# (the installer provisions it).
 RUN APP_URL=http://localhost:3100 \
     DATABASE_URL=postgres://postgres:postgres@localhost:5432/tidetime \
-    NODE_OPTIONS=--max-old-space-size=2048 \
+    NODE_OPTIONS=--max-old-space-size=4096 \
     npm run build
 
 FROM base AS prod-deps

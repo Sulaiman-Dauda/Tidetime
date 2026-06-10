@@ -94,14 +94,14 @@ Next.js build worker exited with code: null and signal: SIGABRT
 
 ### What it usually means
 
-The server doesn't have enough memory for `next build`, which peaks around 2 GB. This is the classic failure on 1 GB VPS instances with no swap. See [Server sizing](./DEPLOYMENT.md#server-sizing).
+The server doesn't have enough memory for `next build`, which peaks at ~3 GB (measured). This is the classic failure on VPS instances with less than ~5 GB of RAM + swap. See [Server sizing](./DEPLOYMENT.md#server-sizing).
 
 ### Fix
 
-Re-run `./install.sh` and answer **yes** when it offers to create a 2 GB swapfile — it detects low-RAM hosts automatically. Or create the swap yourself, then re-run:
+Re-run `./install.sh` and answer **yes** when it offers to create a swapfile — it checks RAM + swap against the ~5 GB the build needs and sizes the file to the gap automatically. Or create the swap yourself, then re-run:
 
 ```bash
-fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab   # persist across reboots
 ```
 

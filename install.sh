@@ -247,28 +247,35 @@ need_sudo() {  # must always return 0: a non-zero last command here would trip s
   if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
 }
 
-# `next build` needs ~2GB of memory; on a 1–2GB VPS with no swap it dies with
-# "JavaScript heap out of memory" (SIGABRT). Offer to add swap before building.
+# `next build` peaks at ~4GB of memory (it OOMs with SIGABRT even at a 2GB heap
+# cap). Make sure RAM + swap covers ~5GB before building; offer a swapfile
+# sized to the deficit. Swap-backed builds are slow but they finish.
 ensure_memory() {
   [ -r /proc/meminfo ] || return 0
-  local mem_kb swap_kb
+  local mem_kb swap_kb total_kb target_kb=$((5 * 1024 * 1024))
   mem_kb="$(awk '/^MemTotal/ {print $2}' /proc/meminfo)"
   swap_kb="$(awk '/^SwapTotal/ {print $2}' /proc/meminfo)"
-  if [ "${mem_kb:-0}" -ge 1900000 ] || [ "${swap_kb:-0}" -ge 1000000 ]; then return 0; fi
-  warn "This server has $((mem_kb / 1024))MB RAM and $((swap_kb / 1024))MB swap — the build WILL run out of memory."
-  if confirm "Add a 2GB swapfile (/swapfile) to keep the build afloat?"; then
+  total_kb=$((${mem_kb:-0} + ${swap_kb:-0}))
+  if [ "$total_kb" -ge "$target_kb" ]; then return 0; fi
+
+  local deficit_gb=$(((target_kb - total_kb + 1048575) / 1048576))
+  [ "$deficit_gb" -lt 2 ] && deficit_gb=2
+  [ "$deficit_gb" -gt 4 ] && deficit_gb=4
+  local swapfile="/swapfile"
+  [ -f "$swapfile" ] && swapfile="/swapfile2"   # don't touch an existing/active one
+
+  warn "This server has $((mem_kb / 1024))MB RAM + $((swap_kb / 1024))MB swap. The build needs ~5GB and WILL run out of memory."
+  if confirm "Add a ${deficit_gb}GB swapfile (${swapfile}) to keep the build afloat?"; then
     need_sudo
-    if [ ! -f /swapfile ]; then
-      ${SUDO} fallocate -l 2G /swapfile 2>/dev/null \
-        || ${SUDO} dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
-      ${SUDO} chmod 600 /swapfile
-      ${SUDO} mkswap /swapfile >/dev/null
+    ${SUDO} fallocate -l "${deficit_gb}G" "$swapfile" 2>/dev/null \
+      || ${SUDO} dd if=/dev/zero of="$swapfile" bs=1M count=$((deficit_gb * 1024)) status=none
+    ${SUDO} chmod 600 "$swapfile"
+    ${SUDO} mkswap "$swapfile" >/dev/null
+    ${SUDO} swapon "$swapfile" 2>/dev/null || true
+    if ! grep -q "^${swapfile} " /etc/fstab 2>/dev/null; then
+      echo "${swapfile} none swap sw 0 0" | ${SUDO} tee -a /etc/fstab >/dev/null
     fi
-    ${SUDO} swapon /swapfile 2>/dev/null || true
-    if ! grep -q '^/swapfile' /etc/fstab 2>/dev/null; then
-      echo '/swapfile none swap sw 0 0' | ${SUDO} tee -a /etc/fstab >/dev/null
-    fi
-    ok "2GB swap enabled (persists across reboots) — smoother sailing."
+    ok "${deficit_gb}GB swap enabled (persists across reboots) — smoother sailing."
   else
     warn "Proceeding without swap. If the build fails with 'heap out of memory', re-run and say yes."
   fi

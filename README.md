@@ -106,10 +106,10 @@ launches PostgreSQL + the app + the reminders worker with Docker Compose, runs
 migrations, waits until the app is healthy, and prints the URL to open. When it
 finishes, visit `/setup` to create your owner account.
 
-A **2 GB RAM / 25 GB disk** server is the comfortable minimum; a 1 GB instance
-works too — the installer offers to add swap so the build doesn't run out of
-memory. Full sizing guidance is in
-[Deployment → Server sizing](./docs/DEPLOYMENT.md#server-sizing).
+The first build needs ~5 GB of RAM + swap — on smaller servers (1–2 GB RAM)
+the installer detects this and offers to add a right-sized swapfile, so even
+a $5 instance works. A **25 GB disk** is the comfortable minimum. Full sizing
+guidance is in [Deployment → Server sizing](./docs/DEPLOYMENT.md#server-sizing).
 
 Re-running the script updates an existing install in place and preserves your
 generated secrets. Unattended installs can skip the prompts:
