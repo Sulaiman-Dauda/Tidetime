@@ -22,12 +22,16 @@ Minimum requirements:
 
 | Resource | Minimum | Recommended | Why |
 | --- | --- | --- | --- |
-| CPU | 1 vCPU | 2 vCPUs | The first install compiles the app inside Docker. Expect 10–20 minutes on 1 vCPU, roughly 5 on 2. Day-to-day load is light. |
-| RAM | 1 GB **+ swap** (the installer sizes it) | 4 GB | The first build peaks at ~3 GB (measured). On hosts where RAM + swap is under ~5 GB it crashes with "JavaScript heap out of memory" — the installer detects this and offers to create a swapfile sized to the gap (2–4 GB). With 4 GB+ of RAM, swap is optional. |
-| Disk | 25 GB SSD | 40 GB or more | OS + Docker + the Tidetime images and build cache use roughly 8–10 GB. The rest is headroom for the PostgreSQL volume, backups, and logs (container logs are capped at ~60 MB per service). |
-| OS | Any Linux that runs Docker | Ubuntu 22.04 / 24.04 LTS | The installer can install Docker itself via get.docker.com on any mainstream distribution. |
+The default install **pulls a prebuilt image** from GHCR — nothing is compiled on your server, so requirements are modest. Building from source (the installer's fallback, or `TIDETIME_BUILD=1`) is the demanding path.
 
-In practice: the **smallest tier at most cloud providers (1 vCPU / 1 GB, ~$5–6/mo)** works once swap is enabled — the installer handles that — but the swap-backed build will be slow. A **2 GB instance plus the installer's swapfile is the practical starting point**, and 4 GB builds without touching swap at all. Running Tidetime is much lighter than building it: the whole stack (app + worker + PostgreSQL) idles at roughly 500 MB of RAM, so there's no need to scale up after a successful install.
+| Resource | Minimum (prebuilt image, default) | If building from source | Why |
+| --- | --- | --- | --- |
+| CPU | 1 vCPU | 1 vCPU (2 recommended) | Pull-based installs barely touch the CPU. A source build compiles the app: 10–20 minutes on 1 vCPU, roughly 5 on 2. |
+| RAM | 1 GB | 1 GB + swap (the installer sizes it) | The running stack (app + worker + PostgreSQL) idles at ~500 MB. A source build peaks at ~3 GB (measured); the installer checks RAM + swap against the ~5 GB it needs and offers a right-sized swapfile (2–4 GB). 4 GB of RAM builds without swap. |
+| Disk | 15 GB SSD | 25 GB SSD | OS + Docker + the pulled images use roughly 6–8 GB. Source builds add a few GB of build cache. The rest is headroom for the PostgreSQL volume, backups, and logs (capped at ~60 MB per service). |
+| OS | Any Linux that runs Docker | same | The installer can install Docker itself via get.docker.com on any mainstream distribution. |
+
+In practice: the **smallest tier at most cloud providers (1 vCPU / 1 GB, ~$5–6/mo) runs Tidetime comfortably** with the default pull-based install — no swap tricks needed. You only need the bigger numbers if you deliberately build from source (e.g. a fork or an architecture without a published image).
 
 Optional but common additions, all configured **in the app** after first launch (not in `.env`):
 
@@ -43,7 +47,7 @@ This means you do not put SMTP or Stripe credentials in `.env`. You bring the ap
 
 ## Path A: One-command installer (recommended)
 
-`install.sh` lives at the repository root. It checks for Docker (and offers to install it on Linux), fetches the source, auto-generates a hardened `.env` (random `POSTGRES_PASSWORD`, a 64-char `AUTH_SECRET`, a `CRON_SECRET`, and `APP_PORT`), then builds and launches the full stack with Docker Compose. Database migrations run automatically inside the app container, and it waits until the app reports healthy.
+`install.sh` lives at the repository root. It checks for Docker (and offers to install it on Linux), fetches the source, auto-generates a hardened `.env` (random `POSTGRES_PASSWORD`, a 64-char `AUTH_SECRET`, a `CRON_SECRET`, and `APP_PORT`), then **pulls the prebuilt image from GHCR** (`ghcr.io/sulaiman-dauda/tidetime`, published by CI on every release) and launches the full stack with Docker Compose — no compiling on your server. If the pull fails (registry unreachable, a fork without published images, an architecture without one), it automatically falls back to building from source, offering to add swap first on small servers. Database migrations run automatically inside the app container, and it waits until the app reports healthy.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/tidetime/main/install.sh -o install.sh
@@ -54,8 +58,8 @@ chmod +x install.sh
 The installer:
 
 - Installs into `/opt/tidetime` (or `~/tidetime` if `/opt` is not writable), or installs in place if you run it from inside a checkout.
-- Generates secrets on first run and **preserves them on re-run** — re-running is the supported upgrade path.
-- Runs `docker compose -p tidetime -f docker-compose.prod.yml up -d --build`.
+- Generates secrets on first run and **preserves them on re-run** — re-running is the supported upgrade path (it pulls the newest image).
+- Runs `docker compose -p tidetime -f docker-compose.prod.yml pull` + `up -d --no-build` (or `up -d --build` in the source-build path).
 
 When it finishes, open the printed URL and go to **`/setup`** to create the owner account.
 
@@ -69,6 +73,8 @@ Override behavior with environment variables:
 | `TIDETIME_PORT` | `3000` | Host port to publish the app on. |
 | `TIDETIME_DIR` | `/opt/tidetime` or `~/tidetime` | Install directory. |
 | `TIDETIME_BRANCH` | `main` | Git branch to deploy. |
+| `TIDETIME_IMAGE` | `ghcr.io/sulaiman-dauda/tidetime:latest` | Prebuilt image to pull — point it at a pinned version tag or a fork's registry. |
+| `TIDETIME_BUILD` | unset | Set to `1` to skip the prebuilt image and compile from source on the server. |
 | `TIDETIME_YES` | unset | Set to `1` to assume "yes" to all prompts (non-interactive). |
 
 Example, fully unattended:
@@ -301,7 +307,7 @@ If you run the manual Node path instead, put the app behind a process manager th
 
 ## Upgrades
 
-- **Installer / Docker path:** re-run `./install.sh` (it preserves your secrets), or pull the new source and run `docker compose -p tidetime -f docker-compose.prod.yml up -d --build`. Migrations run automatically on app start.
+- **Installer / Docker path:** re-run `./install.sh` (it preserves your secrets and pulls the newest image), or do it manually: `docker compose -p tidetime -f docker-compose.prod.yml pull && docker compose -p tidetime -f docker-compose.prod.yml up -d --no-build`. Migrations run automatically on app start.
 - **Manual Node path:**
   1. Review the changelog and release notes.
   2. Pull the new version.

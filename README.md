@@ -101,15 +101,17 @@ chmod +x install.sh
 ./install.sh
 ```
 
-That's it — no `.env` editing. The installer generates secure secrets, builds and
-launches PostgreSQL + the app + the reminders worker with Docker Compose, runs
-migrations, waits until the app is healthy, and prints the URL to open. When it
-finishes, visit `/setup` to create your owner account.
+That's it — no `.env` editing. The installer generates secure secrets, **pulls a
+prebuilt image** (nothing compiles on your server), launches PostgreSQL + the
+app + the reminders worker with Docker Compose, runs migrations, waits until
+the app is healthy, and prints the URL to open. When it finishes, visit
+`/setup` to create your owner account.
 
-The first build needs ~5 GB of RAM + swap — on smaller servers (1–2 GB RAM)
-the installer detects this and offers to add a right-sized swapfile, so even
-a $5 instance works. A **25 GB disk** is the comfortable minimum. Full sizing
-guidance is in [Deployment → Server sizing](./docs/DEPLOYMENT.md#server-sizing).
+Because the image is prebuilt, **a 1 GB RAM / 15 GB disk VPS — the cheapest
+tier at most providers — is enough**. If the image can't be pulled (forks,
+unusual architectures), the installer falls back to building from source and
+offers to add the swap that needs. Full sizing guidance is in
+[Deployment → Server sizing](./docs/DEPLOYMENT.md#server-sizing).
 
 Re-running the script updates an existing install in place and preserves your
 generated secrets. Unattended installs can skip the prompts:
@@ -124,6 +126,8 @@ TIDETIME_URL=https://book.example.com TIDETIME_YES=1 ./install.sh
 | `TIDETIME_PORT` | Host port to expose (default `3000`) |
 | `TIDETIME_DIR` | Install directory (default `/opt/tidetime` or `~/tidetime`) |
 | `TIDETIME_BRANCH` | Git branch to deploy (default `main`) |
+| `TIDETIME_IMAGE` | Prebuilt image to pull (default `ghcr.io/sulaiman-dauda/tidetime:latest`) |
+| `TIDETIME_BUILD` | Set to `1` to build from source instead of pulling |
 | `TIDETIME_YES` | Assume "yes" to all prompts |
 
 > Once you have a domain, point it at the server, put a reverse proxy

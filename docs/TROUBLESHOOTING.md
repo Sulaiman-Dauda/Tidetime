@@ -96,6 +96,8 @@ Next.js build worker exited with code: null and signal: SIGABRT
 
 The server doesn't have enough memory for `next build`, which peaks at ~3 GB (measured). This is the classic failure on VPS instances with less than ~5 GB of RAM + swap. See [Server sizing](./DEPLOYMENT.md#server-sizing).
 
+Note this only applies when **building from source** — the installer's default path pulls a prebuilt image and never compiles anything. If you hit this, first ask why the prebuilt pull didn't happen (check `/tmp/tidetime-pull.log`); pulling is usually the better fix than swapping your way through a build.
+
 ### Fix
 
 Re-run `./install.sh` and answer **yes** when it offers to create a swapfile — it checks RAM + swap against the ~5 GB the build needs and sizes the file to the gap automatically. Or create the swap yourself, then re-run:

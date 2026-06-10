@@ -25,7 +25,13 @@ services:
       retries: 10
       start_period: 15s
 
+  # Both `image:` and `build:` are set on purpose: `docker compose pull` grabs
+  # the prebuilt image from GHCR (the fast path used by install.sh), while
+  # `docker compose up --build` still compiles from source — for forks, other
+  # architectures, or servers without registry access. Override the image with
+  # TIDETIME_IMAGE (e.g. a fork's registry or a pinned version tag).
   app:
+    image: ${TIDETIME_IMAGE:-ghcr.io/sulaiman-dauda/tidetime:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -56,6 +62,7 @@ services:
       - "${APP_PORT:-3000}:3100"
 
   reminders:
+    image: ${TIDETIME_IMAGE:-ghcr.io/sulaiman-dauda/tidetime:latest}
     build:
       context: .
       dockerfile: Dockerfile

@@ -14,7 +14,10 @@
 #   1. Checks for Docker (and offers to install it on Linux).
 #   2. Fetches the Tidetime source from GitHub (or uses the local checkout).
 #   3. Generates a hardened .env: random DB password + 64-char AUTH_SECRET + CRON_SECRET.
-#   4. Builds and launches Postgres + the app + the reminders worker via Docker Compose.
+#   4. Pulls the prebuilt image from GHCR (fast, works on 1GB servers) and starts
+#      Postgres + the app + the reminders worker via Docker Compose. If the pull
+#      fails (no registry access, unsupported architecture, a fork), it falls
+#      back to building from source — adding swap first if the server is small.
 #   5. Runs database migrations automatically and waits until the app is healthy.
 #
 # Re-running is safe: existing secrets in .env are preserved, never regenerated.
@@ -24,6 +27,8 @@
 #   TIDETIME_URL=https://book.me   public URL (else http://<server-ip>:<port>)
 #   TIDETIME_PORT=3000             host port to expose
 #   TIDETIME_BRANCH=main           git branch to deploy
+#   TIDETIME_IMAGE=ghcr.io/...     prebuilt image to pull (default: official latest)
+#   TIDETIME_BUILD=1               skip the prebuilt image, build from source
 #   TIDETIME_YES=1                 assume "yes" to all prompts (non-interactive)
 #
 set -euo pipefail
@@ -322,8 +327,6 @@ preflight() {
   ok "Docker Compose detected: ${DC}"
 
   command -v git >/dev/null 2>&1 || die "git is required. Please install it and re-run."
-
-  ensure_memory
 }
 DOCKER_SUDO=""
 
@@ -430,14 +433,34 @@ EOF
 # ──────────────────────────────────────────────────────────────────────────────
 #  4. Build + launch
 # ──────────────────────────────────────────────────────────────────────────────
+# $DOCKER_SUDO and $DC are intentionally unquoted so they word-split into args
+# ("docker compose" → two tokens).
+dc() { ${DOCKER_SUDO} $DC -p "$PROJECT" -f "$DIR/$COMPOSE_FILE" --project-directory "$DIR" "$@"; }
+
+build_from_source() {
+  ensure_memory
+  info "Compiling the app on this server — grab a coffee. ☕"
+  voyage_run "Building & launching Tidetime" /tmp/tidetime-build.log docker -- \
+    dc up -d --build \
+    || { err "Build/launch failed. Last 40 lines:"; tail -n 40 /tmp/tidetime-build.log; exit 1; }
+}
+
 launch() {
   printf "\n"
-  info "Building images and starting the stack. First build pulls Node + compiles the app — grab a coffee. ☕"
-  # $DOCKER_SUDO and $DC are intentionally unquoted so they word-split into args
-  # ("docker compose" → two tokens). voyage_run execs the result directly.
-  voyage_run "Building & launching Tidetime" /tmp/tidetime-build.log docker -- \
-    ${DOCKER_SUDO} $DC -p "$PROJECT" -f "$DIR/$COMPOSE_FILE" --project-directory "$DIR" up -d --build \
-    || { err "Build/launch failed. Last 40 lines:"; tail -n 40 /tmp/tidetime-build.log; exit 1; }
+  if [ "${TIDETIME_BUILD:-0}" = "1" ]; then
+    info "TIDETIME_BUILD=1 — building from source instead of pulling the prebuilt image."
+    build_from_source
+  else
+    info "Pulling the prebuilt Tidetime image — nothing gets compiled on this server."
+    if voyage_run "Pulling prebuilt images" /tmp/tidetime-pull.log none -- dc pull; then
+      voyage_run "Starting the stack" /tmp/tidetime-up.log none -- dc up -d --no-build \
+        || { err "Startup failed. Last 40 lines:"; tail -n 40 /tmp/tidetime-up.log; exit 1; }
+    else
+      warn "Couldn't pull the prebuilt image (registry unreachable, or no image for this architecture yet)."
+      info "No problem — falling back to building from source."
+      build_from_source
+    fi
+  fi
   ok "Containers are up."
 }
 
