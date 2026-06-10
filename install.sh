@@ -89,7 +89,7 @@ wave_run() {
   fi
 
   "$@" >"$logfile" 2>&1 &
-  local pid=$! f=0 nframes=${#WAVE_FRAMES[@]} start now elapsed
+  local pid=$! f=0 nframes=${#WAVE_FRAMES[@]} start now elapsed=0
   start=$(date +%s)
   printf '\e[?25l'  # hide cursor
   while kill -0 "$pid" 2>/dev/null; do
@@ -176,7 +176,9 @@ resolve_compose() {
 }
 
 SUDO=""
-need_sudo() { [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"; }
+need_sudo() {  # must always return 0: a non-zero last command here would trip set -e
+  if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  1. Preflight — Docker + git
