@@ -18,7 +18,11 @@ function buildCsp({ frameAncestors }: { frameAncestors?: string }): string {
     "worker-src 'self' blob:",
     "frame-src 'self'",
     ...(frameAncestors ? [`frame-ancestors ${frameAncestors}`] : []),
-    ...(isProd ? ["upgrade-insecure-requests"] : []),
+    // No upgrade-insecure-requests: headers are baked into the prebuilt image,
+    // which must also serve plain-HTTP installs (fresh VPS, no domain yet) —
+    // the directive makes browsers rewrite every asset fetch to https://,
+    // breaking all CSS/JS there. On HTTPS deployments assets are same-origin
+    // and already https, so the directive adds nothing; HSTS covers downgrade.
   ];
 
   return directives.join("; ");
@@ -37,7 +41,7 @@ const baseSecurityHeaders = [
   { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+    value: "camera=(), microphone=(), geolocation=()",
   },
   ...(isProd
     ? [
