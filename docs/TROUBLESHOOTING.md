@@ -83,6 +83,30 @@ The bundled Compose files mount the Postgres volume at `/var/lib/postgresql`, **
 
 This is **intentional and safe**. `AUTH_SECRET` is a runtime-only secret and is skipped during `next build`; `APP_URL` and `DATABASE_URL` use throwaway placeholders for the build. This keeps real secrets out of image layers. The real values are read at runtime from `.env`.
 
+## Problem: build fails with "JavaScript heap out of memory" (SIGABRT)
+
+The build log ends with something like:
+
+```text
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+Next.js build worker exited with code: null and signal: SIGABRT
+```
+
+### What it usually means
+
+The server doesn't have enough memory for `next build`, which peaks around 2 GB. This is the classic failure on 1 GB VPS instances with no swap. See [Server sizing](./DEPLOYMENT.md#server-sizing).
+
+### Fix
+
+Re-run `./install.sh` and answer **yes** when it offers to create a 2 GB swapfile — it detects low-RAM hosts automatically. Or create the swap yourself, then re-run:
+
+```bash
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab   # persist across reboots
+```
+
+The build will be slower on swap but will complete. Once installed, the running stack only needs ~500 MB, so the small server is fine afterwards.
+
 ## Problem: database query errors or missing columns
 
 Examples:
