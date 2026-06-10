@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { respondToRsvp } from "@/server/rsvp";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ uid:
   const token = sp.get("t") ?? "";
 
   const res = await respondToRsvp(uid, email, status, token);
-  const dest = new URL(`/booking/${uid}`, env.appUrl);
+  const dest = new URL(`/booking/${uid}`, await getAppUrl());
   if (res.ok) dest.searchParams.set("rsvp", res.status!);
   else dest.searchParams.set("rsvp_error", "1");
   return NextResponse.redirect(dest, { status: 303 });

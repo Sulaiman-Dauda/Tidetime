@@ -3,13 +3,14 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { attendees, bookings } from "@/db/schema";
 import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { isRsvpStatus, rsvpToken, verifyRsvpToken, type RsvpStatus } from "@/lib/rsvp";
 import { logBookingActivity } from "./activity";
 
 /** Signed Accept / Decline / Tentative links for a booking's attendee email. */
-export function buildRsvpLinks(uid: string, email: string) {
+export async function buildRsvpLinks(uid: string, email: string) {
   const token = rsvpToken(uid, email, env.authSecret);
-  const base = `${env.appUrl}/booking/${uid}/rsvp`;
+  const base = `${await getAppUrl()}/booking/${uid}/rsvp`;
   const mk = (status: RsvpStatus) =>
     `${base}?status=${status}&email=${encodeURIComponent(email)}&t=${token}`;
   return { accept: mk("accepted"), decline: mk("declined"), tentative: mk("tentative") };

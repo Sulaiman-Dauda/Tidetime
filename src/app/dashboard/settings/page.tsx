@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanySettings } from "@/server/company-settings";
+import { getCustomDomain } from "@/server/app-url";
 import { getFeatureFlags } from "@/server/feature-flags";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
   // Settings is the company-wide admin hub. Personal preferences live in /dashboard/account.
   if (!user.isAdmin) redirect("/dashboard/account");
 
-  const [settings, keys, features] = await Promise.all([
+  const [settings, keys, features, customDomain] = await Promise.all([
     getCompanySettings(),
     db
       .select({ id: apiKeys.id, note: apiKeys.note, lastUsedAt: apiKeys.lastUsedAt, createdAt: apiKeys.createdAt })
@@ -25,6 +26,7 @@ export default async function SettingsPage() {
       .where(eq(apiKeys.userId, user.id))
       .orderBy(desc(apiKeys.createdAt)),
     getFeatureFlags(),
+    getCustomDomain(),
   ]);
 
   return (
@@ -41,6 +43,7 @@ export default async function SettingsPage() {
           reviewThreshold: user.reviewThreshold,
         }}
         apiKeys={keys}
+        customDomain={customDomain}
       />
       <FeatureFlagsCard flags={features} />
     </div>

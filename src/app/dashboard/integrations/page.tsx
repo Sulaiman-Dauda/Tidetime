@@ -4,7 +4,7 @@ import { getAppStatuses } from "@/app-store/registry";
 import { getCredentialStatuses } from "@/server/integration-credentials";
 import { getLicenseInfo } from "@/server/license";
 import { getFeatureFlags } from "@/server/feature-flags";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { IntegrationsHub } from "./integrations-hub";
 
@@ -19,6 +19,7 @@ export default async function IntegrationsPage() {
     getLicenseInfo(),
     getFeatureFlags(),
   ]);
+  const appUrl = await getAppUrl();
 
   const isAdmin = Boolean(user?.isAdmin) || role === "owner" || role === "admin";
   // CRM is a business feature: only surface its cards once the instance opts in.
@@ -31,7 +32,7 @@ export default async function IntegrationsPage() {
         description="Connect Tidetime to your calendar, video, CRM, payments and email. Staff connect their own accounts in one click; an admin sets up provider credentials once under Setup."
       />
       <IntegrationsHub
-        appUrl={env.appUrl}
+        appUrl={appUrl}
         video={statuses.filter((a) => a.category === "video")}
         crm={crm}
         credentialStatuses={credentialStatuses}

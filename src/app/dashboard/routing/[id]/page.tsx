@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getRoutingForm, listRoutableEventTypes } from "@/server/routing-forms";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { RoutingFormEditor } from "./editor";
 
 export const metadata = { title: "Edit routing form" };
@@ -18,9 +18,11 @@ export default async function RoutingFormEditPage({ params }: { params: Promise<
   ]);
   if (!form) notFound();
 
+  const appUrl = await getAppUrl();
+
   return (
     <RoutingFormEditor
-      appUrl={env.appUrl}
+      appUrl={appUrl}
       form={{
         id: form.id,
         name: form.name,

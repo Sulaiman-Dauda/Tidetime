@@ -17,7 +17,7 @@ import {
 } from "@/lib/reviews";
 import { sendMail } from "./mailer";
 import { logBookingActivity } from "./activity";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 export interface ReviewContext {
   booking: { id: number; uid: string; title: string; endTime: Date; status: string };
@@ -220,7 +220,7 @@ export async function sendReviewRequests(now: Date = new Date()): Promise<Review
       .limit(1);
     try {
       if (primary) {
-        const url = `${env.appUrl}/booking/${b.uid}/review`;
+        const url = `${await getAppUrl()}/booking/${b.uid}/review`;
         await sendMail({
           to: primary.email,
           subject: `How was ${b.title}?`,

@@ -522,7 +522,8 @@ ART
   printf "          %supdate%s   re-run this installer\n\n" "$BOLD" "$RESET"
 
   if [ "$APP_URL_FINAL" != "${APP_URL_FINAL#http://}" ]; then
-    warn "You're on plain HTTP. When your domain is ready, point it here, set APP_URL to the https:// URL, put a reverse proxy (Caddy/Traefik/Nginx) in front, and re-run."
+    printf "        %sCustom domain%s   %spoint your domain's A record at this server's IP, then save it in%s\n" "$DIM" "$RESET" "$WHITE" "$RESET"
+    printf "                        %sSettings → Brand → Custom domain. HTTPS activates automatically — no certs, no restarts.%s\n" "$WHITE" "$RESET"
   fi
   printf "        %sCalm seas. ⚓%s\n\n" "$DIM" "$RESET"
 }

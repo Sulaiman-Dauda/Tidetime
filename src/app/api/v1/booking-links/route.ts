@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticateApiKey, unauthorized, jsonError } from "@/server/api-auth";
 import { createBookingLink, userOwnsEventType } from "@/server/booking-links";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json(
-    { data: { token, url: `${env.appUrl}/i/${token}` } },
+    { data: { token, url: `${await getAppUrl()}/i/${token}` } },
     { status: 201 },
   );
 }

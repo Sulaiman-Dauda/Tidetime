@@ -9,7 +9,7 @@ import {
   users,
 } from "@/db/schema";
 import { generateIcs, bookingIcalUid } from "@/lib/ics";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { sendMail } from "./mailer";
 import {
   bookingConfirmedAttendee,
@@ -138,11 +138,12 @@ async function silentlyCancelSupersededBooking(uid: string): Promise<void> {
   await db.delete(bookingReferences).where(eq(bookingReferences.bookingId, original.id));
 }
 
-function buildEmailView(ctx: LoadedBookingContext): EmailBookingView | null {
+async function buildEmailView(ctx: LoadedBookingContext): Promise<EmailBookingView | null> {
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
   if (!primary) return null;
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
   const title = ctx.eventType?.title ?? ctx.booking.title;
+  const appUrl = await getAppUrl();
   return {
     title,
     start: ctx.booking.startTime,
@@ -153,14 +154,15 @@ function buildEmailView(ctx: LoadedBookingContext): EmailBookingView | null {
     location: ctx.booking.location ?? "Online",
     meetingUrl: ctx.booking.meetingUrl,
     description: ctx.booking.description,
-    manageUrl: `${env.appUrl}/booking/${ctx.booking.uid}`,
+    manageUrl: `${appUrl}/booking/${ctx.booking.uid}`,
     hour12: true,
   };
 }
 
-function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: string): EmailBookingView {
+async function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: string): Promise<EmailBookingView> {
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
   const title = ctx.eventType?.title ?? ctx.booking.title;
+  const appUrl = await getAppUrl();
   return {
     title,
     start: ctx.booking.startTime,
@@ -171,7 +173,7 @@ function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: string): Em
     location: ctx.booking.location ?? "Online",
     meetingUrl: ctx.booking.meetingUrl,
     description: ctx.booking.description,
-    manageUrl: `${env.appUrl}/booking/${ctx.booking.uid}`,
+    manageUrl: `${appUrl}/booking/${ctx.booking.uid}`,
     hour12: (ctx.host?.timeFormat ?? 12) === 12,
   };
 }
@@ -225,11 +227,11 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
   }
 
   // Build email views AFTER conferencing so the link is included.
-  const attendeeView = buildEmailView(ctx);
+  const attendeeView = await buildEmailView(ctx);
   if (!attendeeView) return;
   // Signed RSVP links let the attendee answer Accept / Decline / Tentative right
   // from the confirmation email; the reply lands on their attendee record.
-  attendeeView.rsvp = buildRsvpLinks(ctx.booking.uid, primary.email);
+  attendeeView.rsvp = await buildRsvpLinks(ctx.booking.uid, primary.email);
 
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
   const title = ctx.eventType?.title ?? ctx.booking.title;
@@ -268,7 +270,7 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
   );
 
   if (ctx.host) {
-    const hostMessage = await bookingConfirmedHost(buildHostEmailView(ctx, primary.name));
+    const hostMessage = await bookingConfirmedHost(await buildHostEmailView(ctx, primary.name));
     tasks.push(
       sendMail({
         to: ctx.host.email,
@@ -402,7 +404,7 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
 
   const tasks: Promise<unknown>[] = [];
 
-  const view = buildEmailView(ctx);
+  const view = await buildEmailView(ctx);
   if (view) {
     const msg = await bookingRescheduledAttendee(view);
     tasks.push(
@@ -524,7 +526,7 @@ export async function runPendingApprovalEffects(bookingId: number): Promise<void
   if (!ctx || ctx.booking.status !== "pending") return;
 
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
-  const attendeeView = buildEmailView(ctx);
+  const attendeeView = await buildEmailView(ctx);
   if (!primary || !attendeeView) return;
 
   const tasks: Promise<unknown>[] = [];
@@ -538,7 +540,7 @@ export async function runPendingApprovalEffects(bookingId: number): Promise<void
   );
 
   if (ctx.host) {
-    const hostMessage = await bookingConfirmedHost(buildHostEmailView(ctx, primary.name));
+    const hostMessage = await bookingConfirmedHost(await buildHostEmailView(ctx, primary.name));
     tasks.push(
       sendMail({
         to: ctx.host.email,

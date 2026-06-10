@@ -1,5 +1,5 @@
 import "server-only";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { getZoomCreds } from "@/server/integration-credentials";
 import type { AppDefinition, VideoApp } from "../types";
 import { appMeta } from "../types";
@@ -37,8 +37,8 @@ async function isConfigured(): Promise<boolean> {
   return (await clientCreds()) !== null;
 }
 
-function redirectUri(): string {
-  return `${env.appUrl}/api/apps/zoom_video/callback`;
+async function redirectUri(): Promise<string> {
+  return `${await getAppUrl()}/api/apps/zoom_video/callback`;
 }
 
 async function getInstallUrl(state: string): Promise<string> {
@@ -47,7 +47,7 @@ async function getInstallUrl(state: string): Promise<string> {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: creds.clientId,
-    redirect_uri: redirectUri(),
+    redirect_uri: await redirectUri(),
     state,
   });
   return `${AUTH_BASE}/authorize?${params.toString()}`;
@@ -70,7 +70,7 @@ export async function exchangeZoomCode(code: string, userId: number): Promise<vo
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: redirectUri(),
+      redirect_uri: await redirectUri(),
     }),
   });
   if (!res.ok) throw new Error(`Zoom token exchange failed (${res.status})`);

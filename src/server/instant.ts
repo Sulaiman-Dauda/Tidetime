@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, bookingReferences, users } from "@/db/schema";
 import { shortId } from "@/lib/crypto";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { provisionAnyVideoMeeting } from "@/app-store/conferencing";
 import { logBookingActivity } from "./activity";
 
@@ -82,6 +82,6 @@ export async function createInstantMeeting(
     ok: true,
     uid,
     joinUrl: provisioned.meeting.url,
-    shareUrl: `${env.appUrl}/meet/${uid}`,
+    shareUrl: `${await getAppUrl()}/meet/${uid}`,
   };
 }

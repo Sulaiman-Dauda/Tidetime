@@ -13,7 +13,7 @@ import { t } from "@/lib/i18n";
 import { sendMail } from "./mailer";
 import { logBookingActivity } from "./activity";
 import { formatRange } from "@/lib/format";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 /**
  * Materialise reminder jobs for a freshly-created booking from the host's
@@ -103,7 +103,7 @@ export async function processDueReminders(now: Date = new Date()): Promise<Remin
     try {
       const recipients = await resolveRecipients(reminder.action, booking.id, booking.userId);
       const when = formatRange(booking.startTime, booking.endTime, recipients.timeZone, true);
-      const html = reminderHtml(booking.title, when, recipients.timeZone, `${env.appUrl}/booking/${booking.uid}`);
+      const html = reminderHtml(booking.title, when, recipients.timeZone, `${await getAppUrl()}/booking/${booking.uid}`);
       const subject = `${t(recipients.locale, "email.reminderSubject")} — ${booking.title}`;
       for (const to of recipients.emails) {
         await sendMail({ to, subject, html });

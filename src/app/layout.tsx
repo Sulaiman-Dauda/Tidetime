@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import "./globals.css";
 
 const clashDisplay = localFont({
@@ -33,20 +34,22 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", displ
 const description =
   "Tidetime is a fast, elegant, open-source scheduling platform. Share your link, let people book — no back-and-forth.";
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  const appUrl = await getAppUrl();
+  return {
   applicationName: env.appName,
   title: {
     default: `${env.appName} — Scheduling, perfected`,
     template: `%s · ${env.appName}`,
   },
   description,
-  metadataBase: new URL(env.appUrl),
+  metadataBase: new URL(appUrl),
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
-    url: env.appUrl,
+    url: appUrl,
     siteName: env.appName,
     title: `${env.appName} — Scheduling, perfected`,
     description,
@@ -59,7 +62,8 @@ export const metadata: Metadata = {
   icons: {
     icon: "/icon.svg",
   },
-};
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

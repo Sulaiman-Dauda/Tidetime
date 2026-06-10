@@ -8,7 +8,7 @@ import {
   revokeBookingLink,
   userOwnsEventType,
 } from "@/server/booking-links";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 const createSchema = z.object({
   eventTypeId: z.coerce.number().int().positive(),
@@ -64,7 +64,7 @@ export async function createLinkAction(
   });
 
   revalidatePath("/dashboard/links");
-  return { ok: true, url: `${env.appUrl}/i/${token}` };
+  return { ok: true, url: `${await getAppUrl()}/i/${token}` };
 }
 
 export async function revokeLinkAction(formData: FormData): Promise<void> {

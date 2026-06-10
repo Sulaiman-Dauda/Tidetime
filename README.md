@@ -130,9 +130,10 @@ TIDETIME_URL=https://book.example.com TIDETIME_YES=1 ./install.sh
 | `TIDETIME_BUILD` | Set to `1` to build from source instead of pulling |
 | `TIDETIME_YES` | Assume "yes" to all prompts |
 
-> Once you have a domain, point it at the server, put a reverse proxy
-> (Caddy/Traefik/Nginx) in front for HTTPS, set `TIDETIME_URL` to the `https://`
-> address, and re-run the installer.
+> Once you have a domain, point its DNS A record at the server and save it in
+> **Settings → Brand → Custom domain**. HTTPS activates automatically with a
+> free auto-renewing certificate — no reverse proxy setup, no restarts. See
+> [Custom domain and HTTPS](./docs/DEPLOYMENT.md#custom-domain-and-https).
 
 ## Quick start for self-hosting
 

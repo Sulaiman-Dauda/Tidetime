@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getPollForOwner } from "@/server/polls";
 import { rankOptions, type PollChoice } from "@/lib/polls";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { PollResults } from "./results";
 
 export const metadata = { title: "Poll results" };
@@ -26,10 +26,11 @@ export default async function PollResultsPage({ params }: { params: Promise<{ id
 
   // Distinct voters for a quick participation stat.
   const voters = new Set(data.votes.map((v) => v.voterEmail));
+  const appUrl = await getAppUrl();
 
   return (
     <PollResults
-      appUrl={env.appUrl}
+      appUrl={appUrl}
       poll={{
         id: data.poll.id,
         token: data.poll.token,

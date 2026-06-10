@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { credentials, selectedCalendars, destinationCalendars } from "@/db/schema";
 import { encrypt, decrypt, hmacSign } from "@/lib/crypto";
 import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { getGoogleCreds } from "./integration-credentials";
 
 /* -------------------------------------------------------------------------- */
@@ -27,7 +28,7 @@ async function getOAuthClient() {
   return new google.auth.OAuth2(
     creds.clientId,
     creds.clientSecret,
-    `${env.appUrl}/api/google-calendar/callback`,
+    `${await getAppUrl()}/api/google-calendar/callback`,
   );
 }
 

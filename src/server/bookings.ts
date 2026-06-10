@@ -32,7 +32,7 @@ import { validateResponses as validateFieldResponses, type FieldValues } from "@
 import { normalizeRecurringRule, expandRecurrence } from "@/lib/recurrence";
 import { logBookingActivity } from "./activity";
 import { upsertCustomerFromBooking } from "./customers";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { isValidTimeZone, formatDateKey, addDaysToKey, zonedTimeToUtc } from "@/lib/time";
 import {
   runAcceptedBookingEffects,
@@ -93,7 +93,7 @@ function validateResponses(fields: BookingField[], responses: Record<string, unk
   return first ?? null;
 }
 
-function buildEmailView(args: {
+async function buildEmailView(args: {
   eventType: ResolvedEventType;
   hostName: string;
   attendeeName: string;
@@ -105,7 +105,8 @@ function buildEmailView(args: {
   notes?: string | null;
   uid: string;
   hour12: boolean;
-}): EmailBookingView {
+}): Promise<EmailBookingView> {
+  const appUrl = await getAppUrl();
   return {
     title: args.eventType.title,
     start: args.start,
@@ -116,7 +117,7 @@ function buildEmailView(args: {
     location: args.location,
     meetingUrl: args.meetingUrl,
     description: args.notes,
-    manageUrl: `${env.appUrl}/booking/${args.uid}`,
+    manageUrl: `${appUrl}/booking/${args.uid}`,
     hour12: args.hour12,
   };
 }
@@ -590,7 +591,7 @@ async function createRecurringSeries(args: {
     .limit(1);
   const hour12 = (hostUser?.timeFormat ?? 12) === 12;
   const seriesDates = created.map((r) => r.start);
-  const baseView = buildEmailView({
+  const baseView = await buildEmailView({
     eventType,
     hostName,
     attendeeName: input.name,
@@ -608,7 +609,7 @@ async function createRecurringSeries(args: {
   const a = await bookingSeriesConfirmedAttendee(baseView, seriesDates, input.timeZone, true, status);
   tasks.push(sendMail({ to: input.email, subject: a.subject, html: a.html }));
   if (hostUser) {
-    const hostView = buildEmailView({
+    const hostView = await buildEmailView({
       eventType,
       hostName,
       attendeeName: input.name,
@@ -740,7 +741,7 @@ export async function cancelBooking(
       attendeeName: primary.name,
       location: b.location ?? "Online",
       meetingUrl: b.meetingUrl,
-      manageUrl: `${env.appUrl}/booking/${uid}`,
+      manageUrl: `${await getAppUrl()}/booking/${uid}`,
     };
     const m = await bookingCancelledAttendee(view, reason);
     // Attach a CANCEL .ics (stable chain UID + bumped SEQUENCE) so the meeting

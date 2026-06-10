@@ -15,6 +15,7 @@ import {
   Column,
 } from "@react-email/components";
 import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 /**
  * React Email templates — a maintainable, component-based replacement for the
@@ -41,7 +42,8 @@ const styles = {
   list: { margin: "0 0 20px", paddingLeft: "18px", color: "#0f172a", fontSize: "14px" } as const,
 };
 
-function Shell({ preview, children }: { preview: string; children: React.ReactNode }) {
+async function Shell({ preview, children }: { preview: string; children: React.ReactNode }) {
+  const appUrl = await getAppUrl();
   return (
     <Html>
       <Head />
@@ -54,8 +56,8 @@ function Shell({ preview, children }: { preview: string; children: React.ReactNo
           <Section style={styles.content}>{children}</Section>
           <Section style={styles.footer}>
             Sent by {env.appName} ·{" "}
-            <Link href={env.appUrl} style={{ color: "#94a3b8" }}>
-              {env.appUrl.replace(/^https?:\/\//, "")}
+            <Link href={appUrl} style={{ color: "#94a3b8" }}>
+              {appUrl.replace(/^https?:\/\//, "")}
             </Link>
           </Section>
         </Container>

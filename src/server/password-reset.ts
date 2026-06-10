@@ -5,7 +5,7 @@ import { users, verificationTokens, sessions } from "@/db/schema";
 import { randomToken, sha256, hashPassword } from "@/lib/crypto";
 import { sendMail } from "./mailer";
 import { passwordResetEmail } from "./emails";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
 const PURPOSE = "password_reset";
 const TTL_MS = 1000 * 60 * 30; // 30 minutes
@@ -38,7 +38,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
     expiresAt: new Date(Date.now() + TTL_MS),
   });
 
-  const resetUrl = `${env.appUrl}/reset-password?token=${token}`;
+  const resetUrl = `${await getAppUrl()}/reset-password?token=${token}`;
   const mail = await passwordResetEmail(resetUrl, RESET_TTL_MINUTES);
   await sendMail({ to: user.email, subject: mail.subject, html: mail.html });
 }

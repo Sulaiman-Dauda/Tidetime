@@ -21,6 +21,11 @@ import {
   updateCompanyBookingAction,
   type CompanySettingsState,
 } from "./company-actions";
+import {
+  checkCustomDomainAction,
+  updateCustomDomainAction,
+  type DomainState,
+} from "./domain-actions";
 
 function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
@@ -72,10 +77,12 @@ export function SettingsHub({
   settings,
   review,
   apiKeys,
+  customDomain,
 }: {
   settings: CompanySettings;
   review: ReviewSettingsView;
   apiKeys: ApiKeyRow[];
+  customDomain: string | null;
 }) {
   return (
     <Tabs defaultValue="general" className="space-y-6">
@@ -87,8 +94,9 @@ export function SettingsHub({
         <TabsTrigger value="legal">Legal</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="general">
+      <TabsContent value="general" className="space-y-6">
         <GeneralSection profile={settings.profile} />
+        <DomainSection customDomain={customDomain} />
       </TabsContent>
       <TabsContent value="booking">
         <BookingSection booking={settings.booking} />
@@ -199,6 +207,105 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
           </div>
         </Field>
         <SaveButton />
+      </form>
+    </Card>
+  );
+}
+
+/* --------------------------------- Domain --------------------------------- */
+
+function DomainSection({ customDomain }: { customDomain: string | null }) {
+  const [state, action] = useActionState<DomainState, FormData>(updateCustomDomainAction, null);
+  const [checking, setChecking] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<boolean | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (state?.ok) {
+      setLiveStatus(null);
+      toast({
+        title: state.domain ? "Domain saved" : "Domain removed",
+        description: state.domain
+          ? `Point your DNS A record at this server, then use "Check status" to activate HTTPS.`
+          : "The instance is back on its install address.",
+      });
+    }
+    if (state?.error) {
+      toast({ title: "Couldn't save domain", description: state.error, variant: "destructive" });
+    }
+  }, [state, toast]);
+
+  async function checkStatus() {
+    setChecking(true);
+    try {
+      const result = await checkCustomDomainAction();
+      if (result?.error) {
+        toast({ title: "Couldn't check domain", description: result.error, variant: "destructive" });
+      } else {
+        setLiveStatus(result?.live ?? false);
+        toast(
+          result?.live
+            ? {
+                title: "Your domain is live",
+                description: `https://${result.domain} is serving Tidetime with a valid certificate.`,
+              }
+            : {
+                title: "Not reachable yet",
+                description:
+                  "DNS may still be propagating. Confirm the A record points at this server and try again in a few minutes.",
+                variant: "destructive",
+              },
+        );
+      }
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  const saved = state?.ok ? state.domain ?? null : customDomain;
+
+  return (
+    <Card className="p-6">
+      <form action={action} className="space-y-5">
+        <div>
+          <h2 className="text-sm font-semibold">Custom domain</h2>
+          <p className="text-xs text-muted-foreground">
+            Serve Tidetime from your own domain over HTTPS. The certificate is obtained and renewed
+            automatically — no certificate files or server changes needed.
+          </p>
+        </div>
+        <Field
+          label="Domain"
+          htmlFor="domain"
+          hint={
+            <>
+              1. Create a DNS A record for the domain pointing at this server&apos;s IP.&nbsp;
+              2. Save, then use &quot;Check status&quot;. Booking links, emails, and calendar
+              redirects switch to the domain automatically. Leave empty to remove it.
+            </>
+          }
+        >
+          <Input
+            id="domain"
+            name="domain"
+            defaultValue={customDomain ?? ""}
+            placeholder="calendar.example.com"
+            autoComplete="off"
+          />
+        </Field>
+        {saved && liveStatus !== null && (
+          <p className={`text-xs ${liveStatus ? "text-emerald-600" : "text-muted-foreground"}`}>
+            {liveStatus
+              ? `✓ https://${saved} is live.`
+              : `https://${saved} isn't answering yet — DNS may still be propagating.`}
+          </p>
+        )}
+        <div className="flex items-center gap-2">
+          <SaveButton />
+          <Button type="button" variant="outline" onClick={checkStatus} disabled={checking || !saved}>
+            {checking ? "Checking…" : "Check status"}
+          </Button>
+        </div>
       </form>
     </Card>
   );

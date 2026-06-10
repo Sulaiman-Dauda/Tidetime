@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { eventTypes } from "@/db/schema";
 import { listServiceCategories } from "@/server/service-categories";
 import { getAvailableVideoLocations } from "@/app-store/registry";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { EventTypeEditor } from "./editor";
 
 export default async function EventTypePage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,12 +23,13 @@ export default async function EventTypePage({ params }: { params: Promise<{ id: 
 
   const categories = await listServiceCategories();
   const availableVideo = await getAvailableVideoLocations(user.id);
+  const appUrl = await getAppUrl();
 
   return (
     <EventTypeEditor
       eventType={et}
       username={user.username}
-      appUrl={env.appUrl}
+      appUrl={appUrl}
       categories={categories.map((c) => ({ id: c.id, name: c.name }))}
       availableVideo={availableVideo}
     />

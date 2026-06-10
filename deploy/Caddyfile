@@ -1,0 +1,32 @@
+# Tidetime's bundled HTTPS proxy.
+#
+# How custom domains work (no manual cert setup, no restarts):
+#   1. The admin saves a domain under Dashboard → Settings → Brand → Custom domain.
+#   2. They point the domain's DNS A record at this server's IP.
+#   3. On the first HTTPS request, Caddy asks the app (the `ask` endpoint below)
+#      whether the hostname is the configured one; if yes, it obtains a
+#      Let's Encrypt certificate automatically and keeps it renewed.
+#
+# The `ask` gate means this server will never request certificates for random
+# hostnames someone happens to point at its IP.
+
+{
+	on_demand_tls {
+		ask http://app:3100/api/domain/verify
+	}
+}
+
+# HTTPS for the custom domain (cert issued on demand, gated by the app).
+https:// {
+	tls {
+		on_demand
+	}
+	reverse_proxy app:3100
+}
+
+# Plain HTTP (port 80): serves the app for hostnames/IPs without TLS and lets
+# ACME HTTP-01 challenges through. Direct IP access on the APP_PORT mapping
+# (default 3000) continues to work alongside this.
+http:// {
+	reverse_proxy app:3100
+}

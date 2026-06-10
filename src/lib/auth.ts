@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
@@ -7,14 +7,29 @@ import { sessions, users, type User } from "@/db/schema";
 import { env } from "./env";
 import { randomToken, sha256 } from "./crypto";
 
-// Secure cookies — and the __Host- prefix, which mandates HTTPS by spec — must
-// be keyed off the actual scheme, not NODE_ENV: fresh self-hosted installs run
-// production builds on plain http://<server-ip> until a reverse proxy is added,
-// and browsers silently refuse Secure/__Host- cookies there, which logs users
-// out on their first navigation.
-const IS_HTTPS = env.appUrl.startsWith("https://");
-const COOKIE_NAME = IS_HTTPS ? "__Host-tidetime_session" : "tidetime_session";
+// Secure cookies — and the __Host- prefix, which mandates HTTPS by spec — are
+// decided per request from the actual scheme, never from NODE_ENV: a fresh
+// self-hosted install is browsed over plain http://<server-ip>, while the same
+// instance may simultaneously serve https://<custom-domain> through the
+// bundled Caddy proxy. Each origin gets the strongest cookie it can hold, and
+// reads accept both names so neither origin invalidates the other.
+const SECURE_COOKIE = "__Host-tidetime_session";
+const PLAIN_COOKIE = "tidetime_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+/** Whether the current request arrived over HTTPS (directly or via a proxy). */
+async function requestIsHttps(): Promise<boolean> {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto");
+  if (proto) return proto.split(",")[0].trim() === "https";
+  return env.appUrl.startsWith("https://");
+}
+
+/** The session token from whichever cookie name is present. */
+async function readSessionToken(): Promise<string | undefined> {
+  const store = await cookies();
+  return store.get(SECURE_COOKIE)?.value ?? store.get(PLAIN_COOKIE)?.value;
+}
 
 /** Create a new session for a user and set the cookie. */
 export async function createSession(userId: number): Promise<void> {
@@ -24,10 +39,11 @@ export async function createSession(userId: number): Promise<void> {
 
   await db.insert(sessions).values({ id, userId, expiresAt });
 
+  const isHttps = await requestIsHttps();
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
+  store.set(isHttps ? SECURE_COOKIE : PLAIN_COOKIE, token, {
     httpOnly: true,
-    secure: IS_HTTPS,
+    secure: isHttps,
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
@@ -36,8 +52,7 @@ export async function createSession(userId: number): Promise<void> {
 
 /** Revoke all of a user's sessions except the one making this request. */
 export async function revokeOtherSessions(userId: number): Promise<void> {
-  const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  const token = await readSessionToken();
   const currentId = token ? sha256(token) : null;
   await db
     .delete(sessions)
@@ -50,18 +65,18 @@ export async function revokeOtherSessions(userId: number): Promise<void> {
 
 /** Destroy the current session. */
 export async function destroySession(): Promise<void> {
-  const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  const token = await readSessionToken();
   if (token) {
     await db.delete(sessions).where(eq(sessions.id, sha256(token)));
-    store.delete(COOKIE_NAME);
+    const store = await cookies();
+    store.delete(SECURE_COOKIE);
+    store.delete(PLAIN_COOKIE);
   }
 }
 
 /** Resolve the current user from the session cookie (cached per request). */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  const token = await readSessionToken();
   if (!token) return null;
 
   const id = sha256(token);
@@ -101,5 +116,3 @@ export const hasAnyUser = cache(async (): Promise<boolean> => {
   const [row] = await db.select({ id: users.id }).from(users).limit(1);
   return Boolean(row);
 });
-
-export { COOKIE_NAME };

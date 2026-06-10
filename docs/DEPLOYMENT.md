@@ -97,11 +97,12 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-The stack (`docker-compose.prod.yml`) runs three services:
+The stack (`docker-compose.prod.yml`) runs four services:
 
 - **postgres** — `postgres:18-alpine`, data in the `tidetime_pgdata` volume.
 - **app** — the Next.js server. Its start command is `npm run db:migrate:runtime && npm run start`, so **migrations run automatically** before the server boots.
 - **reminders** — a sidecar that runs the background job runner on a loop (see [Background jobs](#background-jobs)).
+- **caddy** — the bundled HTTPS proxy on ports 80/443 (overridable via `HTTP_PORT`/`HTTPS_PORT`), powering [custom domains](#custom-domain-and-https) with automatic certificates.
 
 Important details specific to this path:
 
@@ -230,17 +231,21 @@ Reminders, review requests, webhook deliveries, and retention cleanup all run to
 
 The Docker Compose stack already runs option 2 for you. Only the manual Node path requires you to wire up jobs yourself.
 
-## Reverse proxy and HTTPS
+## Custom domain and HTTPS
 
-In production, put Tidetime behind a reverse proxy such as Nginx, Caddy, or Traefik to terminate HTTPS and forward traffic to the app port.
+The Docker stack ships with everything needed to serve your own domain over HTTPS — no certificate files, no proxy configuration, no restarts:
 
-Recommended setup:
+1. Create a **DNS A record** for your domain (e.g. `calendar.example.com`) pointing at the server's IP. If you use Cloudflare, set the record to **DNS only (grey cloud)** or set SSL mode to *Full* — the certificate lives on this server.
+2. In Tidetime, go to **Dashboard → Settings → Brand → Custom domain**, enter the domain, and save.
+3. Press **Check status**. The first HTTPS request triggers the bundled Caddy proxy to obtain a Let's Encrypt certificate automatically (and keep it renewed).
 
-- Force HTTPS.
-- Forward `X-Forwarded-*` headers correctly.
-- Point the proxy upstream at the host's `APP_PORT` (Docker) or `PORT` (manual Node).
-- Keep `APP_URL` exactly aligned with the public HTTPS address (no trailing slash).
-- Avoid caching logged-in dynamic pages.
+From that moment `https://calendar.example.com` serves your instance, and all outgoing links — booking pages, emails, OAuth redirect URIs — use the domain instead of the install address. Plain-IP access on `APP_PORT` keeps working alongside it.
+
+Requirements: ports **80 and 443** must be reachable from the internet (open them in your provider's firewall), and the DNS record must point at this server. Certificate issuance is gated by the app — Caddy only requests certificates for the domain you saved in Settings, never for arbitrary hostnames pointed at your IP.
+
+### Bringing your own proxy instead
+
+If you already run Nginx/Traefik/another Caddy on this host, set `HTTPS_PORT`/`HTTP_PORT` in `.env` to move or free the bundled proxy's ports, point your proxy upstream at the host's `APP_PORT`, and make sure it forwards `X-Forwarded-Proto` (Tidetime uses it to decide cookie security). Keep `APP_URL` (or the in-app domain setting) aligned with the public address, and avoid caching logged-in dynamic pages.
 
 ## Health checks
 

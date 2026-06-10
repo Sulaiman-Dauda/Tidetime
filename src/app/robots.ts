@@ -1,7 +1,12 @@
 import type { MetadataRoute } from "next";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 
-export default function robots(): MetadataRoute.Robots {
+// Rendered at request time so the URLs follow the custom domain saved in
+// Settings (and the build doesn't need a database).
+export const dynamic = "force-dynamic";
+
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const appUrl = await getAppUrl();
   return {
     rules: [
       {
@@ -10,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/dashboard/", "/booking/", "/i/"],
       },
     ],
-    sitemap: `${env.appUrl}/sitemap.xml`,
-    host: env.appUrl,
+    sitemap: `${appUrl}/sitemap.xml`,
+    host: appUrl,
   };
 }

@@ -109,6 +109,18 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab   # persist across reboots
 
 The build will be slower on swap but will complete. Once installed, the running stack only needs ~500 MB, so the small server is fine afterwards.
 
+## Problem: custom domain saved but "Check status" says it isn't live
+
+### Check these first
+
+- The domain's **A record** points at this server's public IP (`dig +short yourdomain.com` should print it). DNS changes can take minutes to hours to propagate.
+- Ports **80 and 443** are open in your cloud provider's firewall and not occupied by another web server on the host (`ss -tlnp | grep -E ':80|:443'`).
+- On Cloudflare: the record is **DNS only (grey cloud)**, or SSL mode is *Full* — *Flexible* mode or proxying during first issuance can break certificate validation.
+- The domain you typed in Settings matches exactly (no `www.` mismatch — add a separate record or save the variant you use).
+- Caddy's view of things: `docker compose -p tidetime -f docker-compose.prod.yml logs caddy | tail -50` shows certificate issuance attempts and errors.
+
+The certificate is requested on the **first HTTPS request** after DNS resolves — pressing "Check status" again after propagation is usually all it takes.
+
 ## Problem: database query errors or missing columns
 
 Examples:

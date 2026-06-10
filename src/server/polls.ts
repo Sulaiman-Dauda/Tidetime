@@ -10,7 +10,7 @@ import {
   users,
 } from "@/db/schema";
 import { shortId } from "@/lib/crypto";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { isPollChoice, rankOptions, type PollChoice, type PollVisibility } from "@/lib/polls";
 import { runAcceptedBookingEffects } from "./booking-effects";
 import { sendMail } from "./mailer";
@@ -289,7 +289,7 @@ export async function finalizePoll(
     dateStyle: "full",
     timeStyle: "short",
   });
-  const manageUrl = `${env.appUrl}/booking/${uid}`;
+  const manageUrl = `${await getAppUrl()}/booking/${uid}`;
   await Promise.allSettled(
     participants.slice(1).map((p) =>
       sendMail({

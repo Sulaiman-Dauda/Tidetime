@@ -3,7 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { credentials } from "@/db/schema";
 import { encrypt, decrypt } from "@/lib/crypto";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { graphDateTime, parseGraphDate, isGraphEventBusy } from "@/lib/ms-graph";
 import { getMicrosoftCreds } from "../integration-credentials";
 import type {
@@ -48,8 +48,8 @@ async function clientCreds(): Promise<{ clientId: string; clientSecret: string }
   return creds;
 }
 
-function redirectUri(): string {
-  return `${env.appUrl}/api/microsoft-calendar/callback`;
+async function redirectUri(): Promise<string> {
+  return `${await getAppUrl()}/api/microsoft-calendar/callback`;
 }
 
 /** Whether Microsoft 365 OAuth credentials are configured (DB or env). */
@@ -63,7 +63,7 @@ export async function getMicrosoftAuthUrl(state: string): Promise<string> {
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: "code",
-    redirect_uri: redirectUri(),
+    redirect_uri: await redirectUri(),
     response_mode: "query",
     scope: SCOPES.join(" "),
     state,
@@ -81,7 +81,7 @@ export async function exchangeMicrosoftCode(code: string, userId: number): Promi
       client_id: clientId,
       client_secret: clientSecret,
       code,
-      redirect_uri: redirectUri(),
+      redirect_uri: await redirectUri(),
       grant_type: "authorization_code",
       scope: SCOPES.join(" "),
     }),

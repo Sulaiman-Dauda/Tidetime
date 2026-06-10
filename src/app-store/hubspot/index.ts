@@ -1,5 +1,5 @@
 import "server-only";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { getHubspotCreds } from "@/server/integration-credentials";
 import type { AppDefinition, CrmApp } from "../types";
 import { appMeta } from "../types";
@@ -38,8 +38,8 @@ async function isConfigured(): Promise<boolean> {
   return (await clientCreds()) !== null;
 }
 
-function redirectUri(): string {
-  return `${env.appUrl}/api/apps/hubspot/callback`;
+async function redirectUri(): Promise<string> {
+  return `${await getAppUrl()}/api/apps/hubspot/callback`;
 }
 
 async function getInstallUrl(state: string): Promise<string> {
@@ -47,7 +47,7 @@ async function getInstallUrl(state: string): Promise<string> {
   if (!creds) throw new Error("HubSpot is not configured");
   const params = new URLSearchParams({
     client_id: creds.clientId,
-    redirect_uri: redirectUri(),
+    redirect_uri: await redirectUri(),
     scope: SCOPES.join(" "),
     state,
   });
@@ -64,7 +64,7 @@ export async function exchangeHubspotCode(code: string, userId: number): Promise
       grant_type: "authorization_code",
       client_id: creds.clientId,
       client_secret: creds.clientSecret,
-      redirect_uri: redirectUri(),
+      redirect_uri: await redirectUri(),
       code,
     }),
   });

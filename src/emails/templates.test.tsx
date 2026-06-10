@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { bookingConfirmedAttendee, passwordResetEmail, inviteEmail } from "@/server/emails";
+
+// getAppUrl reads the custom domain from the DB; stub it so templates render
+// without a database in unit tests.
+vi.mock("@/server/app-url", () => ({
+  getAppUrl: async () => process.env.APP_URL ?? "http://localhost:3100",
+}));
 
 describe("react-email rendering", () => {
   it("renders a booking confirmation to HTML with the meeting link", async () => {

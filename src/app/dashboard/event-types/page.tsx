@@ -13,7 +13,7 @@ import { DeleteEventButton } from "../_components/delete-event-button";
 import { PageHeader } from "../_components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration } from "@/lib/format";
-import { env } from "@/lib/env";
+import { getAppUrl } from "@/server/app-url";
 import { locationLabel } from "@/lib/locations";
 
 export const metadata = { title: "Services" };
@@ -26,6 +26,7 @@ export default async function EventTypesPage({ searchParams }: Props) {
   const { welcome } = await searchParams;
   const user = (await getCurrentUser())!;
   const items = await listEventTypes(user.id);
+  const appUrl = await getAppUrl();
 
   return (
     <div className="animate-fade-in space-y-8">
@@ -40,7 +41,7 @@ export default async function EventTypesPage({ searchParams }: Props) {
       ) : (
         <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
           {items.map((et) => {
-            const publicUrl = `${env.appUrl}/${user.username}/${et.slug}`;
+            const publicUrl = `${appUrl}/${user.username}/${et.slug}`;
             return (
               <div
                 key={et.id}
