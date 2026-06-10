@@ -60,8 +60,14 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/overview")
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setData(d); })
+      .then((r) => {
+        if (r.status === 401) {
+          window.location.href = "/login";
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
+      .then((d) => { if (!cancelled && d) setData(d); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);

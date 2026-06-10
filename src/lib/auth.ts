@@ -4,9 +4,16 @@ import { cache } from "react";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
+import { env } from "./env";
 import { randomToken, sha256 } from "./crypto";
 
-const COOKIE_NAME = process.env.NODE_ENV === "production" ? "__Host-tidetime_session" : "tidetime_session";
+// Secure cookies — and the __Host- prefix, which mandates HTTPS by spec — must
+// be keyed off the actual scheme, not NODE_ENV: fresh self-hosted installs run
+// production builds on plain http://<server-ip> until a reverse proxy is added,
+// and browsers silently refuse Secure/__Host- cookies there, which logs users
+// out on their first navigation.
+const IS_HTTPS = env.appUrl.startsWith("https://");
+const COOKIE_NAME = IS_HTTPS ? "__Host-tidetime_session" : "tidetime_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
 /** Create a new session for a user and set the cookie. */
@@ -20,7 +27,7 @@ export async function createSession(userId: number): Promise<void> {
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: IS_HTTPS,
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
