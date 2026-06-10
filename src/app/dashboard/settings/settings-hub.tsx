@@ -85,8 +85,9 @@ export function SettingsHub({
   customDomain: string | null;
 }) {
   return (
-    <Tabs defaultValue="general" className="space-y-6">
+    <Tabs defaultValue="domain" className="space-y-6">
       <TabsList className="flex-wrap">
+        <TabsTrigger value="domain">Domain</TabsTrigger>
         <TabsTrigger value="general">Brand</TabsTrigger>
         <TabsTrigger value="booking">Booking</TabsTrigger>
         <TabsTrigger value="reviews">Reviews</TabsTrigger>
@@ -94,9 +95,11 @@ export function SettingsHub({
         <TabsTrigger value="legal">Legal</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="general" className="space-y-6">
-        <GeneralSection profile={settings.profile} />
+      <TabsContent value="domain">
         <DomainSection customDomain={customDomain} />
+      </TabsContent>
+      <TabsContent value="general">
+        <GeneralSection profile={settings.profile} />
       </TabsContent>
       <TabsContent value="booking">
         <BookingSection booking={settings.booking} />
@@ -252,7 +255,7 @@ function DomainSection({ customDomain }: { customDomain: string | null }) {
             : {
                 title: "Not reachable yet",
                 description:
-                  "DNS may still be propagating. Confirm the A record points at this server and try again in a few minutes.",
+                  "The certificate isn't active yet. Confirm the A record points at this server, ports 80/443 are open, and try again in a few minutes.",
                 variant: "destructive",
               },
         );

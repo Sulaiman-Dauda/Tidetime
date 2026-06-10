@@ -236,7 +236,7 @@ The Docker Compose stack already runs option 2 for you. Only the manual Node pat
 The Docker stack ships with everything needed to serve your own domain over HTTPS — no certificate files, no proxy configuration, no restarts:
 
 1. Create a **DNS A record** for your domain (e.g. `calendar.example.com`) pointing at the server's IP. If you use Cloudflare, set the record to **DNS only (grey cloud)** or set SSL mode to *Full* — the certificate lives on this server.
-2. In Tidetime, go to **Dashboard → Settings → Brand → Custom domain**, enter the domain, and save.
+2. In Tidetime, go to **Dashboard → Settings → Domain**, enter the domain, and save.
 3. Press **Check status**. The first HTTPS request triggers the bundled Caddy proxy to obtain a Let's Encrypt certificate automatically (and keep it renewed).
 
 From that moment `https://calendar.example.com` serves your instance, and all outgoing links — booking pages, emails, OAuth redirect URIs — use the domain instead of the install address. Plain-IP access on `APP_PORT` keeps working alongside it.

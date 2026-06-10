@@ -523,7 +523,7 @@ ART
 
   if [ "$APP_URL_FINAL" != "${APP_URL_FINAL#http://}" ]; then
     printf "        %sCustom domain%s   %spoint your domain's A record at this server's IP, then save it in%s\n" "$DIM" "$RESET" "$WHITE" "$RESET"
-    printf "                        %sSettings → Brand → Custom domain. HTTPS activates automatically — no certs, no restarts.%s\n" "$WHITE" "$RESET"
+    printf "                        %sSettings → Domain. HTTPS activates automatically — no certs, no restarts.%s\n" "$WHITE" "$RESET"
   fi
   printf "        %sCalm seas. ⚓%s\n\n" "$DIM" "$RESET"
 }

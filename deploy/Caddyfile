@@ -1,7 +1,7 @@
 # Tidetime's bundled HTTPS proxy.
 #
 # How custom domains work (no manual cert setup, no restarts):
-#   1. The admin saves a domain under Dashboard → Settings → Brand → Custom domain.
+#   1. The admin saves a domain under Dashboard → Settings → Domain.
 #   2. They point the domain's DNS A record at this server's IP.
 #   3. On the first HTTPS request, Caddy asks the app (the `ask` endpoint below)
 #      whether the hostname is the configured one; if yes, it obtains a
