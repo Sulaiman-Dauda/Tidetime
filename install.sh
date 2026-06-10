@@ -59,52 +59,119 @@ err()   { printf "%s  %s%s\n"  "${RED}✘${RESET}" "${RED}$1" "${RESET}" >&2; }
 die()   { err "$1"; exit 1; }
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Ocean-wave animations
+#  The voyage engine 🌊 — a little ship sails your progress to the island.
+#
+#  · Real percentages where the tooling reports steps (Docker BuildKit).
+#  · When no % exists, the ship explores back and forth — but you always get a
+#    live "└ last log line" under the bar, so it's never a frozen black box.
+#  · Non-TTY (curl | bash, CI) degrades to heartbeat lines every 30s.
 # ──────────────────────────────────────────────────────────────────────────────
 WAVE_GLYPHS=(▁ ▂ ▃ ▄ ▅ ▆ ▇ █ ▇ ▆ ▅ ▄ ▃ ▂)
-WAVE_FRAMES=()
-build_wave_frames() {
-  local width=22 n=${#WAVE_GLYPHS[@]} shift i idx line
-  for ((shift = 0; shift < n; shift++)); do
-    line=""
-    for ((i = 0; i < width; i++)); do
-      idx=$(((i + shift) % n))
-      line+="${WAVE_GLYPHS[idx]}"
-    done
-    WAVE_FRAMES+=("$line")
-  done
+SEA_W=26
+SHIP="⛵" ISLAND="🏝"
+QUIPS=(
+  "hoisting the mainsail" "charting the waters" "trimming the jib"
+  "reading the stars" "feeding the gulls" "watching for whales"
+  "riding the current" "steady as she goes" "plotting the course"
+  "securing the cargo" "whistling for wind" "minding the boom"
+)
+ESC="$(printf '\033')"
+
+last_log_line() {  # newest non-empty line of a logfile, ANSI-stripped, truncated
+  local file="$1" cols max line
+  cols="$(tput cols 2>/dev/null || echo 100)"
+  line="$(tail -n 30 "$file" 2>/dev/null | tr '\r' '\n' \
+    | sed -e "s/${ESC}\[[0-9;]*[A-Za-z]//g" \
+    | grep -vE '^[[:space:]]*$' | tail -n 1 || true)"
+  line="${line//$'\t'/ }"
+  max=$((cols - 10)); [ "$max" -lt 24 ] && max=24
+  [ "${#line}" -gt "$max" ] && line="${line:0:max}…"
+  printf '%s' "$line"
 }
-build_wave_frames
 
-# Run a command in the background while a wave rolls across the terminal.
-# Usage: wave_run "Message" /path/to/logfile -- command args...
-wave_run() {
-  local msg="$1" logfile="$2"; shift 2
+docker_progress() {  # % of BuildKit steps completed (#N … / #N DONE), -1 = unknown
+  local file="$1" total done_n pct
+  total="$(grep -oE '^#[0-9]+' "$file" 2>/dev/null | sort -u | wc -l || true)"
+  if [ "${total:-0}" -lt 3 ]; then echo -1; return 0; fi
+  done_n="$(grep -E '^#[0-9]+ (DONE|CACHED|ERROR)' "$file" 2>/dev/null \
+    | cut -d' ' -f1 | sort -u | wc -l || true)"
+  pct=$((done_n * 100 / total))
+  [ "$pct" -gt 99 ] && pct=99   # 100% only when the ship actually docks
+  echo "$pct"
+}
+
+render_sea() {  # render_sea <pct|-1> <frame> — waves astern, calm sea ahead, island at the end
+  local pct="$1" frame="$2" n=${#WAVE_GLYPHS[@]} i pos out=""
+  if [ "$pct" -ge 0 ]; then
+    pos=$((pct * SEA_W / 100))
+    [ "$pos" -gt $((SEA_W - 1)) ] && pos=$((SEA_W - 1))
+  else  # no % known: the ship explores back and forth
+    pos=$((frame % (2 * (SEA_W - 1))))
+    [ "$pos" -ge "$SEA_W" ] && pos=$((2 * (SEA_W - 1) - pos))
+  fi
+  out="$CYAN"
+  for ((i = 0; i < SEA_W; i++)); do
+    if [ "$i" -eq "$pos" ]; then out+="${RESET}${SHIP}${DIM}"
+    elif [ "$i" -lt "$pos" ]; then out+="${WAVE_GLYPHS[$(((i + frame) % n))]}"
+    else out+="·"; fi
+  done
+  printf '%s%s%s' "$out" "$RESET" "$ISLAND"
+}
+
+# Run a command while the ship sails. Live % (when parseable) + last log line.
+# Usage: voyage_run "Message" /path/to/logfile <docker|none> -- command args...
+voyage_run() {
+  local msg="$1" logfile="$2" pmode="$3"; shift 3
   [ "$1" = "--" ] && shift
+  : >"$logfile"
 
-  if [ "$IS_TTY" -ne 1 ]; then
+  if [ "$IS_TTY" -ne 1 ]; then  # plain heartbeat for curl|bash / CI
     info "$msg"
-    local rc=0; "$@" >"$logfile" 2>&1 || rc=$?
+    "$@" >"$logfile" 2>&1 &
+    local pid=$! rc=0 beat=0 lastline="" ll=""
+    while kill -0 "$pid" 2>/dev/null; do
+      sleep 5; beat=$((beat + 5))
+      if [ $((beat % 30)) -eq 0 ]; then
+        ll="$(last_log_line "$logfile")"
+        if [ -n "$ll" ] && [ "$ll" != "$lastline" ]; then info "   …${beat}s · $ll"; lastline="$ll"; fi
+      fi
+    done
+    wait "$pid" || rc=$?
     return $rc
   fi
 
   "$@" >"$logfile" 2>&1 &
-  local pid=$! f=0 nframes=${#WAVE_FRAMES[@]} start now elapsed=0
+  local pid=$! f=0 start now elapsed=0 pct=-1 lastpoll=0 quip="${QUIPS[0]}" detail="" pcttxt=""
   start=$(date +%s)
-  printf '\e[?25l'  # hide cursor
+  printf '\e[?25l\n'  # hide cursor, reserve the detail line
   while kill -0 "$pid" 2>/dev/null; do
     now=$(date +%s); elapsed=$((now - start))
-    printf "\r  ${CYAN}%s${RESET}  %s ${DIM}(%ss)${RESET}   " "${WAVE_FRAMES[f]}" "$msg" "$elapsed"
-    f=$(((f + 1) % nframes))
+    if [ "$now" -gt "$lastpoll" ]; then  # heavier polling only once per second
+      lastpoll=$now
+      if [ "$pmode" = "docker" ]; then pct="$(docker_progress "$logfile")"; fi
+      detail="$(last_log_line "$logfile")"
+      quip="${QUIPS[$(((elapsed / 6) % ${#QUIPS[@]}))]}"
+    fi
+    pcttxt=""
+    [ "$pct" -ge 0 ] && pcttxt=" · ${BOLD}${pct}%${RESET}"
+    printf '\e[1A\r\e[K  %s  %s%s %s· %s · %ss%s\n' \
+      "$(render_sea "$pct" "$f")" "${BOLD}${msg}${RESET}" "$pcttxt" "$DIM" "$quip" "$elapsed" "$RESET"
+    printf '\r\e[K     %s└ %s%s' "$DIM" "$detail" "$RESET"
+    f=$((f + 1))
     sleep 0.12
   done
-  printf '\e[?25h'  # show cursor
   local rc=0; wait "$pid" || rc=$?
+  printf '\e[1A\r\e[K'
   if [ $rc -eq 0 ]; then
-    printf "\r  ${GREEN}%s${RESET}  %s ${DIM}(%ss)${RESET}        \n" "$(printf '▇%.0s' $(seq 1 22))" "$msg" "$elapsed"
+    printf '  %s%s%s%s  %s · %s100%% · docked in %ss ⚓%s\n' \
+      "$GREEN" "$(printf '▇%.0s' $(seq 1 "$SEA_W"))" "$RESET" "$ISLAND" \
+      "${BOLD}${msg}${RESET}" "$GREEN" "$elapsed" "$RESET"
   else
-    printf "\r  ${RED}%s${RESET}  %s            \n" "$(printf '▁%.0s' $(seq 1 22))" "$msg"
+    printf '  %s%s%s   %s · %sran aground after %ss%s\n' \
+      "$RED" "$(printf '▁%.0s' $(seq 1 "$SEA_W"))" "$RESET" \
+      "${BOLD}${msg}${RESET}" "$RED" "$elapsed" "$RESET"
   fi
+  printf '\r\e[K\e[?25h'  # clear the stale detail line, show cursor
   return $rc
 }
 
@@ -180,6 +247,34 @@ need_sudo() {  # must always return 0: a non-zero last command here would trip s
   if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
 }
 
+# `next build` needs ~2GB of memory; on a 1–2GB VPS with no swap it dies with
+# "JavaScript heap out of memory" (SIGABRT). Offer to add swap before building.
+ensure_memory() {
+  [ -r /proc/meminfo ] || return 0
+  local mem_kb swap_kb
+  mem_kb="$(awk '/^MemTotal/ {print $2}' /proc/meminfo)"
+  swap_kb="$(awk '/^SwapTotal/ {print $2}' /proc/meminfo)"
+  if [ "${mem_kb:-0}" -ge 1900000 ] || [ "${swap_kb:-0}" -ge 1000000 ]; then return 0; fi
+  warn "This server has $((mem_kb / 1024))MB RAM and $((swap_kb / 1024))MB swap — the build WILL run out of memory."
+  if confirm "Add a 2GB swapfile (/swapfile) to keep the build afloat?"; then
+    need_sudo
+    if [ ! -f /swapfile ]; then
+      ${SUDO} fallocate -l 2G /swapfile 2>/dev/null \
+        || ${SUDO} dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+      ${SUDO} chmod 600 /swapfile
+      ${SUDO} mkswap /swapfile >/dev/null
+    fi
+    ${SUDO} swapon /swapfile 2>/dev/null || true
+    if ! grep -q '^/swapfile' /etc/fstab 2>/dev/null; then
+      echo '/swapfile none swap sw 0 0' | ${SUDO} tee -a /etc/fstab >/dev/null
+    fi
+    ok "2GB swap enabled (persists across reboots) — smoother sailing."
+  else
+    warn "Proceeding without swap. If the build fails with 'heap out of memory', re-run and say yes."
+  fi
+  return 0
+}
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  1. Preflight — Docker + git
 # ──────────────────────────────────────────────────────────────────────────────
@@ -193,7 +288,7 @@ preflight() {
     if [ "$os" = "Linux" ]; then
       if confirm "Install Docker now (via get.docker.com)?"; then
         need_sudo
-        wave_run "Installing Docker" /tmp/tidetime-docker.log -- bash -c "curl -fsSL https://get.docker.com | ${SUDO} sh" \
+        voyage_run "Installing Docker" /tmp/tidetime-docker.log none -- bash -c "curl -fsSL https://get.docker.com | ${SUDO} sh" \
           || die "Docker installation failed. See /tmp/tidetime-docker.log"
         need_sudo
         ${SUDO} systemctl enable --now docker >/dev/null 2>&1 || true
@@ -220,6 +315,8 @@ preflight() {
   ok "Docker Compose detected: ${DC}"
 
   command -v git >/dev/null 2>&1 || die "git is required. Please install it and re-run."
+
+  ensure_memory
 }
 DOCKER_SUDO=""
 
@@ -247,13 +344,13 @@ fetch_source() {
 
   if [ -d "$DIR/.git" ]; then
     info "Updating existing checkout in ${BOLD}${DIR}${RESET}"
-    wave_run "Pulling latest source" /tmp/tidetime-git.log -- git -C "$DIR" pull --ff-only origin "$BRANCH" \
+    voyage_run "Pulling latest source" /tmp/tidetime-git.log none -- git -C "$DIR" pull --ff-only origin "$BRANCH" \
       || die "git pull failed. See /tmp/tidetime-git.log"
   else
     need_sudo
     if [ ! -d "$DIR" ]; then ${SUDO} mkdir -p "$DIR"; ${SUDO} chown "$(id -u):$(id -g)" "$DIR" 2>/dev/null || true; fi
     info "Fetching Tidetime into ${BOLD}${DIR}${RESET}"
-    wave_run "Cloning ${REPO_URL##*/} (${BRANCH})" /tmp/tidetime-git.log -- \
+    voyage_run "Cloning ${REPO_URL##*/} (${BRANCH})" /tmp/tidetime-git.log none -- \
       git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$DIR" \
       || die "git clone failed. See /tmp/tidetime-git.log"
   fi
@@ -330,8 +427,8 @@ launch() {
   printf "\n"
   info "Building images and starting the stack. First build pulls Node + compiles the app — grab a coffee. ☕"
   # $DOCKER_SUDO and $DC are intentionally unquoted so they word-split into args
-  # ("docker compose" → two tokens). wave_run execs the result directly.
-  wave_run "Building & launching Tidetime" /tmp/tidetime-build.log -- \
+  # ("docker compose" → two tokens). voyage_run execs the result directly.
+  voyage_run "Building & launching Tidetime" /tmp/tidetime-build.log docker -- \
     ${DOCKER_SUDO} $DC -p "$PROJECT" -f "$DIR/$COMPOSE_FILE" --project-directory "$DIR" up -d --build \
     || { err "Build/launch failed. Last 40 lines:"; tail -n 40 /tmp/tidetime-build.log; exit 1; }
   ok "Containers are up."
@@ -343,13 +440,14 @@ wait_healthy() {
   if [ "$IS_TTY" -ne 1 ]; then
     info "Waiting for the app to become healthy…"
   fi
-  local start now elapsed f=0 nframes=${#WAVE_FRAMES[@]}
+  local start now elapsed=0 f=0 pct=0
   start=$(date +%s)
   [ "$IS_TTY" -eq 1 ] && printf '\e[?25l'
   while true; do
     if curl -fsS --max-time 3 "$url" >/dev/null 2>&1; then
       [ "$IS_TTY" -eq 1 ] && printf '\e[?25h'
-      printf "\r  ${GREEN}%s${RESET}  Database connected · app healthy            \n" "$(printf '▇%.0s' $(seq 1 22))"
+      printf "\r\e[K  ${GREEN}%s${RESET}${ISLAND}  ${BOLD}Database connected · app healthy${RESET} ${GREEN}⚓${RESET}\n" \
+        "$(printf '▇%.0s' $(seq 1 "$SEA_W"))"
       return 0
     fi
     now=$(date +%s); elapsed=$((now - start))
@@ -361,8 +459,10 @@ wait_healthy() {
       return 1
     fi
     if [ "$IS_TTY" -eq 1 ]; then
-      printf "\r  ${CYAN}%s${RESET}  Waiting for migrations & first boot ${DIM}(%ss)${RESET}   " "${WAVE_FRAMES[f]}" "$elapsed"
-      f=$(((f + 1) % nframes))
+      pct=$((elapsed * 100 / HEALTH_TIMEOUT)); [ "$pct" -gt 99 ] && pct=99
+      printf "\r\e[K  %s  ${BOLD}Migrations & first boot${RESET} ${DIM}· %ss of up to %ss${RESET}" \
+        "$(render_sea "$pct" "$f")" "$elapsed" "$HEALTH_TIMEOUT"
+      f=$((f + 1))
     fi
     sleep 0.5
   done
@@ -378,8 +478,9 @@ success() {
         ≈≋≈  ▁▂▃▄▅▆▇█▇▆▅▄▃▂▁  ≈≋≈
 ART
   printf "%s\n" "$RESET"
+  local total=$(( $(date +%s) - INSTALL_START ))
   printf "        %s%sTHE TIDE IS IN.%s  🌊\n" "$BOLD" "$GREEN" "$RESET"
-  printf "        %sTidetime is live — your schedule's in sync.%s\n\n" "$WHITE" "$RESET"
+  printf "        %sTidetime is live — zero to scheduled in %dm %02ds.%s\n\n" "$WHITE" "$((total / 60))" "$((total % 60))" "$RESET"
 
   printf "        %sOpen Tidetime%s   %s%s%s\n" "$DIM" "$RESET" "$BOLD$CYAN" "$APP_URL_FINAL" "$RESET"
   printf "        %sFirst run%s       %sgo to %s/setup to create your owner account%s\n" "$DIM" "$RESET" "$WHITE" "$APP_URL_FINAL" "$RESET"
@@ -399,6 +500,8 @@ ART
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main
 # ──────────────────────────────────────────────────────────────────────────────
+INSTALL_START="$(date +%s)"
+
 main() {
   banner
   preflight
@@ -409,4 +512,7 @@ main() {
   success
 }
 
-main "$@"
+# Run only when executed (not sourced) — keeps the functions unit-testable.
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+  main "$@"
+fi
