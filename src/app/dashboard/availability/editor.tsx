@@ -26,6 +26,15 @@ export type Interval = { start: string; end: string };
 export type WeeklyRule = { day: number; intervals: Interval[] };
 export type DateOverride = { date: string; intervals: Interval[] };
 
+function formatOverrideDate(key: string): string {
+  return new Date(`${key}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 type Props = {
   schedule: { id: number; name: string; timeZone: string };
   initialWeekly: WeeklyRule[];
@@ -90,9 +99,13 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
   function save() {
     start(async () => {
       try {
-        await saveScheduleAction({ scheduleId: schedule.id, name, timeZone, weekly, overrides });
-        toast({ title: "Changes saved", description: "Your availability has been updated." });
-        router.refresh();
+        const res = await saveScheduleAction({ scheduleId: schedule.id, name, timeZone, weekly, overrides });
+        if (res.ok) {
+          toast({ title: "Changes saved", description: "Your availability has been updated." });
+          router.refresh();
+        } else {
+          toast({ variant: "destructive", title: "Couldn't save changes", description: res.error });
+        }
       } catch {
         toast({
           variant: "destructive",
@@ -197,6 +210,9 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  All hours on this page are wall-clock times in this timezone.
+                </p>
               </div>
             </div>
             <div className="mt-4 border-t border-border/40 pt-3">
@@ -208,8 +224,13 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
             <h3 className="mb-1 text-sm font-semibold">Date overrides</h3>
             <p className="mb-3 text-sm text-muted-foreground">Add hours or block specific dates.</p>
             <div className="flex items-center gap-2">
-              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-              <Button variant="outline" size="icon" onClick={addOverride}>
+              <Input
+                type="date"
+                value={newDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setNewDate(e.target.value)}
+              />
+              <Button variant="outline" size="icon" onClick={addOverride} aria-label="Add override">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -217,7 +238,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
               {overrides.map((ov) => (
                 <div key={ov.date} className="rounded-md border border-border bg-secondary/30 p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-medium">{ov.date}</span>
+                    <span className="text-sm font-medium">{formatOverrideDate(ov.date)}</span>
                   <Tooltip content="Remove override">
                     <Button
                       variant="ghost"

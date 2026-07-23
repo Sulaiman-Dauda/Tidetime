@@ -15,10 +15,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import { deleteScheduleAction } from "./actions";
 
 export function DeleteScheduleButton({ scheduleId, scheduleName }: { scheduleId: number; scheduleName: string }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [pending, start] = useTransition();
 
   return (
@@ -41,8 +43,13 @@ export function DeleteScheduleButton({ scheduleId, scheduleName }: { scheduleId:
           <form
             action={async (formData) => {
               start(async () => {
-                await deleteScheduleAction(formData);
-                router.refresh();
+                const res = await deleteScheduleAction(formData);
+                if (res.ok) {
+                  toast({ title: "Schedule deleted" });
+                  router.refresh();
+                } else {
+                  toast({ variant: "destructive", title: "Couldn't delete schedule", description: res.error });
+                }
               });
             }}
           >

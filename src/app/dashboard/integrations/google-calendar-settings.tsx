@@ -13,7 +13,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar, CheckCircle2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Calendar, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface GoogleCalendarView {
   id: string;
@@ -21,11 +32,18 @@ interface GoogleCalendarView {
   primary: boolean;
 }
 
+const OAUTH_ERRORS: Record<string, string> = {
+  access_denied: "You declined access on the Google consent screen.",
+  invalid_state: "The sign-in link expired. Please try connecting again.",
+  forbidden: "Your role doesn't allow managing connections.",
+};
+
 export function GoogleCalendarSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [calendars, setCalendars] = useState<GoogleCalendarView[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [destinationCalendarId, setDestinationCalendarId] = useState<string | null>(null);
@@ -33,6 +51,27 @@ export function GoogleCalendarSettings() {
 
   useEffect(() => {
     loadStatus();
+    // Surface the OAuth outcome the callback redirect put in the URL — a
+    // failed connect must never be silent.
+    const params = new URLSearchParams(window.location.search);
+    const googleError = params.get("google_error") ?? params.get("app_error");
+    if (params.get("google_connected")) {
+      toast({ title: "Google Calendar connected", description: "Busy times will now block your public availability." });
+    } else if (googleError) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't connect Google Calendar",
+        description: OAUTH_ERRORS[googleError] ?? googleError,
+      });
+    }
+    if (params.get("google_connected") || googleError) {
+      params.delete("google_connected");
+      params.delete("google_error");
+      params.delete("app_error");
+      const query = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadStatus() {
@@ -45,6 +84,7 @@ export function GoogleCalendarSettings() {
         setSelected(data.selected ?? []);
         setDestinationCalendarId(data.destinationCalendarId ?? null);
         setConnected(Boolean(data.connected));
+        setExpired(Boolean(data.expired));
       } else {
         setConnected(false);
       }
@@ -57,6 +97,9 @@ export function GoogleCalendarSettings() {
 
   function connect() {
     setConnecting(true);
+    // If the redirect fails (or the user navigates back), don't leave the
+    // button stuck on "Redirecting…" forever.
+    setTimeout(() => setConnecting(false), 8000);
     window.location.href = "/api/google-calendar/auth";
   }
 
@@ -147,20 +190,35 @@ export function GoogleCalendarSettings() {
 
       {!connected ? (
         <div className="space-y-4">
-          <div className="rounded-lg border border-border/60 bg-secondary/30 p-4 text-sm text-muted-foreground">
-            <p>Connect your Google account to:</p>
-            <ul className="mt-2 list-disc list-inside space-y-1">
-              <li>Automatically block times you&apos;re busy on your Google Calendar</li>
-              <li>Have new bookings created as Google Calendar events</li>
-              <li>Keep your schedule in sync without manual copying</li>
-            </ul>
-          </div>
+          {expired ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">Your Google connection expired</p>
+                <p className="mt-0.5">
+                  Busy-time conflict checking and calendar events have stopped. Reconnect to
+                  resume syncing.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-secondary/30 p-4 text-sm text-muted-foreground">
+              <p>Connect your Google account to:</p>
+              <ul className="mt-2 list-disc list-inside space-y-1">
+                <li>Automatically block times you&apos;re busy on your Google Calendar</li>
+                <li>Have new bookings created as Google Calendar events</li>
+                <li>Keep your schedule in sync without manual copying</li>
+              </ul>
+            </div>
+          )}
           <Button onClick={connect} disabled={connecting}>
             {connecting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Redirecting...
               </>
+            ) : expired ? (
+              "Reconnect Google Calendar"
             ) : (
               "Connect Google Calendar"
             )}
@@ -235,14 +293,31 @@ export function GoogleCalendarSettings() {
             <Button variant="outline" size="sm" onClick={loadStatus}>
               Refresh
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={disconnect}
-              className="text-destructive hover:bg-destructive/10"
-            >
-              Disconnect
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                  Disconnect
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Disconnect Google Calendar?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Busy-time conflict checking stops and new bookings will no longer be added to
+                    your Google Calendar. Your selected-calendar choices are removed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={disconnect}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+                  >
+                    Disconnect
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             {saving ? <span className="text-xs text-muted-foreground">Saving…</span> : null}
           </div>
         </div>

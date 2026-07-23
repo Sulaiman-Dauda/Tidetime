@@ -62,8 +62,12 @@ export default async function ProviderDetailPage({ params }: Props) {
       role: invites.role,
       token: invites.token,
       expiresAt: invites.expiresAt,
+      createdAt: invites.createdAt,
+      invitedBy: users.name,
+      invitedByUsername: users.username,
     })
     .from(invites)
+    .leftJoin(users, eq(users.id, invites.createdBy))
     .where(and(eq(invites.teamId, teamId), isNull(invites.acceptedAt), gt(invites.expiresAt, new Date())))
     .orderBy(desc(invites.id));
   const pendingInvites = pending.map((p) => ({
@@ -72,6 +76,8 @@ export default async function ProviderDetailPage({ params }: Props) {
     role: p.role,
     url: `${appUrl}/signup?invite=${p.token}`,
     expiresAt: p.expiresAt.toISOString(),
+    invitedAt: p.createdAt.toISOString(),
+    invitedBy: p.invitedBy ?? p.invitedByUsername ?? null,
   }));
 
   return (

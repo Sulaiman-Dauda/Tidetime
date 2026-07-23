@@ -3,11 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
-import { bookings, attendees, services } from "@/db/schema";
+import { bookings, attendees, memberships, services } from "@/db/schema";
 import { can } from "@/lib/rbac";
 import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
 import { formatRange } from "@/lib/format";
+import { answersFromResponses } from "@/lib/booking-fields";
 import { Badge } from "@/components/ui/badge";
 import { AcceptButton, CancelBookingButton, DeclineButton } from "../_components/booking-actions";
 import {
@@ -18,6 +19,7 @@ import {
   CheckCircle2,
   Clock,
   MapPin,
+  Phone,
   User,
   XCircle,
 } from "lucide-react";
@@ -38,12 +40,11 @@ const ACTIVITY_META: Record<
   rsvp: { label: "RSVP", icon: CheckCircle2, tone: "text-sky-500" },
 };
 
-function formatResponseValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (value === null || value === undefined) return "—";
-  return String(value);
-}
+const RSVP_BADGES: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+  accepted: { label: "Attending", variant: "default" },
+  tentative: { label: "Maybe", variant: "secondary" },
+  declined: { label: "Declined", variant: "destructive" },
+};
 
 export default async function BookingDetailPage({ params }: Props) {
   const { user, role, teamId } = await requireAnyPermission([
@@ -52,23 +53,24 @@ export default async function BookingDetailPage({ params }: Props) {
   ]);
   const { uid } = await params;
 
-
-  const [row] = await db
-    .select({ booking: bookings })
-    .from(bookings)
-    .leftJoin(services, eq(services.id, bookings.serviceId))
-    .where(
-      and(
-        eq(bookings.uid, uid),
-        can(role, "booking.all.view")
-          ? eq(services.teamId, teamId)
-          : eq(bookings.userId, user.id),
-      ),
-    )
-    .limit(1);
-
-  const booking = row?.booking;
+  // Authorize against the host's membership, not the service's team — a
+  // booking whose service was deleted must stay visible to team viewers.
+  const [booking] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!booking) notFound();
+  let authorized = booking.userId === user.id;
+  if (!authorized && can(role, "booking.all.view") && booking.userId !== null) {
+    const [hostMembership] = await db
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(and(
+        eq(memberships.userId, booking.userId),
+        eq(memberships.teamId, teamId),
+        eq(memberships.accepted, true),
+      ))
+      .limit(1);
+    authorized = Boolean(hostMembership);
+  }
+  if (!authorized) notFound();
 
   const [ats, activity, serviceRow] = await Promise.all([
     db.select().from(attendees).where(eq(attendees.bookingId, booking.id)),
@@ -83,15 +85,21 @@ export default async function BookingDetailPage({ params }: Props) {
       : Promise.resolve(null),
   ]);
 
-  const when = formatRange(booking.startTime, booking.endTime, user.timeZone);
-  const fieldLabels = new Map((serviceRow?.bookingFields ?? []).map((field) => [field.name, field.label]));
-  const responseEntries = Object.entries(booking.responses ?? {}).filter(([, value]) => {
-    if (value === null || value === undefined) return false;
-    if (typeof value === "string") return value.trim().length > 0;
-    if (Array.isArray(value)) return value.length > 0;
-    return true;
-  });
+  const when = formatRange(booking.startTime, booking.endTime, user.timeZone, user.timeFormat === 12);
+  // Custom-question answers via the shared helper: system name/email fields are
+  // excluded (they already render on the attendee rows above).
+  const answers = serviceRow
+    ? answersFromResponses(serviceRow.bookingFields, (booking.responses ?? {}) as Record<string, unknown>)
+    : Object.entries(booking.responses ?? {})
+        .filter(([key, value]) => !["name", "email"].includes(key) && typeof value === "string" && value.trim())
+        .map(([key, value]) => ({ label: key, value: String(value) }));
   const canCancel = booking.status === "accepted" && booking.endTime.getTime() >= Date.now();
+  const activityTime = new Intl.DateTimeFormat("en-US", {
+    timeZone: user.timeZone,
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour12: user.timeFormat === 12,
+  });
 
   return (
     <div className="animate-fade-in space-y-8">
@@ -140,28 +148,40 @@ export default async function BookingDetailPage({ params }: Props) {
                   )}
                 </div>
               )}
-              {ats.map((a) => (
-                <div key={a.id} className="flex items-center gap-2 text-muted-foreground">
-                  <User className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-foreground">{a.name}</span>
-                  <a href={`mailto:${a.email}`} className="hover:underline">
-                    {a.email}
-                  </a>
-                </div>
-              ))}
+              {ats.map((a) => {
+                const rsvp = a.rsvpStatus ? RSVP_BADGES[a.rsvpStatus] : null;
+                return (
+                  <div key={a.id} className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                    <User className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-foreground">{a.name}</span>
+                    <a href={`mailto:${a.email}`} className="hover:underline">
+                      {a.email}
+                    </a>
+                    {a.phoneNumber ? (
+                      <a href={`tel:${a.phoneNumber}`} className="flex items-center gap-1 hover:underline">
+                        <Phone className="h-3 w-3" />
+                        {a.phoneNumber}
+                      </a>
+                    ) : null}
+                    {rsvp ? (
+                      <Badge variant={rsvp.variant} className="text-[10px]">{rsvp.label}</Badge>
+                    ) : null}
+                  </div>
+                );
+              })}
             </dl>
           </div>
 
           <div className="border-t border-border/60 pt-5">
             <h2 className="text-sm font-medium text-foreground">Booking answers</h2>
-            {responseEntries.length === 0 ? (
+            {answers.length === 0 ? (
               <p className="mt-3 text-xs text-muted-foreground">No extra answers were submitted.</p>
             ) : (
               <dl className="mt-4 space-y-3 text-[13px]">
-                {responseEntries.map(([key, value]) => (
-                  <div key={key} className="grid gap-1 sm:grid-cols-[140px_1fr]">
-                    <dt className="text-muted-foreground">{fieldLabels.get(key) ?? key}</dt>
-                    <dd className="text-foreground">{formatResponseValue(value)}</dd>
+                {answers.map((answer) => (
+                  <div key={answer.label} className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                    <dt className="text-muted-foreground">{answer.label}</dt>
+                    <dd className="text-foreground">{answer.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -206,10 +226,7 @@ export default async function BookingDetailPage({ params }: Props) {
                         <p className="text-xs text-muted-foreground">{entry.message}</p>
                       )}
                       <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-                        {new Date(entry.createdAt).toLocaleString(undefined, {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })}
+                        {activityTime.format(new Date(entry.createdAt))}
                         {entry.actor ? ` · ${entry.actor}` : ""}
                       </p>
                     </div>

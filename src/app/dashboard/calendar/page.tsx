@@ -1,11 +1,14 @@
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
-import { bookings, attendees, services, serviceProviders, teams } from "@/db/schema";
+import { bookings, attendees, memberships, services, serviceProviders, teams, users } from "@/db/schema";
 import { CalendarView, type CalendarEvent } from "./calendar-view";
 import type { CalendarService } from "./quick-booking-dialog";
 import { can } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
+import { zonedTimeToUtc } from "@/lib/time";
+
+const EVENT_LIMIT = 500;
 
 interface Props {
   searchParams: Promise<{ month?: string }>;
@@ -29,50 +32,68 @@ async function loadEvents(
   role: MembershipRole,
   year: number,
   month: number,
-): Promise<CalendarEvent[]> {
-  // Pad the range by a few days so events bleeding into adjacent weeks still load.
-  const rangeStart = new Date(year, month, -6);
-  const rangeEnd = new Date(year, month + 1, 7);
+  timeZone: string,
+): Promise<{ events: CalendarEvent[]; truncated: boolean }> {
+  // Month boundaries in the viewer's timezone, padded by a week so events
+  // bleeding into adjacent grid cells still load.
+  const rangeStart = zonedTimeToUtc(year, month + 1, -6, 0, 0, timeZone);
+  const rangeEnd = zonedTimeToUtc(year, month + 2, 7, 0, 0, timeZone);
+
+  // Team-wide viewers are scoped by the members' bookings, not the service's
+  // team — a booking whose service was deleted must not vanish.
+  const teamWide = can(role, "booking.all.view");
+  const memberRows = teamWide
+    ? await db
+        .select({ userId: memberships.userId })
+        .from(memberships)
+        .where(and(eq(memberships.teamId, teamId), eq(memberships.accepted, true)))
+    : [];
+  const scopeIds = teamWide ? memberRows.map((row) => row.userId) : [userId];
 
   const rows = await db
-    .select({ booking: bookings })
+    .select({ booking: bookings, serviceTitle: services.title, hostName: users.name, hostUsername: users.username })
     .from(bookings)
     .leftJoin(services, eq(services.id, bookings.serviceId))
+    .leftJoin(users, eq(users.id, bookings.userId))
     .where(
       and(
-        can(role, "booking.all.view")
-          ? eq(services.teamId, teamId)
-          : eq(bookings.userId, userId),
+        inArray(bookings.userId, scopeIds),
         inArray(bookings.status, ["accepted", "pending"]),
         gte(bookings.startTime, rangeStart),
         lt(bookings.startTime, rangeEnd),
       ),
     )
     .orderBy(bookings.startTime)
-    .limit(500);
+    .limit(EVENT_LIMIT + 1);
 
-  if (rows.length === 0) return [];
-  const bookingRows = rows.map((row) => row.booking);
+  const truncated = rows.length > EVENT_LIMIT;
+  const bookingRows = rows.slice(0, EVENT_LIMIT);
+  if (bookingRows.length === 0) return { events: [], truncated: false };
 
   const ats = await db
     .select()
     .from(attendees)
-    .where(inArray(attendees.bookingId, bookingRows.map((r) => r.id)));
+    .where(inArray(attendees.bookingId, bookingRows.map((r) => r.booking.id)));
 
   const nameByBooking = new Map<number, string>();
   for (const a of ats) {
     if (!nameByBooking.has(a.bookingId) || a.isPrimary) nameByBooking.set(a.bookingId, a.name);
   }
 
-  return bookingRows.map((r) => ({
-    uid: r.uid,
-    title: r.title,
-    start: r.startTime.toISOString(),
-    end: r.endTime.toISOString(),
-    status: r.status as "accepted" | "pending",
-    location: r.location,
-    attendee: nameByBooking.get(r.id) ?? null,
-  }));
+  return {
+    truncated,
+    events: bookingRows.map(({ booking: r, serviceTitle, hostName, hostUsername }) => ({
+      uid: r.uid,
+      title: serviceTitle ?? r.title,
+      start: r.startTime.toISOString(),
+      end: r.endTime.toISOString(),
+      status: r.status as "accepted" | "pending",
+      location: r.location,
+      attendee: nameByBooking.get(r.id) ?? null,
+      hostId: r.userId,
+      hostName: teamWide ? hostName ?? hostUsername ?? null : null,
+    })),
+  };
 }
 
 /** The host's own bookable services, for quick-create from the calendar. */
@@ -115,9 +136,17 @@ export default async function CalendarPage({ searchParams }: Props) {
     "booking.all.view",
   ]);
   const { year, month } = parseMonth((await searchParams).month);
-  const [events, services] = await Promise.all([
-    loadEvents(user.id, teamId, role, year, month),
+  const [{ events, truncated }, calendarServices, teamMembers] = await Promise.all([
+    loadEvents(user.id, teamId, role, year, month, user.timeZone),
     loadServices(user.id, teamId, role),
+    can(role, "booking.all.view")
+      ? db
+          .select({ id: users.id, name: users.name, username: users.username })
+          .from(memberships)
+          .innerJoin(users, eq(users.id, memberships.userId))
+          .where(and(eq(memberships.teamId, teamId), eq(memberships.accepted, true)))
+          .orderBy(asc(users.name))
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -125,8 +154,12 @@ export default async function CalendarPage({ searchParams }: Props) {
       year={year}
       month={month}
       events={events}
+      truncated={truncated}
       timeZone={user.timeZone}
-      services={services}
+      hour12={user.timeFormat === 12}
+      weekStart={user.weekStart}
+      services={calendarServices}
+      teamMembers={teamMembers.map((m) => ({ id: m.id, name: m.name ?? m.username }))}
     />
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { MAX_IMAGE_BYTES } from "@/lib/image-upload";
 import { useRef, useTransition } from "react";
 import { ImageUp, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ export function CompanyLogoUpload({
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1_000_000) {
+    if (file.size > MAX_IMAGE_BYTES) {
       toast({ title: "Couldn't upload logo", description: "Image must be under 1 MB.", variant: "destructive" });
       return;
     }

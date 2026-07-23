@@ -25,8 +25,19 @@ import {
   type TeamState,
   type ImportState,
 } from "../actions";
-import { createInviteAction, revokeInviteAction, type InviteState } from "../invite-actions";
-import { Trash2, UserPlus, Upload, Loader2, Check, Copy, Link2 } from "lucide-react";
+import { createInviteAction, resendInviteAction, revokeInviteAction, type InviteState } from "../invite-actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2, UserPlus, Upload, Loader2, Check, Copy, Link2, Send } from "lucide-react";
 
 interface Member {
   membershipId: number;
@@ -42,6 +53,8 @@ interface PendingInvite {
   role: MembershipRole;
   url: string;
   expiresAt: string;
+  invitedAt: string;
+  invitedBy: string | null;
 }
 
 const ASSIGNABLE: MembershipRole[] = ["admin", "scheduler", "member"];
@@ -64,8 +77,6 @@ export function TeamMembers({
   const canManageRoles = can(viewerRole, "member.role.assign");
   const canRemove = can(viewerRole, "member.remove");
   const [copiedId, setCopiedId] = useState<number | null>(null);
-
-  const [revokeState, revoke, revoking] = useActionState<InviteState, FormData>(revokeInviteAction, null);
 
   const [inviteState, invite, inviting] = useActionState<InviteState, FormData>(createInviteAction, null);
   const [importState, runImport, importing] = useActionState<ImportState, FormData>(bulkImportMembersAction, null);
@@ -111,15 +122,6 @@ export function TeamMembers({
       /* clipboard unavailable */
     }
   }
-
-  useEffect(() => {
-    if (revokeState?.ok) {
-      toast({ title: "Invitation revoked" });
-      router.refresh();
-    } else if (revokeState?.error) {
-      toast({ title: "Couldn't revoke invitation", description: revokeState.error, variant: "destructive" });
-    }
-  }, [revokeState, toast, router]);
 
   useEffect(() => {
     if (importState?.ok) {
@@ -234,50 +236,13 @@ export function TeamMembers({
           </p>
           <div className="mt-4 space-y-2">
             {pendingInvites.map((inv) => (
-              <div
+              <InviteRow
                 key={inv.id}
-                className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-medium">{inv.email}</p>
-                    <Badge variant="outline" className="capitalize">{inv.role}</Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Expires {new Date(inv.expiresAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5"
-                    onClick={() => copyPendingLink(inv.url, inv.id)}
-                  >
-                    {copiedId === inv.id ? (
-                      <Check className="h-3.5 w-3.5 text-primary" />
-                    ) : (
-                      <Link2 className="h-3.5 w-3.5" />
-                    )}
-                    {copiedId === inv.id ? "Copied" : "Copy link"}
-                  </Button>
-                  <form action={revoke}>
-                    <input type="hidden" name="inviteId" value={inv.id} />
-                    <input type="hidden" name="teamId" value={teamId} />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 gap-1.5 text-destructive hover:text-destructive"
-                      disabled={revoking}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Revoke
-                    </Button>
-                  </form>
-                </div>
-              </div>
+                invite={inv}
+                teamId={teamId}
+                copied={copiedId === inv.id}
+                onCopy={() => copyPendingLink(inv.url, inv.id)}
+              />
             ))}
           </div>
         </Card>
@@ -287,7 +252,8 @@ export function TeamMembers({
         <Card className="p-5">
           <h2 className="text-sm font-semibold">Bulk import</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Paste CSV with columns: <code>email,name,role</code>. Existing users only.
+            Paste CSV with columns: <code>email,name,role</code>. Existing accounts join the team
+            immediately; unknown emails are reported so you can invite them individually.
           </p>
           <form action={runImport} className="mt-3 space-y-3">
             <input type="hidden" name="teamId" value={teamId} />
@@ -391,12 +357,140 @@ function RemoveButton({
   }, [state, toast, onDone]);
 
   return (
-    <form action={action}>
-      <input type="hidden" name="teamId" value={teamId} />
-      <input type="hidden" name="membershipId" value={membershipId} />
-      <Button type="submit" variant="ghost" size="icon" className="h-8 w-8" disabled={pending}>
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </form>
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={pending} aria-label="Remove member">
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove this member?</AlertDialogTitle>
+          <AlertDialogDescription>
+            They lose access to the dashboard and are unassigned from all services. Their past
+            bookings are kept.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <form action={action}>
+            <input type="hidden" name="teamId" value={teamId} />
+            <input type="hidden" name="membershipId" value={membershipId} />
+            <AlertDialogAction
+              type="submit"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+              disabled={pending}
+            >
+              Remove member
+            </AlertDialogAction>
+          </form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/** One pending invitation with its own action state, so resending or revoking
+ *  one invite never disables the others. */
+function InviteRow({
+  invite: inv,
+  teamId,
+  copied,
+  onCopy,
+}: {
+  invite: PendingInvite;
+  teamId: number;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [revokeState, revoke, revoking] = useActionState<InviteState, FormData>(revokeInviteAction, null);
+  const [resendState, resend, resending] = useActionState<InviteState, FormData>(resendInviteAction, null);
+
+  useEffect(() => {
+    if (revokeState?.ok) {
+      toast({ title: "Invitation revoked" });
+      router.refresh();
+    } else if (revokeState?.error) {
+      toast({ title: "Couldn't revoke invitation", description: revokeState.error, variant: "destructive" });
+    }
+  }, [revokeState, toast, router]);
+
+  useEffect(() => {
+    if (resendState?.ok) {
+      toast({ title: "Invitation re-sent", description: "The expiry was extended by 7 days." });
+      router.refresh();
+    } else if (resendState?.error) {
+      toast({ title: "Couldn't resend invitation", description: resendState.error, variant: "destructive" });
+    }
+  }, [resendState, toast, router]);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate text-sm font-medium">{inv.email}</p>
+          <Badge variant="outline" className="capitalize">{inv.role}</Badge>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {inv.invitedBy ? `Invited by ${inv.invitedBy} · ` : ""}
+          {new Date(inv.invitedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          {" · expires "}
+          {new Date(inv.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5" onClick={onCopy}>
+          {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Link2 className="h-3.5 w-3.5" />}
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+        <form action={resend}>
+          <input type="hidden" name="inviteId" value={inv.id} />
+          <input type="hidden" name="teamId" value={teamId} />
+          <Button type="submit" size="sm" variant="outline" className="h-8 gap-1.5" disabled={resending}>
+            <Send className="h-3.5 w-3.5" />
+            {resending ? "Sending…" : "Resend"}
+          </Button>
+        </form>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1.5 text-destructive hover:text-destructive"
+              disabled={revoking}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Revoke
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revoke this invitation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The signup link for {inv.email} stops working immediately. You can invite them
+                again later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <form action={revoke}>
+                <input type="hidden" name="inviteId" value={inv.id} />
+                <input type="hidden" name="teamId" value={teamId} />
+                <AlertDialogAction
+                  type="submit"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+                  disabled={revoking}
+                >
+                  Revoke
+                </AlertDialogAction>
+              </form>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
   );
 }

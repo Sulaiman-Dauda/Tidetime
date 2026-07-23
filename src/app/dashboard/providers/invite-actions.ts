@@ -11,6 +11,7 @@ import { teamRole } from "@/server/memberships";
 import { inviteEmail } from "@/server/emails";
 import { sendMail } from "@/server/mailer";
 import { randomToken } from "@/lib/crypto";
+import { getAppUrl } from "@/server/app-url";
 
 const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -65,7 +66,7 @@ export async function createInviteAction(_prev: InviteState, formData: FormData)
   });
 
   const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, parsed.data.teamId)).limit(1);
-  const appUrl = process.env.APP_URL || "http://localhost:3100";
+  const appUrl = await getAppUrl();
   const inviteUrl = `${appUrl}/signup?invite=${token}`;
 
   const email = await inviteEmail({
@@ -80,6 +81,7 @@ export async function createInviteAction(_prev: InviteState, formData: FormData)
   await sendMail({ to: parsed.data.email, subject: email.subject, html: email.html });
 
   revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
   return { ok: true, inviteUrl };
 }
 
@@ -87,6 +89,50 @@ const revokeSchema = z.object({
   inviteId: z.coerce.number().int().positive(),
   teamId: z.coerce.number().int().positive(),
 });
+
+/** Re-send a pending invitation: refreshes the 7-day expiry and emails the
+ *  invitee again. Requires member.invite. */
+export async function resendInviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {
+  const user = await requireUser();
+  const parsed = revokeSchema.safeParse({
+    inviteId: formData.get("inviteId"),
+    teamId: formData.get("teamId"),
+  });
+  if (!parsed.success) return { error: "Invalid request" };
+
+  const role = await teamRole(user.id, parsed.data.teamId);
+  if (!role || !can(role, "member.invite")) {
+    return { error: "You don't have permission to manage invitations" };
+  }
+
+  const [invite] = await db
+    .select({ id: invites.id, token: invites.token, email: invites.email })
+    .from(invites)
+    .where(and(
+      eq(invites.id, parsed.data.inviteId),
+      eq(invites.teamId, parsed.data.teamId),
+      isNull(invites.acceptedAt),
+    ))
+    .limit(1);
+  if (!invite) return { error: "Invitation not found" };
+
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await db.update(invites).set({ expiresAt }).where(eq(invites.id, invite.id));
+
+  const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, parsed.data.teamId)).limit(1);
+  const appUrl = await getAppUrl();
+  const inviteUrl = `${appUrl}/signup?invite=${invite.token}`;
+  const email = await inviteEmail({
+    teamName: team?.name ?? "the team",
+    inviterName: user.name ?? user.username,
+    inviteUrl,
+  });
+  await sendMail({ to: invite.email, subject: email.subject, html: email.html });
+
+  revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
+  return { ok: true, inviteUrl };
+}
 
 /** Revoke a pending (unaccepted) invitation. Requires member.invite. */
 export async function revokeInviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {
@@ -113,5 +159,6 @@ export async function revokeInviteAction(_prev: InviteState, formData: FormData)
     );
 
   revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
   return { ok: true };
 }

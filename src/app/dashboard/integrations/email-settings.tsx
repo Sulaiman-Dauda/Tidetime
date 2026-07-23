@@ -347,9 +347,17 @@ export function EmailSettings() {
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <Mail className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-base font-semibold">Email delivery</h2>
-        <Badge variant="success" className="ml-auto">
-          {activeProvider === "smtp" ? "SMTP active" : "Microsoft 365 active"}
-        </Badge>
+        {/* The badge reflects actual health, not just the stored preference —
+            an active-but-unconfigured provider means mail is silently dropped. */}
+        {(activeProvider === "smtp" ? smtp.host.trim().length > 0 : microsoftConnection.connected) ? (
+          <Badge variant="success" className="ml-auto">
+            {activeProvider === "smtp" ? "SMTP active" : "Microsoft 365 active"}
+          </Badge>
+        ) : (
+          <Badge variant="destructive" className="ml-auto">
+            {activeProvider === "smtp" ? "SMTP not configured" : "Microsoft 365 disconnected"}
+          </Badge>
+        )}
       </div>
       <p className="mb-5 text-sm text-muted-foreground">
         Keep both connections configured and choose which one Tidetime uses for booking

@@ -5,6 +5,7 @@ import { Camera, Loader2, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { MAX_IMAGE_BYTES } from "@/lib/image-upload";
 import { initials } from "@/lib/format";
 
 export function AvatarUpload({
@@ -25,7 +26,7 @@ export function AvatarUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 1_000_000) {
+    if (file.size > MAX_IMAGE_BYTES) {
       toast({
         title: "Couldn't upload photo",
         description: "Image must be under 1 MB.",

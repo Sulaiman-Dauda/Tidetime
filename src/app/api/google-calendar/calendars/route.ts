@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac";
 import {
   getGoogleDestinationCalendar,
   getSelectedCalendars,
+  hasExpiredGoogleCredential,
   isGoogleConnected,
   listGoogleCalendars,
   setGoogleDestinationCalendar,
@@ -33,6 +34,7 @@ export async function GET(_req: NextRequest) {
   if (!connected) {
     return NextResponse.json({
       connected: false,
+      expired: await hasExpiredGoogleCredential(user.id),
       calendars: [],
       selected: [],
       destinationCalendarId: null,

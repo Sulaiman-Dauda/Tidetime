@@ -22,56 +22,90 @@ export interface CalendarEvent {
   status: "accepted" | "pending";
   location: string | null;
   attendee: string | null;
+  hostId: number | null;
+  /** set only for team-wide viewers */
+  hostName: string | null;
 }
 
 interface Props {
   year: number;
   month: number;
   events: CalendarEvent[];
+  /** the month had more events than the query limit — some are not shown */
+  truncated: boolean;
   timeZone: string;
+  hour12: boolean;
+  /** 0=Sunday .. 6=Saturday, from the viewer's profile */
+  weekStart: number;
   services: CalendarService[];
+  /** team roster for the provider filter; empty for member-scoped viewers */
+  teamMembers: { id: number; name: string }[];
 }
 
 /** YYYY-MM-DD for an instant rendered in a specific timezone (en-CA → ISO order). */
-function dayKeyInTz(iso: string, timeZone: string): string {
+function dayKeyInTz(iso: string | Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date(iso));
-}
-
-function timeInTz(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    timeZone,
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(iso));
+  }).format(typeof iso === "string" ? new Date(iso) : iso);
 }
 
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
-function monthMatrix(year: number, month: number): (Date | null)[][] {
-  const startDay = new Date(year, month, 1).getDay();
+/**
+ * Month grid of day keys. Cells are plain "YYYY-MM-DD" strings — the same
+ * vocabulary events are bucketed in — so no browser-local Date conversion can
+ * shift a booking onto the wrong cell.
+ */
+function monthMatrix(year: number, month: number, weekStart: number): (string | null)[][] {
+  const startDay = (new Date(year, month, 1).getDay() - weekStart + 7) % 7;
   const days = new Date(year, month + 1, 0).getDate();
-  const cells: (Date | null)[] = [];
+  const cells: (string | null)[] = [];
   for (let i = 0; i < startDay; i++) cells.push(null);
-  for (let d = 1; d <= days; d++) cells.push(new Date(year, month, d));
+  for (let d = 1; d <= days; d++) {
+    cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
   while (cells.length % 7 !== 0) cells.push(null);
-  const rows: (Date | null)[][] = [];
+  const rows: (string | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
   return rows;
 }
 
-function localDayKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+export function CalendarView({
+  year,
+  month,
+  events: allEvents,
+  truncated,
+  timeZone,
+  hour12,
+  weekStart,
+  services,
+  teamMembers,
+}: Props) {
+  const rows = useMemo(() => monthMatrix(year, month, weekStart), [year, month, weekStart]);
+  const weekdays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => WEEKDAY_SHORT[(i + weekStart) % 7]),
+    [weekStart],
+  );
+  // Provider filter for team-wide viewers.
+  const [filterHostId, setFilterHostId] = useState<number | null>(null);
+  const events = useMemo(
+    () => (filterHostId === null ? allEvents : allEvents.filter((e) => e.hostId === filterHostId)),
+    [allEvents, filterHostId],
+  );
 
-export function CalendarView({ year, month, events, timeZone, services }: Props) {
-  const rows = useMemo(() => monthMatrix(year, month), [year, month]);
+  function timeInTz(iso: string): string {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12,
+    }).format(new Date(iso));
+  }
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startMove] = useTransition();
@@ -129,9 +163,11 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
     return map;
   }, [events, timeZone]);
 
-  const todayKey = localDayKey(new Date());
+  // "Today" in the profile timezone — the browser's clock must not decide
+  // which cell gets the highlight.
+  const todayKey = dayKeyInTz(new Date(), timeZone);
   const defaultSelected = useMemo(() => {
-    const visibleDays = rows.flat().filter((d): d is Date => Boolean(d)).map((d) => localDayKey(d));
+    const visibleDays = rows.flat().filter((d): d is string => Boolean(d));
     if (visibleDays.includes(todayKey)) return todayKey;
     const firstWithEvents = visibleDays.find((key) => (byDay.get(key)?.length ?? 0) > 0);
     return firstWithEvents ?? visibleDays[0] ?? null;
@@ -144,16 +180,17 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
 
   const prev = month === 0 ? monthKey(year - 1, 11) : monthKey(year, month - 1);
   const next = month === 11 ? monthKey(year + 1, 0) : monthKey(year, month + 1);
-  const thisMonth = monthKey(new Date().getFullYear(), new Date().getMonth());
+  const [todayYear, todayMonth] = todayKey.split("-").map(Number);
+  const thisMonth = monthKey(todayYear, todayMonth - 1);
 
-  const monthLabel = new Date(year, month, 1).toLocaleString(undefined, {
+  const monthLabel = new Date(year, month, 1).toLocaleString("en-US", {
     month: "long",
     year: "numeric",
   });
 
   const selectedEvents = selected ? byDay.get(selected) ?? [] : [];
   const selectedLabel = selected
-    ? new Date(`${selected}T00:00:00`).toLocaleDateString(undefined, {
+    ? new Date(`${selected}T00:00:00`).toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
         day: "numeric",
@@ -171,6 +208,19 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {teamMembers.length > 1 ? (
+            <select
+              aria-label="Filter by provider"
+              value={filterHostId === null ? "all" : String(filterHostId)}
+              onChange={(ev) => setFilterHostId(ev.target.value === "all" ? null : Number(ev.target.value))}
+              className="h-8 rounded-xl border bg-card px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="all">All providers</option>
+              {teamMembers.map((member) => (
+                <option key={member.id} value={member.id}>{member.name}</option>
+              ))}
+            </select>
+          ) : null}
           <Button asChild variant="outline" size="sm">
             <Link href={`/dashboard/calendar?month=${thisMonth}` as Route}>Today</Link>
           </Button>
@@ -190,21 +240,27 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
         </div>
       </div>
 
+      {truncated ? (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
+          This month has more bookings than the calendar can display — some are hidden. Use the
+          provider filter or the Bookings page to see everything.
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-[1fr_300px] lg:items-start">
         {/* Month grid — sticky on desktop so it stays in view while a busy day's
             bookings scroll in the rail. Offset clears the sticky top bar (h-14). */}
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-card lg:sticky lg:top-[72px] lg:self-start">
           <div className="grid grid-cols-7 border-b border-border/50 bg-muted/30 text-center text-xs font-semibold text-foreground/60">
-            {WEEKDAY_SHORT.map((d) => (
+            {weekdays.map((d) => (
               <div key={d} className="py-2.5">
                 {d}
               </div>
             ))}
           </div>
           <div className="grid grid-cols-7">
-            {rows.flat().map((date, i) => {
-              if (!date) return <div key={i} className="min-h-[104px] border-b border-r border-border/50 bg-muted/10" />;
-              const key = localDayKey(date);
+            {rows.flat().map((key, i) => {
+              if (!key) return <div key={i} className="min-h-[104px] border-b border-r border-border/50 bg-muted/10" />;
               const dayEvents = byDay.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selected;
@@ -262,7 +318,7 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
                           : "text-foreground/70 group-hover:text-foreground",
                       )}
                     >
-                      {date.getDate()}
+                      {Number(key.slice(-2))}
                     </span>
                     <button
                       type="button"
@@ -299,19 +355,38 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
                         )}
                         title={`${e.title} — drag to another day to reschedule`}
                       >
-                        <span className="tabular-nums opacity-70">{timeInTz(e.start, timeZone)}</span>{" "}
+                        <span className="tabular-nums opacity-70">{timeInTz(e.start)}</span>{" "}
                         {e.title}
+                        {e.hostName ? <span className="opacity-60"> · {e.hostName}</span> : null}
                       </div>
                     ))}
                     {dayEvents.length > 3 ? (
-                      <div className="px-1.5 text-[11px] font-semibold text-foreground/50">
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          setSelected(key);
+                        }}
+                        className="w-full rounded px-1.5 text-left text-[11px] font-semibold text-primary/80 hover:text-primary"
+                      >
                         +{dayEvents.length - 3} more
-                      </div>
+                      </button>
                     ) : null}
                   </div>
                 </div>
               );
             })}
+          </div>
+          <div className="flex items-center gap-4 border-t border-border/50 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary/60" aria-hidden />
+              Confirmed
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500/70" aria-hidden />
+              Awaiting approval
+            </span>
+            <span className="ml-auto hidden sm:block">Times in {timeZone.replace(/_/g, " ")}</span>
           </div>
         </div>
 
@@ -364,12 +439,13 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
                   <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5" />
-                      {timeInTz(e.start, timeZone)} – {timeInTz(e.end, timeZone)}
+                      {timeInTz(e.start)} – {timeInTz(e.end)}
                     </span>
                     {e.attendee ? (
                       <span className="flex items-center gap-1.5">
                         <User className="h-3.5 w-3.5" />
                         {e.attendee}
+                        {e.hostName ? <span className="text-muted-foreground/70">with {e.hostName}</span> : null}
                       </span>
                     ) : null}
                     {e.location ? (

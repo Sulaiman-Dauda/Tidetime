@@ -54,6 +54,7 @@ export async function changeMemberRoleAction(_prev: TeamState, formData: FormDat
     .where(eq(users.id, target.userId));
 
   revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
   return { ok: true };
 }
 
@@ -103,6 +104,7 @@ export async function removeMemberAction(_prev: TeamState, formData: FormData): 
   });
 
   revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
   return { ok: true };
 }
 
@@ -145,15 +147,19 @@ export async function bulkImportMembersAction(_prev: ImportState, formData: Form
       .where(and(eq(memberships.userId, u.id), eq(memberships.teamId, teamId)))
       .limit(1);
     if (existing) continue;
+    // Admin-initiated import of an existing account is direct membership —
+    // there is no invite token to accept, so an `accepted: false` row would be
+    // stranded as "Pending" forever.
     await db.insert(memberships).values({
       userId: u.id,
       teamId,
       role: row.role as MembershipRole,
-      accepted: false,
+      accepted: true,
     });
     added++;
   }
 
   revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
   return { ok: true, added, errors: rowErrors };
 }

@@ -4,7 +4,10 @@ export function listTimeZones(): string[] {
   const sv = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
   if (typeof sv === "function") {
     try {
-      return sv("timeZone");
+      const zones = sv("timeZone");
+      // The runtime list omits plain "UTC", but users (and the seed) store it —
+      // a select whose value is missing from its options renders blank.
+      return zones.includes("UTC") ? zones : ["UTC", ...zones];
     } catch {
       /* fall through */
     }

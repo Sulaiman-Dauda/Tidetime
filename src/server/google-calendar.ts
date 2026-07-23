@@ -130,6 +130,21 @@ export async function isGoogleConnected(userId: number): Promise<boolean> {
   return Boolean(cred);
 }
 
+/**
+ * A connection that used to work but whose refresh token now fails. Surfaced
+ * in the UI as "reconnect needed" — silently showing "not connected" hides
+ * that conflict checking stopped.
+ */
+export async function hasExpiredGoogleCredential(userId: number): Promise<boolean> {
+  if (!userId) return false;
+  const [cred] = await db
+    .select({ id: credentials.id })
+    .from(credentials)
+    .where(and(eq(credentials.userId, userId), eq(credentials.invalid, true)))
+    .limit(1);
+  return Boolean(cred);
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Calendar listing & selection                                               */
 /* -------------------------------------------------------------------------- */
