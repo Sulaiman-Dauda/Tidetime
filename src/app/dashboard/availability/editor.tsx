@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,9 +40,11 @@ type Props = {
   schedule: { id: number; name: string; timeZone: string };
   initialWeekly: WeeklyRule[];
   initialOverrides: DateOverride[];
+  /** 0=Sunday .. 6=Saturday, from the viewer's profile */
+  weekStart?: number;
 };
 
-export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }: Props) {
+export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides, weekStart = 0 }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -132,7 +135,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
         <div className="rounded-2xl border border-border/60 bg-card p-5">
           <h3 className="mb-4 text-sm font-semibold">Weekly hours</h3>
           <div className="space-y-1">
-            {weekly.map((rule) => {
+            {[...weekly].sort((a, b) => ((a.day - weekStart + 7) % 7) - ((b.day - weekStart + 7) % 7)).map((rule) => {
               const enabled = rule.intervals.length > 0;
               return (
                 <div key={rule.day} className="flex flex-col gap-3 border-b py-3 last:border-0 sm:flex-row sm:items-start sm:gap-4">
@@ -214,6 +217,13 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                   All hours on this page are wall-clock times in this timezone.
                 </p>
               </div>
+            </div>
+            <div className="mt-3 rounded-lg bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
+              Buffers, minimum notice and slot spacing are configured per service in the{" "}
+              <Link href="/dashboard/services" className="font-medium text-foreground underline-offset-2 hover:underline">
+                service editor
+              </Link>
+              ; these hours are the outer bounds.
             </div>
             <div className="mt-4 border-t border-border/40 pt-3">
               <DeleteScheduleButton scheduleId={schedule.id} scheduleName={name} />

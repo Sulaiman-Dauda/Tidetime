@@ -1268,14 +1268,16 @@ function CustomField({
         ? "number"
         : field.type === "email"
           ? "email"
-          : "text";
+          : field.type === "date"
+            ? "date"
+            : "text";
 
   return (
     <FormField
       label={field.label}
       htmlFor={field.name}
       required={field.required}
-      hint={field.type === "phone" ? "Include your country code, e.g. +44" : undefined}
+      hint={field.hint ?? (field.type === "phone" ? "Include your country code, e.g. +44" : undefined)}
       error={error}
     >
       {field.type === "textarea" ? (
@@ -1286,6 +1288,19 @@ function CustomField({
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         />
+      ) : field.type === "select" ? (
+        <select
+          id={field.name}
+          aria-invalid={Boolean(error)}
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) => onChange(event.target.value)}
+          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="">Choose…</option>
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
       ) : (
         <Input
           id={field.name}

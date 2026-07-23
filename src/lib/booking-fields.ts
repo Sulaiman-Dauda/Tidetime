@@ -70,6 +70,18 @@ export function validateResponses(
       errors[field.name] = "Enter a valid phone number";
     } else if (field.type === "number" && typeof value === "string" && Number.isNaN(Number(value))) {
       errors[field.name] = "Enter a valid number";
+    } else if (
+      field.type === "select" &&
+      typeof value === "string" &&
+      !(field.options ?? []).includes(value)
+    ) {
+      errors[field.name] = "Pick one of the listed options";
+    } else if (
+      field.type === "date" &&
+      typeof value === "string" &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(value)
+    ) {
+      errors[field.name] = "Enter a valid date";
     }
   }
 

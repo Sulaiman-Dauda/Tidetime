@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { BookingField, EventLocation, Service } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -65,18 +66,36 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
   const [locations, setLocations] = useState<EventLocation[]>(service.locations.length ? service.locations : [{ type: "jitsi" }]);
   const [fields, setFields] = useState<BookingField[]>(service.bookingFields);
   const [providerIds, setProviderIds] = useState<number[]>(selectedProviderIds);
+  const [draft, setDraft] = useState(service.draft);
 
   const publicUrl = `${appUrl}/book/${teamSlug}/${form.slug}`;
+
+  // Unsaved-changes tracking: warn before the browser discards edits.
+  const snapshot = useMemo(
+    () => JSON.stringify({ form, locations, fields, providerIds, draft }),
+    [form, locations, fields, providerIds, draft],
+  );
+  const savedSnapshot = useRef(snapshot);
+  const dirty = snapshot !== savedSnapshot.current;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function save() {
+  function save(nextDraft = draft) {
     startTransition(async () => {
       const result = await updateServiceAction({
         id: service.id,
         ...form,
+        draft: nextDraft,
         locations,
         bookingFields: fields,
         providerIds,
@@ -85,7 +104,11 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
         toast({ title: "Could not save service", description: result.error, variant: "destructive" });
         return;
       }
-      toast({ title: service.draft ? "Service published" : "Service saved" });
+      setDraft(nextDraft);
+      savedSnapshot.current = JSON.stringify({ form, locations, fields, providerIds, draft: nextDraft });
+      toast({
+        title: draft && !nextDraft ? "Service published" : nextDraft ? "Draft saved" : "Service saved",
+      });
       router.refresh();
     });
   }
@@ -95,11 +118,25 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
       <div className="flex flex-wrap items-center gap-3">
         <Button asChild variant="ghost" size="icon"><Link href="/dashboard/services"><ArrowLeft className="h-4 w-4" /></Link></Button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">{service.draft ? "New service" : form.title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="truncate text-xl font-semibold">{service.draft ? "New service" : form.title}</h1>
+            {draft ? <Badge variant="secondary">Draft</Badge> : null}
+            {dirty ? <Badge variant="outline" className="text-muted-foreground">Unsaved changes</Badge> : null}
+          </div>
           <a href={publicUrl} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground">{publicUrl}</a>
         </div>
-        <Button onClick={save} disabled={pending || providerIds.length === 0 || locations.length === 0}>
-          <Check className="h-4 w-4" /> {pending ? "Saving…" : service.draft ? "Publish service" : "Save"}
+        {!draft ? (
+          <Button
+            variant="outline"
+            onClick={() => save(true)}
+            disabled={pending}
+            title="Take the service off the public booking page while you edit"
+          >
+            Unpublish
+          </Button>
+        ) : null}
+        <Button onClick={() => save(false)} disabled={pending || providerIds.length === 0 || locations.length === 0}>
+          <Check className="h-4 w-4" /> {pending ? "Saving…" : draft ? "Publish service" : "Save"}
         </Button>
       </div>
 
@@ -169,17 +206,48 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
 
       <Card className="space-y-5 p-6">
         <SectionTitle title="Booking questions" description="Name and email are always included. Add only information the provider needs." />
-        {fields.map((field, index) => (
-          <div key={`${field.name}-${index}`} className="grid gap-2 rounded-xl border border-border/60 p-3 sm:grid-cols-[1fr_160px_auto]">
-            <Input value={field.label} onChange={(e) => setFields((items) => items.map((item, i) => i === index ? { ...item, label: e.target.value } : item))} />
-            <Select value={field.type} disabled={field.system} onValueChange={(value) => setFields((items) => items.map((item, i) => i === index ? { ...item, type: value as BookingField["type"] } : item))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="text">Short text</SelectItem><SelectItem value="textarea">Long text</SelectItem><SelectItem value="phone">Phone</SelectItem><SelectItem value="number">Number</SelectItem><SelectItem value="checkbox">Checkbox</SelectItem></SelectContent>
-            </Select>
-            {field.system ? null : <Button variant="ghost" size="icon" onClick={() => setFields((items) => items.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button>}
-            <label className="flex items-center gap-2 text-xs text-muted-foreground"><Switch checked={field.required} onCheckedChange={(value) => setFields((items) => items.map((item, i) => i === index ? { ...item, required: value } : item))} /> Required</label>
-          </div>
-        ))}
+        {fields.map((field, index) => {
+          const update = (patch: Partial<BookingField>) =>
+            setFields((items) => items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+          return (
+            <div key={`${field.name}-${index}`} className="space-y-2 rounded-xl border border-border/60 p-3">
+              <div className="grid gap-2 sm:grid-cols-[1fr_170px_auto]">
+                <Input value={field.label} onChange={(e) => update({ label: e.target.value })} />
+                <Select value={field.type} disabled={field.system} onValueChange={(value) => update({ type: value as BookingField["type"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Short text</SelectItem>
+                    <SelectItem value="textarea">Long text</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="checkbox">Checkbox</SelectItem>
+                    <SelectItem value="select">Dropdown</SelectItem>
+                    <SelectItem value="date">Date</SelectItem>
+                  </SelectContent>
+                </Select>
+                {field.system ? null : <Button variant="ghost" size="icon" onClick={() => setFields((items) => items.filter((_, i) => i !== index))} aria-label="Remove question"><Trash2 className="h-4 w-4" /></Button>}
+              </div>
+              {field.type === "select" ? (
+                <Input
+                  value={(field.options ?? []).join(", ")}
+                  placeholder="Options, comma separated — e.g. Small, Medium, Large"
+                  onChange={(e) => update({ options: e.target.value.split(",").map((o) => o.trim()).filter(Boolean) })}
+                />
+              ) : null}
+              {field.system ? null : (
+                <Input
+                  value={field.hint ?? ""}
+                  placeholder="Help text shown under the question (optional)"
+                  className="text-xs"
+                  onChange={(e) => update({ hint: e.target.value || undefined })}
+                />
+              )}
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch checked={field.required} onCheckedChange={(value) => update({ required: value })} /> Required
+              </label>
+            </div>
+          );
+        })}
         <Button variant="outline" size="sm" onClick={() => setFields((items) => [...items, { name: `question_${Date.now()}`, label: "New question", type: "text", required: false }])}><Plus className="h-4 w-4" /> Add question</Button>
       </Card>
     </div>

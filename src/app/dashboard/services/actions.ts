@@ -100,6 +100,8 @@ const updateSchema = z.object({
   slotInterval: z.number().int().min(5).max(1440).nullable(),
   requiresConfirmation: z.boolean(),
   disableGuests: z.boolean(),
+  /** explicit status — saving no longer force-publishes */
+  draft: z.boolean(),
   locations: eventLocationsSchema.min(1, "Add at least one location").max(3),
   bookingFields: bookingFieldsSchema,
   providerIds: z.array(z.number().int().positive()).min(1, "Assign at least one provider"),
@@ -142,7 +144,7 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
       bookingFields: data.bookingFields,
       requiresConfirmation: data.requiresConfirmation,
       disableGuests: data.disableGuests,
-      draft: false,
+      draft: data.draft,
       updatedAt: new Date(),
     }).where(eq(services.id, data.id));
     await tx.delete(serviceProviders).where(eq(serviceProviders.serviceId, data.id));
@@ -150,7 +152,14 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
   });
   revalidatePath("/dashboard/services");
   revalidatePath(`/dashboard/services/${data.id}`);
+  revalidatePublicPages(company.slug, data.slug);
   return { ok: true };
+}
+
+/** Keep the public booking pages in step with catalog changes. */
+function revalidatePublicPages(teamSlug: string, serviceSlug?: string) {
+  revalidatePath(`/book/${teamSlug}`);
+  if (serviceSlug) revalidatePath(`/book/${teamSlug}/${serviceSlug}`);
 }
 
 export async function listServices() {
@@ -185,15 +194,19 @@ export async function deleteServiceAction(formData: FormData) {
   const company = await companyForServiceManager(user.id);
   await db.delete(services).where(and(eq(services.id, Number(formData.get("id"))), eq(services.teamId, company.teamId)));
   revalidatePath("/dashboard/services");
+  revalidatePublicPages(company.slug);
 }
 
 export async function toggleHiddenAction(formData: FormData) {
   const user = await requireUser();
   const company = await companyForServiceManager(user.id);
   const id = Number(formData.get("id"));
+  const [row] = await db.select({ slug: services.slug }).from(services)
+    .where(and(eq(services.id, id), eq(services.teamId, company.teamId))).limit(1);
   await db.update(services).set({ hidden: formData.get("hidden") !== "true" })
     .where(and(eq(services.id, id), eq(services.teamId, company.teamId)));
   revalidatePath("/dashboard/services");
+  revalidatePublicPages(company.slug, row?.slug);
 }
 
 export async function duplicateServiceAction(formData: FormData) {
@@ -212,6 +225,7 @@ export async function duplicateServiceAction(formData: FormData) {
   }).returning({ id: services.id });
   if (hosts.length) await db.insert(serviceProviders).values(hosts.map((host) => ({ serviceId: created.id, userId: host.userId })));
   revalidatePath("/dashboard/services");
+  revalidatePublicPages(company.slug);
 }
 
 export async function reorderServicesAction(formData: FormData) {
@@ -227,4 +241,5 @@ export async function reorderServicesAction(formData: FormData) {
     await tx.update(services).set({ position: rows[index].position }).where(eq(services.id, rows[target].id));
   });
   revalidatePath("/dashboard/services");
+  revalidatePublicPages(company.slug);
 }

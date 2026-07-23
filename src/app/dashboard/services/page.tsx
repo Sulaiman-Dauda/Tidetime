@@ -7,10 +7,10 @@ import { eq } from "drizzle-orm";
 import {
   listServices,
   duplicateServiceAction,
-  toggleHiddenAction,
   reorderServicesAction,
 } from "./actions";
 import { NewServiceButton } from "../_components/new-service-button";
+import { HideServiceButton } from "../_components/hide-service-button";
 import { DeleteServiceButton } from "../_components/delete-service-button";
 import { PageHeader } from "../_components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -152,17 +152,7 @@ export default async function ServicesPage({ searchParams }: Props) {
                       <Copy className="h-3.5 w-3.5" />
                     </button>
                   </form> : null}
-                  {canManage ? <form action={toggleHiddenAction}>
-                    <input type="hidden" name="id" value={et.id} />
-                    <input type="hidden" name="hidden" value={String(et.hidden)} />
-                    <button
-                      type="submit"
-                      title={et.hidden ? "Show" : "Hide"}
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      <EyeOff className="h-3.5 w-3.5" />
-                    </button>
-                  </form> : null}
+                  {canManage ? <HideServiceButton id={et.id} hidden={et.hidden} title={et.title} /> : null}
                   <Link
                     href={`/dashboard/services/${et.id}` as Route}
                     title={canManage ? "Edit" : "View"}
@@ -200,7 +190,7 @@ function EmptyState({
         {!canManage
           ? "An owner or manager can assign you to a company service."
           : firstRun
-          ? "Your workspace is ready. Create the first service people can book with you — we’ll open the editor right away so you can adjust duration, availability, questions, pricing, and more."
+          ? "Your workspace is ready. Create the first service people can book with you — we’ll open the editor right away so you can adjust duration, location, providers, questions, and more."
           : "Services are what people book — like a 30-minute consultation, a haircut, or a class. Each one gets its own booking page."}
       </p>
       {canManage ? <div className="mt-6">

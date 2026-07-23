@@ -94,20 +94,36 @@ const bookingFieldTypeSchema = z.enum([
   "phone",
   "number",
   "checkbox",
+  "select",
+  "date",
 ]);
 
-const bookingFieldSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Field name is required")
-    .max(64)
-    .regex(/^[a-zA-Z0-9_]+$/, "Use letters, numbers, and underscores only"),
-  label: z.string().trim().min(1, "Field label is required").max(128),
-  type: bookingFieldTypeSchema,
-  required: z.boolean(),
-  system: z.boolean().optional(),
-});
+const bookingFieldSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Field name is required")
+      .max(64)
+      .regex(/^[a-zA-Z0-9_]+$/, "Use letters, numbers, and underscores only"),
+    label: z.string().trim().min(1, "Field label is required").max(128),
+    type: bookingFieldTypeSchema,
+    required: z.boolean(),
+    system: z.boolean().optional(),
+    /** dropdown choices — required for "select" fields */
+    options: z.array(z.string().trim().min(1).max(128)).max(50).optional(),
+    /** helper text shown under the input on the public form */
+    hint: z.string().trim().max(200).optional(),
+  })
+  .superRefine((field, ctx) => {
+    if (field.type === "select" && (!field.options || field.options.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `"${field.label}" needs at least one option`,
+        path: ["options"],
+      });
+    }
+  });
 
 export const bookingFieldsSchema = z
   .array(bookingFieldSchema)

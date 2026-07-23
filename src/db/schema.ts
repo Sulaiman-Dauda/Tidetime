@@ -565,7 +565,9 @@ export type BookingFieldType =
   | "email"
   | "phone"
   | "number"
-  | "checkbox";
+  | "checkbox"
+  | "select"
+  | "date";
 
 export type BookingField = {
   name: string;
@@ -574,6 +576,10 @@ export type BookingField = {
   required: boolean;
   /** System fields (name/email) cannot be removed or retyped. */
   system?: boolean;
+  /** dropdown choices — required for "select" fields */
+  options?: string[];
+  /** helper text shown under the input on the public form */
+  hint?: string;
 };
 
 

@@ -68,6 +68,7 @@ export default async function AvailabilityPage() {
         schedule={{ id: active.id, name: active.name, timeZone: active.timeZone ?? user.timeZone }}
         initialWeekly={weekly}
         initialOverrides={overrides}
+        weekStart={user.weekStart}
       />
     </div>
   );
