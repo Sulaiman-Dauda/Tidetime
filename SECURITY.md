@@ -2,7 +2,8 @@
 
 > Audience: security reporters, maintainers, and self-hosters.
 >
-> If you need product help instead, see [docs/README.md](./docs/README.md) or [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md).
+> For setup and deployment help, see the [README](./README.md) and
+> [deployment guide](./docs/DEPLOYMENT.md).
 
 ## Supported versions
 
@@ -44,7 +45,8 @@ Tidetime already includes several security-focused defaults:
 - `scrypt` password hashing
 - AES-GCM encryption for stored credentials
 - HMAC-signed outgoing webhooks
-- Stripe webhook signature verification
+- SSRF-resistant webhook validation with DNS-pinned outbound connections
+- role- and ownership-scoped server authorization
 - global security headers with clickjacking protection on sensitive routes
 - strict environment validation in production
 

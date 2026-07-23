@@ -15,7 +15,7 @@ describe("mergeTeamSlots", () => {
     expect(mergeTeamSlots([])).toEqual([]);
   });
 
-  it("unions slots for round_robin and sums seats", () => {
+  it("unions provider slots and preserves eligible provider IDs", () => {
     const out = mergeTeamSlots([hostA, hostB]);
     expect(out.map((s) => s.time)).toEqual([
       "2025-01-01T09:00:00Z",
@@ -24,7 +24,6 @@ describe("mergeTeamSlots", () => {
     ]);
     const shared = out.find((s) => s.time === "2025-01-01T10:00:00Z")!;
     expect(shared.hostIds.sort()).toEqual([1, 2]);
-    expect(shared.seatsRemaining).toBe(2);
   });
 
   it("sorts slots chronologically", () => {

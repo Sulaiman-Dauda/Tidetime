@@ -17,7 +17,7 @@ async function getOAuthClient() {
   const creds = await getGoogleCreds();
   if (!creds) {
     throw new Error(
-      "Google OAuth is not configured — add it in Settings → Integrations (or set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)",
+      "Google OAuth is not configured — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
     );
   }
   return new google.auth.OAuth2(

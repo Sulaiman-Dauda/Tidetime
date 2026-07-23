@@ -430,8 +430,7 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
 }
 
 /**
- * Side effects for a booking that now needs host approval. Callers should only
- * invoke this after the attendee has finished any required payment.
+ * Notify both parties when a booking is waiting for provider approval.
  */
 export async function runPendingApprovalEffects(bookingId: number): Promise<void> {
   const ctx = await loadBookingContext(bookingId);

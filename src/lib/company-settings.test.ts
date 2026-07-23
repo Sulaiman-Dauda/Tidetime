@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_COMPANY_BOOKING,
   DEFAULT_COMPANY_PROFILE,
-  dateFormatOptions,
   mergeWithDefaults,
   normalizeBrandColor,
 } from "./company-settings";
@@ -26,18 +25,11 @@ describe("mergeWithDefaults", () => {
 
   it("ignores type-mismatched values", () => {
     const merged = mergeWithDefaults(DEFAULT_COMPANY_BOOKING, {
-      futureBookingLimitDays: "lots",
-      minimumBookingNoticeMinutes: 30,
+      bookingDisabled: "yes",
+      spamProtectionEnabled: true,
     });
-    expect(merged.futureBookingLimitDays).toBe(DEFAULT_COMPANY_BOOKING.futureBookingLimitDays);
-    expect(merged.minimumBookingNoticeMinutes).toBe(30);
-  });
-
-  it("accepts array overrides", () => {
-    const merged = mergeWithDefaults(DEFAULT_COMPANY_BOOKING, {
-      appointmentStatuses: ["A", "B"],
-    });
-    expect(merged.appointmentStatuses).toEqual(["A", "B"]);
+    expect(merged.bookingDisabled).toBe(DEFAULT_COMPANY_BOOKING.bookingDisabled);
+    expect(merged.spamProtectionEnabled).toBe(true);
   });
 
   it("does not mutate the defaults object", () => {
@@ -57,13 +49,5 @@ describe("normalizeBrandColor", () => {
     expect(normalizeBrandColor("blue")).toBe(DEFAULT_COMPANY_PROFILE.brandColor);
     expect(normalizeBrandColor("")).toBe(DEFAULT_COMPANY_PROFILE.brandColor);
     expect(normalizeBrandColor(null)).toBe(DEFAULT_COMPANY_PROFILE.brandColor);
-  });
-});
-
-describe("dateFormatOptions", () => {
-  it("maps each format to Intl options", () => {
-    expect(dateFormatOptions("DMY")).toMatchObject({ day: "2-digit" });
-    expect(dateFormatOptions("MDY")).toMatchObject({ month: "2-digit" });
-    expect(dateFormatOptions("YMD")).toMatchObject({ year: "numeric" });
   });
 });

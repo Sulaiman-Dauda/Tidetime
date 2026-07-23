@@ -25,7 +25,7 @@ export interface AltchaChallenge {
   maxnumber: number;
 }
 
-export interface AltchaSolution {
+interface AltchaSolution {
   algorithm: string;
   challenge: string;
   number: number;
@@ -80,24 +80,4 @@ export function verifyAltchaSolution(solution: unknown, now = Date.now()): boole
   if (!safeEqualHex(sha256Hex(s.salt + s.number), s.challenge)) return false;
   if (!safeEqualHex(hmacHex(s.challenge), s.signature)) return false;
   return true;
-}
-
-/**
- * Reference solver — brute-forces the number. Used by the built-in widget and by
- * tests. Returns null if no solution is found within maxnumber (shouldn't happen
- * for a well-formed challenge).
- */
-export function solveAltchaChallenge(challenge: AltchaChallenge): AltchaSolution | null {
-  for (let number = 0; number <= challenge.maxnumber; number++) {
-    if (sha256Hex(challenge.salt + number) === challenge.challenge) {
-      return {
-        algorithm: challenge.algorithm,
-        challenge: challenge.challenge,
-        number,
-        salt: challenge.salt,
-        signature: challenge.signature,
-      };
-    }
-  }
-  return null;
 }

@@ -4,9 +4,8 @@
  * Two layers:
  *  - `isBlockedHostname` / `isBlockedIp`: fast, synchronous, literal checks used
  *    at registration time for good UX and cheap defence.
- *  - `assertPublicUrl`: authoritative async check that resolves DNS and verifies
- *    every resolved address is publicly routable. Use this immediately before the
- *    actual fetch so DNS-rebinding can't slip an internal address past validation.
+ *  - server-side resolution verifies every address is publicly routable, and
+ *    webhook delivery pins the connection to a verified address.
  */
 
 /** Parse a dotted IPv4 string into four octets, or null if not valid IPv4. */
@@ -32,6 +31,10 @@ function isBlockedIpv4(host: string): boolean {
     (a === 192 && b === 168) || // private
     (a === 100 && b >= 64 && b <= 127) || // CGNAT 100.64.0.0/10
     (a === 192 && b === 0 && o[2] === 0) || // 192.0.0.0/24 IETF protocol assignments
+    (a === 192 && b === 0 && o[2] === 2) || // TEST-NET-1
+    (a === 198 && (b === 18 || b === 19)) || // benchmark testing
+    (a === 198 && b === 51 && o[2] === 100) || // TEST-NET-2
+    (a === 203 && b === 0 && o[2] === 113) || // TEST-NET-3
     a >= 224 // multicast / reserved / broadcast
   );
 }
@@ -43,9 +46,23 @@ function isBlockedIpv6(raw: string): boolean {
   // IPv4-mapped (::ffff:a.b.c.d) — validate the embedded IPv4.
   const mapped = host.match(/(?:::ffff:)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
   if (mapped) return isBlockedIpv4(mapped[1]);
+  const mappedHex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const high = Number.parseInt(mappedHex[1], 16);
+    const low = Number.parseInt(mappedHex[2], 16);
+    return isBlockedIpv4(
+      `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`,
+    );
+  }
   const head = host.split(":")[0] ?? "";
-  // fc00::/7 unique-local (fc.. / fd..) and fe80::/10 link-local.
-  return /^f[cd]/.test(head) || /^fe[89ab]/.test(head);
+  // fc00::/7 unique-local, fe80::/10 link-local, ff00::/8 multicast, and
+  // 2001:db8::/32 documentation addresses.
+  return (
+    /^f[cd]/.test(head) ||
+    /^fe[89ab]/.test(head) ||
+    /^ff/.test(head) ||
+    host.startsWith("2001:db8:")
+  );
 }
 
 /** Synchronous check of a literal IP address. */

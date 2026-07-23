@@ -71,7 +71,6 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "googleapis": "^173.0.0",
-    "intl-messageformat": "^11.2.8",
     "lucide-react": "^0.469.0",
     "next": "^16.2.11",
     "next-themes": "^0.4.4",

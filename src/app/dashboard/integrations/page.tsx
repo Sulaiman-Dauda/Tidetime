@@ -3,8 +3,8 @@ import { requirePermission } from "@/lib/guard";
 import { db } from "@/db";
 import { webhooks } from "@/db/schema";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
-import { GoogleCalendarSettings } from "@/app/dashboard/settings/google-calendar-settings";
-import { EmailSettings } from "@/app/dashboard/settings/email-settings";
+import { GoogleCalendarSettings } from "./google-calendar-settings";
+import { EmailSettings } from "./email-settings";
 import { WebhookManager } from "./webhook-manager";
 
 export const metadata = { title: "Connections" };

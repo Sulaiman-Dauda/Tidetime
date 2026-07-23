@@ -8,27 +8,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * another attendee's response by guessing the URL.
  */
 
-export const RSVP_STATUSES = ["accepted", "declined", "tentative"] as const;
+const RSVP_STATUSES = ["accepted", "declined", "tentative"] as const;
 export type RsvpStatus = (typeof RSVP_STATUSES)[number];
-/** Stored default before the attendee has answered. */
-export type RsvpState = RsvpStatus | "needs_action";
 
 export function isRsvpStatus(v: unknown): v is RsvpStatus {
   return typeof v === "string" && (RSVP_STATUSES as readonly string[]).includes(v);
-}
-
-/** Map our status to the iCalendar PARTSTAT value. */
-export function rsvpPartstat(status: RsvpState): string {
-  switch (status) {
-    case "accepted":
-      return "ACCEPTED";
-    case "declined":
-      return "DECLINED";
-    case "tentative":
-      return "TENTATIVE";
-    default:
-      return "NEEDS-ACTION";
-  }
 }
 
 function normalizeEmail(email: string): string {

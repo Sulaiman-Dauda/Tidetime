@@ -83,16 +83,8 @@ export function can(role: MembershipRole, permission: Permission): boolean {
   return MATRIX[role]?.includes(permission) ?? false;
 }
 
-export function canAll(role: MembershipRole, permissions: Permission[]): boolean {
-  return permissions.every((permission) => can(role, permission));
-}
-
 export function canAny(role: MembershipRole, permissions: Permission[]): boolean {
   return permissions.some((permission) => can(role, permission));
-}
-
-export function permissionsFor(role: MembershipRole): Permission[] {
-  return MATRIX[role] ?? [];
 }
 
 const RANK: Record<MembershipRole, number> = {
@@ -108,8 +100,4 @@ export function canAssignRole(actor: MembershipRole, target: MembershipRole): bo
   if (!can(actor, "member.role.assign")) return false;
   if (actor === "owner") return true;
   return RANK[target] < RANK[actor];
-}
-
-export function compareRoles(a: MembershipRole, b: MembershipRole): number {
-  return RANK[a] - RANK[b];
 }

@@ -66,8 +66,8 @@ function validateResponses(fields: BookingField[], responses: Record<string, unk
   return first ?? null;
 }
 
-/** Load the first host attached to a team service (placeholder before assignment). */
-async function firstTeamHost(
+/** Load one assigned provider so the service can be rejected early when empty. */
+async function firstAssignedProvider(
   serviceId: number,
 ): Promise<{ id: number; name: string | null; username: string } | null> {
   const [row] = await db
@@ -85,9 +85,9 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   if (!teamResolved) return { ok: false, error: "Service not found" };
   const service: ResolvedService = teamResolved.service;
   const teamId = teamResolved.team.id;
-  const placeholder = await firstTeamHost(service.id);
-  if (!placeholder) return { ok: false, error: "This service has no providers" };
-  const host: { id: number; name: string | null; username: string } = placeholder;
+  const initialProvider = await firstAssignedProvider(service.id);
+  if (!initialProvider) return { ok: false, error: "This service has no providers" };
+  const host: { id: number; name: string | null; username: string } = initialProvider;
 
   // Idempotency: return the existing booking if this key was already used.
   if (input.idempotencyKey) {
@@ -276,6 +276,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 export async function cancelBooking(
   uid: string,
   reason?: string,
+  actor: "attendee" | "host" = "attendee",
 ): Promise<BookingResult> {
   const [b] = await db
     .select()
@@ -299,7 +300,7 @@ export async function cancelBooking(
     .where(eq(bookings.id, b.id));
 
   await logBookingActivity(b.id, "cancelled", {
-    actor: "attendee",
+    actor,
     message: reason ? `Cancelled: ${reason}` : "Booking cancelled",
   });
 

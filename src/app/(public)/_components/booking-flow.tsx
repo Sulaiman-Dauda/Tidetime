@@ -154,7 +154,9 @@ function BookingForm({ slug, teamSlug, service, duration, timeZone, slot, prefer
   const renderedAt = useRef(Date.now());
 
   useEffect(() => { if (state?.uid) onBooked(state.uid); }, [state, onBooked]);
-  const customFields = service.bookingFields.filter((field) => !["name", "email"].includes(field.name) && !field.hidden);
+  const customFields = service.bookingFields.filter(
+    (field) => !["name", "email"].includes(field.name),
+  );
 
   function submit(formData: FormData) {
     const payload = {

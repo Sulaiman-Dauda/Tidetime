@@ -107,11 +107,3 @@ export async function runRetentionCleanup(now = new Date()): Promise<RetentionSu
 
   return summary;
 }
-
-export function formatRetentionSummary(s: RetentionSummary): string {
-  return (
-    `[retention] sessions=${s.sessions} tokens=${s.verificationTokens}` +
-    ` cache=${s.calendarCache} drafts=${s.draftServices}` +
-    ` webhookDeliveries=${s.webhookDeliveries} bookings=${s.bookings}`
-  );
-}

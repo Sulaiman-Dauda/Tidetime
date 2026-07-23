@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { teams, memberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { TeamMembers } from "./members";
-import { TeamLogoUpload } from "./team-logo-upload";
 
 export const metadata = { title: "Providers" };
 
@@ -26,7 +25,13 @@ export default async function ProviderDetailPage({ params }: Props) {
   const [self] = await db
     .select({ role: memberships.role })
     .from(memberships)
-    .where(and(eq(memberships.userId, user.id), eq(memberships.teamId, teamId)))
+    .where(
+      and(
+        eq(memberships.userId, user.id),
+        eq(memberships.teamId, teamId),
+        eq(memberships.accepted, true),
+      ),
+    )
     .limit(1);
   if (!self) notFound();
 
@@ -54,13 +59,6 @@ export default async function ProviderDetailPage({ params }: Props) {
           Manage the people who can deliver your company services.
         </p>
       </div>
-
-      {self.role === "owner" && (
-        <div className="rounded-2xl border border-border/60 bg-card p-5">
-          <h3 className="mb-4 text-sm font-semibold">Company logo</h3>
-          <TeamLogoUpload teamId={teamId} currentUrl={team.logoUrl} teamName={team.name} />
-        </div>
-      )}
 
       <TeamMembers
         teamId={teamId}

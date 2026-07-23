@@ -565,31 +565,15 @@ export type BookingFieldType =
   | "email"
   | "phone"
   | "number"
-  | "select"
-  | "radio"
-  | "checkbox"
-  | "multiselect";
-
-/** Show this field only when another field has one of these values. */
-export interface BookingFieldCondition {
-  field: string;
-  equals: string[];
-}
+  | "checkbox";
 
 export type BookingField = {
   name: string;
   label: string;
   type: BookingFieldType;
   required: boolean;
-  placeholder?: string;
-  options?: string[];
-  /** conditional visibility — field is hidden until the condition is met */
-  showWhen?: BookingFieldCondition;
-  /** system fields (name/email) cannot be removed or retyped, but their
-   * label/placeholder/required/hidden can be overridden */
+  /** System fields (name/email) cannot be removed or retyped. */
   system?: boolean;
-  /** hide an optional field from the booking form without deleting it */
-  hidden?: boolean;
 };
 
 

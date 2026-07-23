@@ -24,8 +24,6 @@ const SETUP_LOCK_ID = 20_260_604;
 const setupSchema = z
   .object({
     instanceName: z.string().trim().max(128).optional(),
-    companyEmail: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).optional(),
-    companyWebsite: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).optional(),
     name: z.string().trim().min(1, "Name is required").max(128),
     email: z.string().trim().toLowerCase().email("Enter a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters").max(200),
@@ -57,8 +55,6 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
 
   const parsed = setupSchema.safeParse({
     instanceName: formData.get("instanceName") || undefined,
-    companyEmail: formData.get("companyEmail") || undefined,
-    companyWebsite: formData.get("companyWebsite") || undefined,
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
@@ -77,8 +73,6 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
   const companyProfile = {
     ...DEFAULT_COMPANY_PROFILE,
     name: instanceName || DEFAULT_COMPANY_PROFILE.name,
-    email: parsed.data.companyEmail || "",
-    websiteUrl: parsed.data.companyWebsite || "",
     brandColor: normalizeBrandColor(DEFAULT_COMPANY_PROFILE.brandColor),
   };
 
@@ -109,11 +103,7 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
 
     await tx
       .insert(appSettings)
-      .values([
-        { name: "instance_name", value: instanceName || "Tidetime" },
-        { name: "setup_completed_at", value: new Date().toISOString() },
-        { name: COMPANY_SETTING_KEYS.profile, value: companyProfile },
-      ])
+      .values({ name: COMPANY_SETTING_KEYS.profile, value: companyProfile })
       .onConflictDoNothing();
 
     const [team] = await tx

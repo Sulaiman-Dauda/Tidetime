@@ -7,8 +7,8 @@ import { fetchBusyTimes } from "./calendar";
 
 /**
  * A company service evaluated for one provider. Provider information is
- * runtime-only: services no longer carry personal ownership or schedule
- * compatibility columns.
+ * runtime-only because services belong to the company and providers are
+ * assigned through the service-provider join table.
  */
 export interface ResolvedService extends Service {
   providerId: number | null;

@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { bookings, attendees, services, serviceProviders, teams } from "@/db/schema";
 import { CalendarView, type CalendarEvent } from "./calendar-view";
 import type { CalendarService } from "./quick-booking-dialog";
+import { can } from "@/lib/rbac";
+import type { MembershipRole } from "@/db/schema";
 
 interface Props {
   searchParams: Promise<{ month?: string }>;
@@ -21,17 +23,26 @@ function parseMonth(value: string | undefined): { year: number; month: number } 
   return { year: now.getFullYear(), month: now.getMonth() };
 }
 
-async function loadEvents(userId: number, year: number, month: number): Promise<CalendarEvent[]> {
+async function loadEvents(
+  userId: number,
+  teamId: number,
+  role: MembershipRole,
+  year: number,
+  month: number,
+): Promise<CalendarEvent[]> {
   // Pad the range by a few days so events bleeding into adjacent weeks still load.
   const rangeStart = new Date(year, month, -6);
   const rangeEnd = new Date(year, month + 1, 7);
 
   const rows = await db
-    .select()
+    .select({ booking: bookings })
     .from(bookings)
+    .leftJoin(services, eq(services.id, bookings.serviceId))
     .where(
       and(
-        eq(bookings.userId, userId),
+        can(role, "booking.all.view")
+          ? eq(services.teamId, teamId)
+          : eq(bookings.userId, userId),
         inArray(bookings.status, ["accepted", "pending"]),
         gte(bookings.startTime, rangeStart),
         lt(bookings.startTime, rangeEnd),
@@ -41,18 +52,19 @@ async function loadEvents(userId: number, year: number, month: number): Promise<
     .limit(500);
 
   if (rows.length === 0) return [];
+  const bookingRows = rows.map((row) => row.booking);
 
   const ats = await db
     .select()
     .from(attendees)
-    .where(inArray(attendees.bookingId, rows.map((r) => r.id)));
+    .where(inArray(attendees.bookingId, bookingRows.map((r) => r.id)));
 
   const nameByBooking = new Map<number, string>();
   for (const a of ats) {
     if (!nameByBooking.has(a.bookingId) || a.isPrimary) nameByBooking.set(a.bookingId, a.name);
   }
 
-  return rows.map((r) => ({
+  return bookingRows.map((r) => ({
     uid: r.uid,
     title: r.title,
     start: r.startTime.toISOString(),
@@ -64,14 +76,28 @@ async function loadEvents(userId: number, year: number, month: number): Promise<
 }
 
 /** The host's own bookable services, for quick-create from the calendar. */
-async function loadServices(userId: number): Promise<CalendarService[]> {
-  const rows = await db
+async function loadServices(
+  userId: number,
+  teamId: number,
+  role: MembershipRole,
+): Promise<CalendarService[]> {
+  const selection = {
+    slug: services.slug,
+    teamSlug: teams.slug,
+    title: services.title,
+    length: services.length,
+    hidden: services.hidden,
+  };
+  const rows = can(role, "booking.all.manage")
+    ? await db
+        .select(selection)
+        .from(services)
+        .innerJoin(teams, eq(teams.id, services.teamId))
+        .where(eq(services.teamId, teamId))
+        .orderBy(asc(services.position), asc(services.createdAt))
+    : await db
     .select({
-      slug: services.slug,
-      teamSlug: teams.slug,
-      title: services.title,
-      length: services.length,
-      hidden: services.hidden,
+      ...selection,
     })
     .from(serviceProviders)
     .innerJoin(services, eq(services.id, serviceProviders.serviceId))
@@ -84,11 +110,14 @@ async function loadServices(userId: number): Promise<CalendarService[]> {
 }
 
 export default async function CalendarPage({ searchParams }: Props) {
-  const { user } = await requireAnyPermission(["booking.own.view", "booking.all.view"]);
+  const { user, role, teamId } = await requireAnyPermission([
+    "booking.own.view",
+    "booking.all.view",
+  ]);
   const { year, month } = parseMonth((await searchParams).month);
   const [events, services] = await Promise.all([
-    loadEvents(user.id, year, month),
-    loadServices(user.id),
+    loadEvents(user.id, teamId, role, year, month),
+    loadServices(user.id, teamId, role),
   ]);
 
   return (

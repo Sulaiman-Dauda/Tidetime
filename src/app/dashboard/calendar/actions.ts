@@ -4,13 +4,26 @@ import { revalidatePath } from "next/cache";
 import { requireAnyPermission } from "@/lib/guard";
 import { moveBooking, createBooking } from "@/server/bookings";
 import { zonedTimeToUtc } from "@/lib/time";
+import { bookingForActor } from "@/server/booking-authorization";
+import { can } from "@/lib/rbac";
 
 export type MoveState = { ok?: boolean; error?: string } | null;
 
 /** Drag-to-reschedule from the dashboard calendar: move a booking to newStartIso. */
 export async function moveBookingAction(uid: string, newStartIso: string): Promise<MoveState> {
-  const { user } = await requireAnyPermission(["booking.own.manage", "booking.all.manage"]);
-  const res = await moveBooking(uid, user.id, newStartIso);
+  const { user, role, teamId } = await requireAnyPermission([
+    "booking.own.manage",
+    "booking.all.manage",
+  ]);
+  const booking = await bookingForActor({
+    uid,
+    userId: user.id,
+    teamId,
+    role,
+    operation: "manage",
+  });
+  if (!booking?.userId) return { error: "Booking not found" };
+  const res = await moveBooking(uid, booking.userId, newStartIso);
   if (!res.ok) return { error: res.error };
   revalidatePath("/dashboard/calendar");
   return { ok: true };
@@ -34,12 +47,15 @@ export type ManualBookingState = { ok?: boolean; uid?: string; error?: string } 
 /**
  * Drag-to-create / quick-add from the dashboard calendar: the host books a slot
  * manually for a customer. Uses the trusted `force` path so it confirms
- * immediately, bypassing public availability/approval/payment guards.
+ * immediately, bypassing public availability and approval checks.
  */
 export async function createManualBookingAction(
   input: ManualBookingInput,
 ): Promise<ManualBookingState> {
-  const { user } = await requireAnyPermission(["booking.own.manage", "booking.all.manage"]);
+  const { user, role } = await requireAnyPermission([
+    "booking.own.manage",
+    "booking.all.manage",
+  ]);
 
   const [y, mo, d] = input.date.split("-").map(Number);
   const [hh, mm] = input.time.split(":").map(Number);
@@ -58,7 +74,7 @@ export async function createManualBookingAction(
   const res = await createBooking({
     slug: input.slug,
     teamSlug: input.teamSlug,
-    preferredHostId: user.id,
+    preferredHostId: can(role, "booking.all.manage") ? undefined : user.id,
     start: start.toISOString(),
     duration: input.durationMin,
     timeZone: user.timeZone,

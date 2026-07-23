@@ -8,7 +8,9 @@ production Compose file intentionally refuses to start with a default database p
 Set Google OAuth credentials only if providers will connect Google Calendar.
 SMTP is configured in the administrator UI after startup.
 
-Do not expose PostgreSQL publicly. Terminate TLS at Caddy or another trusted reverse proxy and
+Do not expose PostgreSQL publicly. The production Compose file binds the application port to
+localhost so remote traffic passes through Caddy, which normalizes client-address headers before
+the application applies rate limits. Terminate TLS at Caddy or another trusted reverse proxy and
 back up the PostgreSQL volume before upgrades.
 
 ## Containers
@@ -21,6 +23,30 @@ and Caddy. The app runs the checked-in Drizzle migration before it starts. The c
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f app jobs
+```
+
+## Backups and restore
+
+Create a compressed logical backup before every upgrade and copy it off the application host:
+
+```bash
+mkdir -p backups
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-acl' \
+  > "backups/tidetime-$(date -u +%Y%m%dT%H%M%SZ).dump"
+```
+
+Test restoration regularly against a separate empty database. The following command overwrites the
+named restore database, so never point it at the live database:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  sh -c 'createdb -U "$POSTGRES_USER" tidetime_restore_test'
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  sh -c 'pg_restore -U "$POSTGRES_USER" -d tidetime_restore_test --clean --if-exists --no-owner --no-acl' \
+  < backups/your-backup.dump
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d tidetime_restore_test -c "select count(*) from users;"'
 ```
 
 ## Release checks

@@ -45,11 +45,11 @@ describe("bookingFieldsSchema", () => {
     ).toThrow(/duplicate field name/i);
   });
 
-  it("requires options for select-like fields", () => {
+  it("rejects unsupported field types", () => {
     expect(() =>
       bookingFieldsSchema.parse([
         { name: "team_size", label: "Team size", type: "select", required: false },
       ]),
-    ).toThrow(/requires at least one option/i);
+    ).toThrow();
   });
 });

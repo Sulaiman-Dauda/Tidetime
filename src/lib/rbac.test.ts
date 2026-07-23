@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { can, canAll, canAny, canAssignRole, compareRoles, permissionsFor } from "./rbac";
+import { can, canAny, canAssignRole } from "./rbac";
 
 describe("role permissions", () => {
   it("gives owners every company and personal permission", () => {
@@ -41,13 +41,11 @@ describe("role permissions", () => {
   });
 
   it("keeps members to the teammate directory", () => {
-    expect(permissionsFor("member")).toEqual(["team.directory.view"]);
+    expect(can("member", "team.directory.view")).toBe(true);
+    expect(can("member", "booking.own.view")).toBe(false);
   });
 
-  it("supports all/any checks", () => {
-    expect(
-      canAll("provider", ["booking.own.view", "availability.own.manage"]),
-    ).toBe(true);
+  it("supports any-permission checks", () => {
     expect(
       canAny("provider", ["customer.all.view", "service.assigned.view"]),
     ).toBe(true);
@@ -69,10 +67,5 @@ describe("role assignment", () => {
   it("does not let operational roles assign roles", () => {
     expect(canAssignRole("manager", "provider")).toBe(false);
     expect(canAssignRole("provider", "member")).toBe(false);
-  });
-
-  it("compares privilege rank", () => {
-    expect(compareRoles("owner", "admin")).toBeGreaterThan(0);
-    expect(compareRoles("provider", "receptionist")).toBe(0);
   });
 });

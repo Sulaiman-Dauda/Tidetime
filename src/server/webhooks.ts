@@ -3,7 +3,7 @@ import { and, asc, eq, lte, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { webhooks, webhookDeliveries } from "@/db/schema";
 import { hmacSign } from "@/lib/crypto";
-import { assertPublicUrl } from "@/server/ssrf";
+import { postPublicUrl } from "@/server/ssrf";
 import {
   WEBHOOK_MAX_ATTEMPTS,
   isDeliverySuccess,
@@ -102,21 +102,14 @@ async function sendOnce(
   if (secret) headers["X-Tidetime-Signature-256"] = `sha256=${hmacSign(body, secret)}`;
 
   try {
-    // SSRF guard: resolve + verify the target is publicly routable right before
-    // sending so a rebound DNS record can't redirect us at an internal service.
-    await assertPublicUrl(url);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
-    const res = await fetch(url, {
-      method: "POST",
+    const statusCode = await postPublicUrl({
+      url,
       headers,
       body,
-      signal: controller.signal,
-      // Never follow redirects — a 3xx could bounce delivery at an internal host.
-      redirect: "manual",
+      timeoutMs: 10_000,
     });
-    clearTimeout(timer);
-    return { ok: isDeliverySuccess(res.status), statusCode: res.status };
+    // The low-level request never follows redirects.
+    return { ok: isDeliverySuccess(statusCode), statusCode };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

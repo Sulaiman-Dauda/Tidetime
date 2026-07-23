@@ -15,8 +15,6 @@ export type CompanySettingsState = { ok?: boolean; error?: string } | null;
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required").max(128),
-  email: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).default(""),
-  websiteUrl: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).default(""),
   logoUrl: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).default(""),
   brandColor: z
     .string()
@@ -31,8 +29,6 @@ export async function updateCompanyProfileAction(
   await requireAdmin();
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
-    email: formData.get("email") ?? "",
-    websiteUrl: formData.get("websiteUrl") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
     brandColor: formData.get("brandColor"),
   });
@@ -46,12 +42,8 @@ export async function updateCompanyProfileAction(
 /* ------------------------------ Business logic ---------------------------- */
 
 const bookingSchema = z.object({
-  futureBookingLimitDays: z.coerce.number().int().min(0).max(3650),
-  minimumBookingNoticeMinutes: z.coerce.number().int().min(0).max(525600),
-  rescheduleCancelTimeoutMinutes: z.coerce.number().int().min(0).max(525600),
   bookingDisabled: z.coerce.boolean(),
   spamProtectionEnabled: z.coerce.boolean(),
-  appointmentStatuses: z.string().trim().min(1, "Add at least one status"),
 });
 
 export async function updateCompanyBookingAction(
@@ -60,27 +52,11 @@ export async function updateCompanyBookingAction(
 ): Promise<CompanySettingsState> {
   await requireAdmin();
   const parsed = bookingSchema.safeParse({
-    futureBookingLimitDays: formData.get("futureBookingLimitDays"),
-    minimumBookingNoticeMinutes: formData.get("minimumBookingNoticeMinutes"),
-    rescheduleCancelTimeoutMinutes: formData.get("rescheduleCancelTimeoutMinutes"),
     bookingDisabled: formData.get("bookingDisabled") === "on",
     spamProtectionEnabled: formData.get("spamProtectionEnabled") === "on",
-    appointmentStatuses: formData.get("appointmentStatuses"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  const statuses = parsed.data.appointmentStatuses
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (statuses.length === 0) return { error: "Add at least one status" };
-  await setCompanyBookingDefaults({
-    futureBookingLimitDays: parsed.data.futureBookingLimitDays,
-    minimumBookingNoticeMinutes: parsed.data.minimumBookingNoticeMinutes,
-    rescheduleCancelTimeoutMinutes: parsed.data.rescheduleCancelTimeoutMinutes,
-    bookingDisabled: parsed.data.bookingDisabled,
-    spamProtectionEnabled: parsed.data.spamProtectionEnabled,
-    appointmentStatuses: statuses,
-  });
+  await setCompanyBookingDefaults(parsed.data);
   revalidatePath("/dashboard/settings");
   return { ok: true };
 }

@@ -85,8 +85,6 @@ export interface SlotEngineInput {
 export interface Slot {
   /** UTC ISO start time */
   time: string;
-  /** remaining seats when seatsPerSlot is set */
-  seatsRemaining?: number;
 }
 
 /** Merge overlapping/adjacent intervals. */

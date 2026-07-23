@@ -178,12 +178,15 @@ export async function getTeamSlots(args: {
 
 /** Group team slots by day for the viewer's timezone. */
 export function groupTeamSlotsByDay(slots: TeamSlot[], viewerTz: string): Record<string, TeamSlot[]> {
-  const asSlots: Slot[] = slots.map((s) => ({ time: s.time, seatsRemaining: s.seatsRemaining }));
+  const asSlots: Slot[] = slots.map((slot) => ({ time: slot.time }));
   const grouped = groupSlotsByDay(asSlots, viewerTz);
   const byTime = new Map(slots.map((s) => [s.time, s]));
   const out: Record<string, TeamSlot[]> = {};
   for (const [day, daySlots] of Object.entries(grouped)) {
-    out[day] = daySlots.map((s) => byTime.get(s.time) ?? { time: s.time, hostIds: [], seatsRemaining: s.seatsRemaining });
+    out[day] = daySlots.map((slot) => byTime.get(slot.time) ?? {
+      time: slot.time,
+      hostIds: [],
+    });
   }
   return out;
 }

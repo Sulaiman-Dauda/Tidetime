@@ -23,13 +23,13 @@ export async function GET() {
       },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         status: "degraded",
         database: "down",
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Database unavailable",
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );

@@ -7,7 +7,6 @@ import {
   COMPANY_SETTING_KEYS,
   DEFAULT_COMPANY_BOOKING,
   DEFAULT_COMPANY_LEGAL,
-  DEFAULT_COMPANY_LOCALIZATION,
   DEFAULT_COMPANY_PROFILE,
   mergeWithDefaults,
   normalizeBrandColor,
@@ -45,10 +44,6 @@ export const getCompanySettings = cache(async (): Promise<CompanySettings> => {
 
   return {
     profile,
-    localization: mergeWithDefaults(
-      DEFAULT_COMPANY_LOCALIZATION,
-      byKey.get(COMPANY_SETTING_KEYS.localization),
-    ),
     booking: mergeWithDefaults(
       DEFAULT_COMPANY_BOOKING,
       byKey.get(COMPANY_SETTING_KEYS.booking),

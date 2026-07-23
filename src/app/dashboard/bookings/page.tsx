@@ -3,6 +3,8 @@ import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, services } from "@/db/schema";
+import { can } from "@/lib/rbac";
+import type { MembershipRole } from "@/db/schema";
 import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,9 +28,18 @@ interface BookingRow {
   attendeeTz: string;
 }
 
-async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[]> {
+async function loadBookings(
+  userId: number,
+  teamId: number,
+  role: MembershipRole,
+  filter: Filter,
+): Promise<BookingRow[]> {
   const now = new Date();
-  const conditions = [eq(bookings.userId, userId)];
+  const conditions = [
+    can(role, "booking.all.view")
+      ? eq(services.teamId, teamId)
+      : eq(bookings.userId, userId),
+  ];
 
   if (filter === "upcoming") {
     conditions.push(eq(bookings.status, "accepted"), gte(bookings.endTime, now));
@@ -96,10 +107,13 @@ const FILTER_LABELS: Record<Filter, string> = {
 };
 
 export default async function BookingsPage({ searchParams }: Props) {
-  const { user } = await requireAnyPermission(["booking.own.view", "booking.all.view"]);
+  const { user, role, teamId } = await requireAnyPermission([
+    "booking.own.view",
+    "booking.all.view",
+  ]);
   const { tab } = await searchParams;
   const active: Filter = FILTERS.includes(tab as Filter) ? (tab as Filter) : "upcoming";
-  const rows = await loadBookings(user.id, active);
+  const rows = await loadBookings(user.id, teamId, role, active);
 
   return (
     <div className="animate-fade-in space-y-8">

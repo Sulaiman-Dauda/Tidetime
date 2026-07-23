@@ -15,6 +15,9 @@ concurrency:
 
 env:
   NEXT_TELEMETRY_DISABLED: "1"
+  # Next.js type generation can exceed V8's ~2 GB default heap on a clean
+  # runner. Keep CI aligned with the production image build.
+  NODE_OPTIONS: --max-old-space-size=4096
   APP_URL: http://localhost:3000
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/tidetime
   AUTH_SECRET: ci-auth-secret-please-change-this-32chars

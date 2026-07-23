@@ -4,9 +4,9 @@
  */
 
 /** Base delay before the first retry (ms). */
-export const WEBHOOK_BASE_DELAY_MS = 60_000;
+const WEBHOOK_BASE_DELAY_MS = 60_000;
 /** Upper bound on any single backoff interval (ms). */
-export const WEBHOOK_MAX_DELAY_MS = 6 * 60 * 60 * 1000; // 6 hours
+const WEBHOOK_MAX_DELAY_MS = 6 * 60 * 60 * 1000; // 6 hours
 /** Default attempts before a delivery is marked permanently failed. */
 export const WEBHOOK_MAX_ATTEMPTS = 5;
 
@@ -14,7 +14,7 @@ export const WEBHOOK_MAX_ATTEMPTS = 5;
  * Exponential backoff for the next retry after `attempts` failed attempts.
  * attempts=1 → base, attempts=2 → 2×base, … capped at WEBHOOK_MAX_DELAY_MS.
  */
-export function nextBackoffMs(attempts: number): number {
+function nextBackoffMs(attempts: number): number {
   if (attempts <= 0) return WEBHOOK_BASE_DELAY_MS;
   const delay = WEBHOOK_BASE_DELAY_MS * 2 ** (attempts - 1);
   return Math.min(delay, WEBHOOK_MAX_DELAY_MS);

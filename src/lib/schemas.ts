@@ -93,50 +93,21 @@ const bookingFieldTypeSchema = z.enum([
   "email",
   "phone",
   "number",
-  "select",
-  "radio",
   "checkbox",
-  "multiselect",
 ]);
 
-const bookingFieldConditionSchema = z.object({
-  field: z
+const bookingFieldSchema = z.object({
+  name: z
     .string()
     .trim()
-    .min(1)
+    .min(1, "Field name is required")
     .max(64)
     .regex(/^[a-zA-Z0-9_]+$/, "Use letters, numbers, and underscores only"),
-  equals: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
+  label: z.string().trim().min(1, "Field label is required").max(128),
+  type: bookingFieldTypeSchema,
+  required: z.boolean(),
+  system: z.boolean().optional(),
 });
-
-const bookingFieldSchema = z
-  .object({
-    name: z
-      .string()
-      .trim()
-      .min(1, "Field name is required")
-      .max(64)
-      .regex(/^[a-zA-Z0-9_]+$/, "Use letters, numbers, and underscores only"),
-    label: z.string().trim().min(1, "Field label is required").max(128),
-    type: bookingFieldTypeSchema,
-    required: z.boolean(),
-    placeholder: optionalTrimmedString(200),
-    options: z.array(z.string().trim().min(1).max(100)).max(100).optional(),
-    showWhen: bookingFieldConditionSchema.optional(),
-    system: z.boolean().optional(),
-    hidden: z.boolean().optional(),
-  })
-  .superRefine((field, ctx) => {
-    const needsOptions =
-      field.type === "select" || field.type === "radio" || field.type === "multiselect";
-    if (needsOptions && (!field.options || field.options.length === 0)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "This field type requires at least one option",
-        path: ["options"],
-      });
-    }
-  });
 
 export const bookingFieldsSchema = z
   .array(bookingFieldSchema)
@@ -152,16 +123,5 @@ export const bookingFieldsSchema = z
         });
       }
       names.add(field.name);
-
-      if (field.showWhen) {
-        const priorFieldExists = fields.slice(0, index).some((candidate) => candidate.name === field.showWhen?.field);
-        if (!priorFieldExists) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Conditional fields must reference an earlier field",
-            path: [index, "showWhen", "field"],
-          });
-        }
-      }
     }
   });

@@ -40,7 +40,7 @@ export function shortId(bytes = 12): string {
   return randomBytes(bytes).toString("base64url");
 }
 
-/** SHA-256 hex digest — used to store session/API key lookups. */
+/** SHA-256 hex digest used for opaque tokens and constant-length comparisons. */
 export function sha256(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }

@@ -6,7 +6,7 @@
  */
 
 /** Parse a CSV string into rows of string cells. */
-export function parseCsv(input: string): string[][] {
+function parseCsv(input: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -70,29 +70,6 @@ export function parseCsvRecords(input: string): Record<string, string>[] {
     });
     return record;
   });
-}
-
-function escapeCell(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-/** Serialize an array of records to a CSV string using the given column order. */
-export function toCsv(records: Record<string, unknown>[], columns: string[]): string {
-  const lines = [columns.map(escapeCell).join(",")];
-  for (const record of records) {
-    lines.push(
-      columns
-        .map((col) => {
-          const v = record[col];
-          return escapeCell(v == null ? "" : String(v));
-        })
-        .join(","),
-    );
-  }
-  return lines.join("\n");
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

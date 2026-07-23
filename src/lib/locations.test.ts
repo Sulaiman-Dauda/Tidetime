@@ -1,17 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isVideoLocationType, jitsiRoomUrl, locationLabel, resolveLocation } from "./locations";
-
-describe("isVideoLocationType", () => {
-  it("recognises the retained video providers", () => {
-    expect(isVideoLocationType("jitsi")).toBe(true);
-    expect(isVideoLocationType("google_meet")).toBe(true);
-  });
-  it("is false for non-video types", () => {
-    expect(isVideoLocationType("in_person")).toBe(false);
-    expect(isVideoLocationType("phone")).toBe(false);
-    expect(isVideoLocationType("link")).toBe(false);
-  });
-});
+import { locationLabel, resolveLocation } from "./locations";
 
 describe("resolveLocation", () => {
   it("uses the custom link directly", () => {
@@ -32,9 +20,8 @@ describe("resolveLocation", () => {
   it("mints a built-in Jitsi room from the booking id, no provider needed", () => {
     expect(resolveLocation({ type: "jitsi" }, undefined, "abc123")).toEqual({
       location: "Video call",
-      meetingUrl: jitsiRoomUrl("abc123"),
+      meetingUrl: "https://meet.jit.si/Tidetime-abc123",
     });
-    expect(jitsiRoomUrl("abc123")).toContain("abc123");
     // Without a room id the link can't be minted yet.
     expect(resolveLocation({ type: "jitsi" }).meetingUrl).toBeNull();
   });

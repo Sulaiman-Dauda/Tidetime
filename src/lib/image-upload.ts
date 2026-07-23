@@ -10,7 +10,7 @@
 
 export const MAX_IMAGE_BYTES = 1 * 1024 * 1024; // 1 MB
 
-export type SafeImageMime =
+type SafeImageMime =
   | "image/png"
   | "image/jpeg"
   | "image/gif"
@@ -21,7 +21,7 @@ export type SafeImageMime =
  * null when the content is not an allowed raster image. The returned type comes
  * from the bytes, not from any header.
  */
-export function sniffImageMime(buf: Uint8Array): SafeImageMime | null {
+function sniffImageMime(buf: Uint8Array): SafeImageMime | null {
   if (buf.length < 12) return null;
 
   // PNG: 89 50 4E 47 0D 0A 1A 0A

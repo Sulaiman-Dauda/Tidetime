@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, services } from "@/db/schema";
+import { can } from "@/lib/rbac";
 import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
 import { formatRange } from "@/lib/format";
@@ -45,16 +46,28 @@ function formatResponseValue(value: unknown): string {
 }
 
 export default async function BookingDetailPage({ params }: Props) {
-  const { user } = await requireAnyPermission(["booking.own.view", "booking.all.view"]);
+  const { user, role, teamId } = await requireAnyPermission([
+    "booking.own.view",
+    "booking.all.view",
+  ]);
   const { uid } = await params;
 
 
-  const [booking] = await db
-    .select()
+  const [row] = await db
+    .select({ booking: bookings })
     .from(bookings)
-    .where(and(eq(bookings.uid, uid), eq(bookings.userId, user.id)))
+    .leftJoin(services, eq(services.id, bookings.serviceId))
+    .where(
+      and(
+        eq(bookings.uid, uid),
+        can(role, "booking.all.view")
+          ? eq(services.teamId, teamId)
+          : eq(bookings.userId, user.id),
+      ),
+    )
     .limit(1);
 
+  const booking = row?.booking;
   if (!booking) notFound();
 
   const [ats, activity, serviceRow] = await Promise.all([

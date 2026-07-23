@@ -116,7 +116,7 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
       <form action={action} className="space-y-5">
         <div>
           <h2 className="text-sm font-semibold">Brand & company</h2>
-          <p className="text-xs text-muted-foreground">What customers see across the booking page and emails.</p>
+          <p className="text-xs text-muted-foreground">What customers see on the public booking pages.</p>
         </div>
         <Field
           label="Company name"
@@ -126,23 +126,9 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
           <Input id="name" name="name" defaultValue={profile.name} required />
         </Field>
         <Field
-          label="Company email"
-          htmlFor="email"
-          hint="Used as the sender and reply-to address of system emails."
-        >
-          <Input id="email" name="email" type="email" defaultValue={profile.email} placeholder="noreply@example.com" />
-        </Field>
-        <Field
-          label="Company website"
-          htmlFor="websiteUrl"
-          hint="Should point to the official website of the company."
-        >
-          <Input id="websiteUrl" name="websiteUrl" type="url" defaultValue={profile.websiteUrl} placeholder="https://example.com" />
-        </Field>
-        <Field
           label="Company logo"
           htmlFor="logoUrl"
-          hint="Upload an image (under 1 MB) or paste a URL. Shown on the public booking page and emails."
+          hint="Upload an image (under 1 MB) or paste a URL. Shown on the public booking page."
         >
           <div className="space-y-2">
             <CompanyLogoUpload value={logoUrl} onChange={setLogoUrl} />
@@ -319,34 +305,6 @@ function BookingSection({ booking }: { booking: CompanySettings["booking"] }) {
           </label>
         </div>
 
-        <Field
-          label="Future booking limit (days)"
-          htmlFor="futureBookingLimitDays"
-          hint="How far into the future customers can book."
-        >
-          <Input id="futureBookingLimitDays" name="futureBookingLimitDays" type="number" min={1} max={3650} defaultValue={booking.futureBookingLimitDays} />
-        </Field>
-        <Field
-          label="Minimum booking notice (minutes)"
-          htmlFor="minimumBookingNoticeMinutes"
-          hint="How much lead time is required before a slot can be booked."
-        >
-          <Input id="minimumBookingNoticeMinutes" name="minimumBookingNoticeMinutes" type="number" min={0} defaultValue={booking.minimumBookingNoticeMinutes} />
-        </Field>
-        <Field
-          label="Reschedule/cancel timeout (minutes)"
-          htmlFor="rescheduleCancelTimeoutMinutes"
-          hint="How close to the start reschedule or cancel is blocked."
-        >
-          <Input id="rescheduleCancelTimeoutMinutes" name="rescheduleCancelTimeoutMinutes" type="number" min={0} defaultValue={booking.rescheduleCancelTimeoutMinutes} />
-        </Field>
-        <Field
-          label="Appointment status labels"
-          htmlFor="appointmentStatuses"
-          hint="Comma-separated list of available status labels."
-        >
-          <Input id="appointmentStatuses" name="appointmentStatuses" defaultValue={booking.appointmentStatuses.join(", ")} />
-        </Field>
         <SaveButton />
       </form>
     </Card>

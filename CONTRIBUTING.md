@@ -2,7 +2,7 @@
 
 > Audience: contributors and code collaborators.
 >
-> If you are looking for product help instead, start with [docs/README.md](./docs/README.md).
+> If you are looking for product help instead, start with the [README](./README.md).
 
 Thanks for contributing to Tidetime. 🌊
 
@@ -23,10 +23,10 @@ Please:
 
 Useful links:
 
-- Issues: https://github.com/Sulaiman-Dauda/tidetime/issues
-- New bug report: https://github.com/Sulaiman-Dauda/tidetime/issues/new?template=bug_report.yml
-- New feature request: https://github.com/Sulaiman-Dauda/tidetime/issues/new?template=feature_request.yml
-- Pull requests: https://github.com/Sulaiman-Dauda/tidetime/pulls
+- Issues: https://github.com/Sulaiman-Dauda/tidetime-lite/issues
+- New bug report: https://github.com/Sulaiman-Dauda/tidetime-lite/issues/new?template=bug_report.yml
+- New feature request: https://github.com/Sulaiman-Dauda/tidetime-lite/issues/new?template=feature_request.yml
+- Pull requests: https://github.com/Sulaiman-Dauda/tidetime-lite/pulls
 
 ## Development setup
 

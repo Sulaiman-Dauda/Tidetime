@@ -8,14 +8,8 @@ const JITSI_BASE_URL = "https://meet.jit.si";
  * and unguessable, giving every meeting its own private room with no API,
  * OAuth or provider connection — the always-available video fallback.
  */
-export function jitsiRoomUrl(roomId: string): string {
+function jitsiRoomUrl(roomId: string): string {
   return `${JITSI_BASE_URL}/Tidetime-${roomId}`;
-}
-
-const VIDEO_TYPES = new Set<EventLocation["type"]>(["jitsi", "google_meet"]);
-
-export function isVideoLocationType(type: EventLocation["type"]): boolean {
-  return VIDEO_TYPES.has(type);
 }
 
 export function locationLabel(loc: EventLocation): string {

@@ -1,27 +1,20 @@
 import { describe, it, expect } from "vitest";
 import {
   isRsvpStatus,
-  rsvpPartstat,
   rsvpToken,
   verifyRsvpToken,
-  RSVP_STATUSES,
 } from "./rsvp";
 
 const SECRET = "test-secret-key";
 
 describe("rsvp status helpers", () => {
   it("recognises valid statuses", () => {
-    for (const s of RSVP_STATUSES) expect(isRsvpStatus(s)).toBe(true);
+    for (const status of ["accepted", "declined", "tentative"]) {
+      expect(isRsvpStatus(status)).toBe(true);
+    }
     expect(isRsvpStatus("needs_action")).toBe(false);
     expect(isRsvpStatus("maybe")).toBe(false);
     expect(isRsvpStatus(null)).toBe(false);
-  });
-
-  it("maps to iCalendar PARTSTAT", () => {
-    expect(rsvpPartstat("accepted")).toBe("ACCEPTED");
-    expect(rsvpPartstat("declined")).toBe("DECLINED");
-    expect(rsvpPartstat("tentative")).toBe("TENTATIVE");
-    expect(rsvpPartstat("needs_action")).toBe("NEEDS-ACTION");
   });
 });
 
