@@ -13,6 +13,7 @@ import { requestPasswordReset, resetPassword } from "@/server/password-reset";
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
 import { fieldErrorsFromIssues } from "@/lib/schemas";
 import { isAdminRole } from "@/lib/rbac";
+import { verifyTotp } from "@/lib/totp";
 
 /** Best-effort client IP for rate-limit keys, from forwarding headers. */
 async function clientIp(): Promise<string> {
@@ -165,12 +166,16 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   password: z.string().min(1, "Password is required").max(200),
+  totp: z.string().max(8).optional(),
 });
 
-export async function loginAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export type LoginResult = ActionResult & { needsTotp?: boolean };
+
+export async function loginAction(_prev: LoginResult, formData: FormData): Promise<LoginResult> {
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
+    totp: formData.get("totp") || undefined,
   });
   if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
 
@@ -187,7 +192,7 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
   }
 
   const [user] = await db
-    .select({ id: users.id, passwordHash: users.passwordHash })
+    .select({ id: users.id, passwordHash: users.passwordHash, totpSecret: users.totpSecret })
     .from(users)
     .where(eq(users.email, parsed.data.email))
     .limit(1);
@@ -195,6 +200,14 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
   // Constant-ish response regardless of whether the email exists.
   if (!user || !user.passwordHash || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
     return { error: "Invalid email or password" };
+  }
+
+  // Second factor, only after the password checks out.
+  if (user.totpSecret) {
+    if (!parsed.data.totp) return { needsTotp: true };
+    if (!verifyTotp(user.totpSecret, parsed.data.totp)) {
+      return { needsTotp: true, error: "That code didn't match. Try again." };
+    }
   }
 
   await createSession(user.id);

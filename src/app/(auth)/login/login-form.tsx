@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { loginAction, type ActionResult } from "../actions";
+import { loginAction, type LoginResult } from "../actions";
 import { WaveMark } from "@/components/wave-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ function SubmitButton() {
 
 export function LoginForm() {
   const router = useRouter();
-  const [state, formAction] = useActionState<ActionResult, FormData>(loginAction, {});
+  const [state, formAction] = useActionState<LoginResult, FormData>(loginAction, {});
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -71,6 +71,26 @@ export function LoginForm() {
           />
           {state.fieldErrors?.password && <FieldError msg={state.fieldErrors.password} />}
         </div>
+        {state.needsTotp ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="totp" className="text-[13px] font-medium">
+              Two-factor code
+            </Label>
+            <Input
+              id="totp"
+              name="totp"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              maxLength={8}
+              autoFocus
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the 6-digit code from your authenticator app.
+            </p>
+          </div>
+        ) : null}
         <SubmitButton />
       </form>
     </>

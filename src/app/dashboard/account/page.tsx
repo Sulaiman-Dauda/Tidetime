@@ -27,6 +27,7 @@ export default async function AccountPage() {
           timeFormat: user.timeFormat,
           weekStart: user.weekStart,
           hasPassword: Boolean(user.passwordHash),
+          totpEnabled: Boolean(user.totpSecret),
         }}
       />
     </div>

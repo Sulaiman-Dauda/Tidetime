@@ -108,6 +108,42 @@ export async function removeMemberAction(_prev: TeamState, formData: FormData): 
   return { ok: true };
 }
 
+/** Transfer company ownership to another accepted member. Owner only; the
+ *  previous owner becomes an admin so they keep managing access. */
+export async function transferOwnershipAction(_prev: TeamState, formData: FormData): Promise<TeamState> {
+  const user = await requireUser();
+  const parsed = removeSchema.safeParse({
+    teamId: formData.get("teamId"),
+    membershipId: formData.get("membershipId"),
+  });
+  if (!parsed.success) return { error: "Invalid request" };
+
+  const role = await teamRole(user.id, parsed.data.teamId);
+  if (role !== "owner") return { error: "Only the owner can transfer ownership" };
+
+  const [target] = await db
+    .select({ id: memberships.id, userId: memberships.userId, accepted: memberships.accepted })
+    .from(memberships)
+    .where(and(eq(memberships.id, parsed.data.membershipId), eq(memberships.teamId, parsed.data.teamId)))
+    .limit(1);
+  if (!target || !target.accepted) return { error: "Member not found" };
+  if (target.userId === user.id) return { error: "You already own this company" };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(memberships)
+      .set({ role: "admin" })
+      .where(and(eq(memberships.teamId, parsed.data.teamId), eq(memberships.userId, user.id)));
+    await tx.update(memberships).set({ role: "owner" }).where(eq(memberships.id, target.id));
+    // Both ends of the transfer hold admin-level instance access.
+    await tx.update(users).set({ isAdmin: true }).where(inArray(users.id, [user.id, target.userId]));
+  });
+
+  revalidatePath("/dashboard/providers");
+  revalidatePath("/dashboard/team");
+  return { ok: true };
+}
+
 export type ImportState = { ok?: boolean; error?: string; added?: number; errors?: string[] } | null;
 
 /** Bulk-import members from a CSV (email,name,role). Requires member.invite. */

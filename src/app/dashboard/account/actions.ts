@@ -8,6 +8,9 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
 import { isValidTimeZone } from "@/lib/time";
+import { generateTotpSecret, totpUri, verifyTotp } from "@/lib/totp";
+import { env } from "@/lib/env";
+import { requestEmailChange } from "@/server/email-change";
 
 export type SettingsState = { ok?: boolean; error?: string } | null;
 
@@ -88,6 +91,72 @@ export async function updatePasswordAction(_prev: SettingsState, formData: FormD
   await db.update(users).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(users.id, user.id));
   // Revoke every other session so a stolen session can't outlive a password change.
   await revokeOtherSessions(user.id);
+  return { ok: true };
+}
+
+/* ---- Email change ------------------------------------------------------ */
+
+const emailChangeSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+});
+
+export async function requestEmailChangeAction(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const user = await requireUser();
+  const parsed = emailChangeSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid email" };
+  if (parsed.data.email === user.email.toLowerCase()) {
+    return { error: "That's already your email address" };
+  }
+  const result = await requestEmailChange(user.id, parsed.data.email);
+  if (!result.ok) return { error: result.error };
+  return { ok: true };
+}
+
+/* ---- Two-factor authentication ---------------------------------------- */
+
+export type TotpSetup = { secret: string; uri: string };
+
+/** Start 2FA enrollment: a fresh secret the user adds to their authenticator.
+ *  Nothing is persisted until they prove possession via enableTotpAction. */
+export async function beginTotpSetupAction(): Promise<TotpSetup> {
+  const user = await requireUser();
+  const secret = generateTotpSecret();
+  return { secret, uri: totpUri(secret, user.email, env.appName) };
+}
+
+const enableTotpSchema = z.object({
+  secret: z.string().min(16).max(64).regex(/^[A-Z2-7]+$/),
+  code: z.string().min(6).max(8),
+});
+
+export async function enableTotpAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireUser();
+  const parsed = enableTotpSchema.safeParse({
+    secret: formData.get("secret"),
+    code: formData.get("code"),
+  });
+  if (!parsed.success) return { error: "Invalid code" };
+  if (!verifyTotp(parsed.data.secret, parsed.data.code)) {
+    return { error: "That code didn't match. Check your authenticator app and try again." };
+  }
+  await db.update(users).set({ totpSecret: parsed.data.secret, updatedAt: new Date() }).where(eq(users.id, user.id));
+  revalidatePath("/dashboard/account");
+  return { ok: true };
+}
+
+export async function disableTotpAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireUser();
+  const code = formData.get("code");
+  const [row] = await db.select({ totpSecret: users.totpSecret }).from(users).where(eq(users.id, user.id)).limit(1);
+  if (!row?.totpSecret) return { ok: true };
+  if (typeof code !== "string" || !verifyTotp(row.totpSecret, code)) {
+    return { error: "Enter the current code from your authenticator app to turn 2FA off." };
+  }
+  await db.update(users).set({ totpSecret: null, updatedAt: new Date() }).where(eq(users.id, user.id));
+  revalidatePath("/dashboard/account");
   return { ok: true };
 }
 

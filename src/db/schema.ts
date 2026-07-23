@@ -63,6 +63,8 @@ export const users = pgTable(
     locale: varchar("locale", { length: 16 }).notNull().default("en"),
     /** Instance administrator. */
     isAdmin: boolean("is_admin").notNull().default(false),
+    /** TOTP secret (base32) — non-null means two-factor auth is enabled. */
+    totpSecret: varchar("totp_secret", { length: 64 }),
     defaultScheduleId: integer("default_schedule_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -208,6 +210,10 @@ export const services = pgTable(
     minimumBookingNotice: integer("minimum_booking_notice").notNull().default(120),
     /** granularity of generated slots; null = use length */
     slotInterval: integer("slot_interval"),
+    /** attendees that can share one slot (group events); 1 = one-on-one */
+    seatsPerSlot: integer("seats_per_slot").notNull().default(1),
+    /** cap on accepted bookings per calendar day for this service; null = unlimited */
+    maxBookingsPerDay: integer("max_bookings_per_day"),
 
     requiresConfirmation: boolean("requires_confirmation").notNull().default(false),
     disableGuests: boolean("disable_guests").notNull().default(false),
@@ -335,12 +341,14 @@ export const credentials = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** which calendar the tokens belong to */
+    provider: varchar("provider", { length: 16 }).notNull().default("google"),
     /** encrypted JSON token blob */
     key: text("key").notNull(),
     invalid: boolean("invalid").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("credentials_user_idx").on(t.userId)],
+  (t) => [uniqueIndex("credentials_user_idx").on(t.userId, t.provider)],
 );
 
 export const selectedCalendars = pgTable(

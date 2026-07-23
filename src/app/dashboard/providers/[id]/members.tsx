@@ -24,6 +24,7 @@ import {
   changeMemberRoleAction,
   removeMemberAction,
   bulkImportMembersAction,
+  transferOwnershipAction,
   type TeamState,
   type ImportState,
 } from "../actions";
@@ -39,7 +40,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, UserPlus, Upload, Loader2, Check, Copy, Link2, Send } from "lucide-react";
+import { Trash2, UserPlus, Upload, Loader2, Check, Copy, Link2, Send, Crown } from "lucide-react";
 
 interface Member {
   membershipId: number;
@@ -180,6 +181,14 @@ export function TeamMembers({
                     {m.role}
                   </Badge>
                 )}
+                {viewerRole === "owner" && m.role !== "owner" && m.accepted ? (
+                  <TransferOwnershipButton
+                    teamId={teamId}
+                    membershipId={m.membershipId}
+                    memberName={m.name ?? m.email}
+                    onDone={() => router.refresh()}
+                  />
+                ) : null}
                 {canRemove && m.role !== "owner" && canAssignRole(viewerRole, m.role) ? (
                   <RemoveButton teamId={teamId} membershipId={m.membershipId} onDone={() => router.refresh()} />
                 ) : null}
@@ -397,6 +406,59 @@ function RemoveButton({
               disabled={pending}
             >
               Remove member
+            </AlertDialogAction>
+          </form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function TransferOwnershipButton({
+  teamId,
+  membershipId,
+  memberName,
+  onDone,
+}: {
+  teamId: number;
+  membershipId: number;
+  memberName: string;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [state, action, pending] = useActionState<TeamState, FormData>(transferOwnershipAction, null);
+
+  useEffect(() => {
+    if (state?.ok) {
+      toast({ title: "Ownership transferred", description: "You are now an admin of this company." });
+      onDone();
+    } else if (state?.error) {
+      toast({ title: "Couldn't transfer ownership", description: state.error, variant: "destructive" });
+    }
+  }, [state, toast, onDone]);
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={pending} aria-label="Transfer ownership" title="Transfer ownership">
+          <Crown className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Make {memberName} the owner?</AlertDialogTitle>
+          <AlertDialogDescription>
+            They become the company owner and you become an admin. Only the new owner can transfer
+            ownership back.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <form action={action}>
+            <input type="hidden" name="teamId" value={teamId} />
+            <input type="hidden" name="membershipId" value={membershipId} />
+            <AlertDialogAction type="submit" disabled={pending}>
+              Transfer ownership
             </AlertDialogAction>
           </form>
         </AlertDialogFooter>
