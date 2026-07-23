@@ -34,6 +34,18 @@ npm run dev
 Open `http://localhost:3100/setup` to create the company owner. Setup creates the company and
 the first provider. Add providers under **Providers**, then assign them to services.
 
+Earlier pre-release databases are intentionally unsupported. To replace an old local prototype
+database, confirm its exact database name and then apply the clean baseline:
+
+```bash
+npm run db:reset -- --confirm tidetime_lite
+npm run db:migrate
+npm run db:seed
+```
+
+The reset command refuses production mode, remote database hosts, system databases, and
+non-matching confirmation names.
+
 ## Production
 
 ```bash
