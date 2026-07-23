@@ -19,8 +19,9 @@ env:
   # runner. Keep CI aligned with the production image build.
   NODE_OPTIONS: --max-old-space-size=4096
   APP_URL: http://localhost:3000
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/tidetime
+  DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/tidetime
   AUTH_SECRET: ci-auth-secret-please-change-this-32chars
+  CRON_SECRET: ci-cron-secret-please-change-this-32chars
 
 jobs:
   validate:
@@ -32,10 +33,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -72,8 +73,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

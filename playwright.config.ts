@@ -42,9 +42,12 @@ export default defineConfig({
         env: {
           ...process.env,
           APP_URL: process.env.E2E_APP_URL ?? "http://127.0.0.1:3100",
-          DATABASE_URL: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/tidetime",
+          DATABASE_URL:
+            process.env.DATABASE_URL ??
+            "postgres://postgres:postgres@127.0.0.1:5432/tidetime",
           AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-auth-secret-that-is-at-least-32-characters",
-          CRON_SECRET: process.env.CRON_SECRET ?? "e2e-cron-secret",
+          CRON_SECRET:
+            process.env.CRON_SECRET ?? "e2e-cron-secret-that-is-at-least-32-characters",
           PORT: "3100",
           HOSTNAME: "127.0.0.1",
         },
