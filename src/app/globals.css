@@ -157,3 +157,58 @@
     letter-spacing: -0.02em;
   }
 }
+
+/* ── Motion primitives (pure CSS, no animation library) ──────────────────── */
+@keyframes tt-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes tt-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tt-pop {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tt-ring {
+  from { opacity: 0.5; transform: scale(0.7); }
+  to   { opacity: 0;   transform: scale(2.3); }
+}
+@keyframes tt-wave-draw {
+  from { stroke-dashoffset: 30; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes tt-wave-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-1.5px); }
+}
+
+/* Gentle staggered entrance for lists/cards — pair with an inline
+   animation-delay for a silky, professional cascade. */
+.tt-rise { animation: tt-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tt-fade { animation: tt-fade 0.5s ease both; }
+/* App-wide route-enter transition (dashboard template). */
+.tt-page-enter { animation: tt-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Skeleton shimmer — a soft light sweeps across loading placeholders. */
+@keyframes tt-shimmer { 100% { transform: translateX(100%); } }
+.tt-shimmer { position: relative; overflow: hidden; }
+.tt-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
+  animation: tt-shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-rise,
+  .tt-fade,
+  .tt-page-enter,
+  .tt-shimmer::after {
+    animation: none !important;
+  }
+}

@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "../_components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
-import { CalendarX2, Clock, MapPin, User, X } from "lucide-react";
+import { Clock, MapPin, User, X } from "lucide-react";
 
 type Filter = "upcoming" | "pending" | "past" | "cancelled";
 
@@ -123,7 +123,7 @@ export default async function BookingsPage({ searchParams }: Props) {
       />
 
       <Tabs value={active}>
-        <TabsList>
+        <TabsList className="flex-wrap">
           {FILTERS.map((f) => (
             <TabsTrigger key={f} value={f} asChild>
               <Link href={`/dashboard/bookings?tab=${f}`}>{FILTER_LABELS[f]}</Link>
@@ -134,7 +134,7 @@ export default async function BookingsPage({ searchParams }: Props) {
         <TabsContent value={active} className="mt-6">
           {rows.length === 0 ? (
             <EmptyState
-              icon={CalendarX2}
+              brand
               title={`No ${active} bookings`}
               description={
                 active === "upcoming"
@@ -151,8 +151,8 @@ export default async function BookingsPage({ searchParams }: Props) {
             />
           ) : (
             <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
-              {rows.map((b) => (
-                <BookingRow key={b.uid} booking={b} filter={active} userTz={user.timeZone} />
+              {rows.map((b, i) => (
+                <BookingRow key={b.uid} booking={b} filter={active} userTz={user.timeZone} index={i} />
               ))}
             </div>
           )}
@@ -166,10 +166,12 @@ function BookingRow({
   booking,
   filter,
   userTz,
+  index,
 }: {
   booking: BookingRow;
   filter: Filter;
   userTz: string;
+  index: number;
 }) {
   const when = formatRange(booking.startTime, booking.endTime, userTz);
   const attendeeSummary =
@@ -178,15 +180,22 @@ function BookingRow({
       : `${booking.attendeeNames[0]} + ${booking.attendeeNames.length - 1} guest${booking.attendeeNames.length - 1 === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      className="tt-rise group relative flex flex-col gap-3 px-5 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between"
+      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+    >
+      {/* Stretched link: the whole row navigates to the booking. Inner
+          interactive elements (meeting link, actions) sit above it via z-10. */}
+      <Link
+        href={`/dashboard/bookings/${booking.uid}`}
+        aria-label={`Open booking: ${booking.title}`}
+        className="absolute inset-0 z-0 rounded-[inherit] focus-visible:ring-2 focus-visible:ring-ring"
+      />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/dashboard/bookings/${booking.uid}`}
-            className="text-sm font-medium text-foreground hover:underline"
-          >
+          <span className="text-sm font-medium text-foreground group-hover:underline">
             {booking.title}
-          </Link>
+          </span>
           {booking.status === "pending" && (
             <Badge variant="pending" className="gap-1">
               <Clock className="h-2.5 w-2.5" /> Pending
@@ -222,7 +231,7 @@ function BookingRow({
               {booking.meetingUrl ? (
                 <a
                   href={booking.meetingUrl}
-                  className="hover:text-foreground hover:underline"
+                  className="relative z-10 hover:text-foreground hover:underline"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -237,14 +246,16 @@ function BookingRow({
       </div>
 
       {filter === "pending" && (
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
           <DeclineButton uid={booking.uid} />
           <AcceptButton uid={booking.uid} />
         </div>
       )}
 
       {filter === "upcoming" && (
-        <CancelBookingButton uid={booking.uid} />
+        <div className="relative z-10 shrink-0">
+          <CancelBookingButton uid={booking.uid} />
+        </div>
       )}
     </div>
   );

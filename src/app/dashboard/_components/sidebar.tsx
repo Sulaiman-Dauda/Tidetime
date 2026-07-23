@@ -100,7 +100,7 @@ export function SidebarContent({ user, onNavigate }: SidebarProps) {
         return true;
       })
       .map((item) =>
-        item.href === "/dashboard/services" && role === "provider"
+        item.href === "/dashboard/services" && role === "member"
           ? { ...item, label: "My services" }
           : item,
       ),

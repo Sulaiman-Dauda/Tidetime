@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { initials } from "@/lib/format";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
-import { Users } from "lucide-react";
 
 export const metadata = { title: "Team" };
 
@@ -45,7 +44,7 @@ export default async function TeamDirectoryPage() {
       />
       {teammates.length === 0 ? (
         <EmptyState
-          icon={Users}
+          brand
           title="No teammates yet"
           description="Accepted teammates will appear here."
         />

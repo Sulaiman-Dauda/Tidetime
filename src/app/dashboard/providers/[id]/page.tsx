@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
-import { teams, memberships, users } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { teams, memberships, users, invites } from "@/db/schema";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { getAppUrl } from "@/server/app-url";
 import { TeamMembers } from "./members";
 
 export const metadata = { title: "Providers" };
@@ -51,6 +52,28 @@ export default async function ProviderDetailPage({ params }: Props) {
     .innerJoin(users, eq(memberships.userId, users.id))
     .where(eq(memberships.teamId, teamId));
 
+  // Pending (unaccepted, unexpired) invitations — with a shareable signup link
+  // so admins aren't blocked when email delivery isn't configured.
+  const appUrl = await getAppUrl();
+  const pending = await db
+    .select({
+      id: invites.id,
+      email: invites.email,
+      role: invites.role,
+      token: invites.token,
+      expiresAt: invites.expiresAt,
+    })
+    .from(invites)
+    .where(and(eq(invites.teamId, teamId), isNull(invites.acceptedAt), gt(invites.expiresAt, new Date())))
+    .orderBy(desc(invites.id));
+  const pendingInvites = pending.map((p) => ({
+    id: p.id,
+    email: p.email,
+    role: p.role,
+    url: `${appUrl}/signup?invite=${p.token}`,
+    expiresAt: p.expiresAt.toISOString(),
+  }));
+
   return (
     <div className="animate-fade-in space-y-8">
       <div>
@@ -70,6 +93,7 @@ export default async function ProviderDetailPage({ params }: Props) {
           name: m.name,
           email: m.email,
         }))}
+        pendingInvites={pendingInvites}
       />
     </div>
   );

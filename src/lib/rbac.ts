@@ -44,24 +44,24 @@ const ALL: Permission[] = [
 ];
 
 const MATRIX: Record<MembershipRole, Permission[]> = {
+  // Full control, including deleting/transferring the team.
   owner: ALL,
+  // Manages the team, services, members, all bookings and company settings —
+  // everything except deleting the team itself.
   admin: ALL.filter((permission) => permission !== "team.delete"),
-  manager: [
+  // Front-desk: sees and manages every booking and customer, but is not a
+  // bookable provider and cannot view/manage the service catalogue, team,
+  // members or settings. They still book on behalf of customers from the
+  // calendar (quick-create loads services via booking.all.manage).
+  scheduler: [
     "team.directory.view",
-    "member.invite",
-    "member.remove",
-    "service.catalog.view",
-    "service.catalog.manage",
-    "service.assigned.view",
-    "availability.own.manage",
-    "booking.own.view",
-    "booking.own.manage",
     "booking.all.view",
     "booking.all.manage",
     "customer.all.view",
-    "connection.own.manage",
   ],
-  provider: [
+  // A regular team member / provider: takes appointments and manages their own
+  // availability, own bookings and own integrations.
+  member: [
     "team.directory.view",
     "service.assigned.view",
     "availability.own.manage",
@@ -69,14 +69,6 @@ const MATRIX: Record<MembershipRole, Permission[]> = {
     "booking.own.manage",
     "connection.own.manage",
   ],
-  receptionist: [
-    "team.directory.view",
-    "service.catalog.view",
-    "booking.all.view",
-    "booking.all.manage",
-    "customer.all.view",
-  ],
-  member: ["team.directory.view"],
 };
 
 export function can(role: MembershipRole, permission: Permission): boolean {
@@ -88,11 +80,9 @@ export function canAny(role: MembershipRole, permissions: Permission[]): boolean
 }
 
 const RANK: Record<MembershipRole, number> = {
-  owner: 5,
-  admin: 4,
-  manager: 3,
-  provider: 2,
-  receptionist: 2,
+  owner: 4,
+  admin: 3,
+  scheduler: 2,
   member: 1,
 };
 
@@ -100,4 +90,15 @@ export function canAssignRole(actor: MembershipRole, target: MembershipRole): bo
   if (!can(actor, "member.role.assign")) return false;
   if (actor === "owner") return true;
   return RANK[target] < RANK[actor];
+}
+
+/**
+ * Whether a role grants instance-administration (company settings, SMTP/M365
+ * email, custom domain, webhooks). These surfaces are gated by the
+ * `users.isAdmin` flag rather than a per-request role lookup; that flag is kept
+ * in sync with this predicate at every role-assignment site, so
+ * `company.settings.manage` (held by owner + admin) is enforced through it.
+ */
+export function isAdminRole(role: MembershipRole): boolean {
+  return role === "owner" || role === "admin";
 }

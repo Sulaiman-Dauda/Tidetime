@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { signupAction, type ActionResult } from "../actions";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,16 @@ export function SignupForm({
   inviteEmail: string;
 }) {
   const [state, formAction] = useActionState<ActionResult, FormData>(signupAction, {});
+  const [timeZone, setTimeZone] = useState("");
+
+  useEffect(() => {
+    setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
 
   return (
     <form action={formAction} className="space-y-5">
       <input type="hidden" name="inviteToken" value={inviteToken} />
+      <input type="hidden" name="timeZone" value={timeZone} />
 
       {state.error && (
         <p className="rounded-md border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">

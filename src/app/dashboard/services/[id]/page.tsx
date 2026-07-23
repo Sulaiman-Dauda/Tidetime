@@ -67,7 +67,9 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
       teamSlug={company.teamSlug}
       appUrl={appUrl}
       providers={providers}
-      selectedProviderIds={selected.map((row) => row.userId)}
+      selectedProviderIds={selected
+        .map((row) => row.userId)
+        .filter((id) => providers.some((provider) => provider.id === id))}
     />
   );
 }

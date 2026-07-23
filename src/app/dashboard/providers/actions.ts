@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
-import { memberships, users, type MembershipRole } from "@/db/schema";
-import { can, canAssignRole } from "@/lib/rbac";
+import { memberships, serviceProviders, services, users, type MembershipRole } from "@/db/schema";
+import { can, canAssignRole, isAdminRole } from "@/lib/rbac";
 import { teamRole } from "@/server/memberships";
 import { parseCsvRecords, validateProviderImport } from "@/lib/csv";
 
@@ -15,7 +15,7 @@ export type TeamState = { ok?: boolean; error?: string } | null;
 const roleSchema = z.object({
   teamId: z.coerce.number().int().positive(),
   membershipId: z.coerce.number().int().positive(),
-  role: z.enum(["admin", "manager", "provider", "receptionist", "member"]),
+  role: z.enum(["admin", "scheduler", "member"]),
 });
 
 /** Change a member's role. Requires member.role.assign + authority over target. */
@@ -47,6 +47,12 @@ export async function changeMemberRoleAction(_prev: TeamState, formData: FormDat
     .set({ role: parsed.data.role })
     .where(eq(memberships.id, parsed.data.membershipId));
 
+  // Keep the instance-admin flag in sync with the new role (owner/admin ⇒ admin).
+  await db
+    .update(users)
+    .set({ isAdmin: isAdminRole(parsed.data.role) })
+    .where(eq(users.id, target.userId));
+
   revalidatePath("/dashboard/providers");
   return { ok: true };
 }
@@ -69,7 +75,7 @@ export async function removeMemberAction(_prev: TeamState, formData: FormData): 
   if (!role || !can(role, "member.remove")) return { error: "You don't have permission to remove members" };
 
   const [target] = await db
-    .select({ role: memberships.role })
+    .select({ role: memberships.role, userId: memberships.userId })
     .from(memberships)
     .where(and(eq(memberships.id, parsed.data.membershipId), eq(memberships.teamId, parsed.data.teamId)))
     .limit(1);
@@ -77,7 +83,24 @@ export async function removeMemberAction(_prev: TeamState, formData: FormData): 
   if (target.role === "owner") return { error: "The owner can't be removed" };
   if (!canAssignRole(role, target.role)) return { error: "You can't remove that member" };
 
-  await db.delete(memberships).where(eq(memberships.id, parsed.data.membershipId));
+  await db.transaction(async (tx) => {
+    await tx.delete(memberships).where(eq(memberships.id, parsed.data.membershipId));
+
+    // Unassign the removed member from this team's services — stale
+    // service_providers rows would block saving those services later.
+    await tx.delete(serviceProviders).where(
+      and(
+        eq(serviceProviders.userId, target.userId),
+        inArray(
+          serviceProviders.serviceId,
+          tx.select({ id: services.id }).from(services).where(eq(services.teamId, parsed.data.teamId)),
+        ),
+      ),
+    );
+
+    // A removed member must not retain instance-admin access.
+    await tx.update(users).set({ isAdmin: false }).where(eq(users.id, target.userId));
+  });
 
   revalidatePath("/dashboard/providers");
   return { ok: true };

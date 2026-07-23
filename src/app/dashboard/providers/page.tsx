@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Users } from "lucide-react";
 
 export const metadata = { title: "Providers" };
 
@@ -35,7 +34,7 @@ export default async function ProvidersPage() {
 
       {rows.length === 0 ? (
         <EmptyState
-          icon={Users}
+          brand
           title="No company configured"
           description="Complete first-run setup to create your company."
         />

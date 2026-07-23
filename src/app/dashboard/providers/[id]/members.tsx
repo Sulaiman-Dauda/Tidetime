@@ -25,8 +25,8 @@ import {
   type TeamState,
   type ImportState,
 } from "../actions";
-import { createInviteAction, type InviteState } from "../invite-actions";
-import { Trash2, UserPlus, Upload, Loader2 } from "lucide-react";
+import { createInviteAction, revokeInviteAction, type InviteState } from "../invite-actions";
+import { Trash2, UserPlus, Upload, Loader2, Check, Copy, Link2 } from "lucide-react";
 
 interface Member {
   membershipId: number;
@@ -36,16 +36,26 @@ interface Member {
   email: string;
 }
 
-const ASSIGNABLE: MembershipRole[] = ["admin", "manager", "provider", "receptionist", "member"];
+interface PendingInvite {
+  id: number;
+  email: string;
+  role: MembershipRole;
+  url: string;
+  expiresAt: string;
+}
+
+const ASSIGNABLE: MembershipRole[] = ["admin", "scheduler", "member"];
 
 export function TeamMembers({
   teamId,
   viewerRole,
   members,
+  pendingInvites = [],
 }: {
   teamId: number;
   viewerRole: MembershipRole;
   members: Member[];
+  pendingInvites?: PendingInvite[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -53,14 +63,24 @@ export function TeamMembers({
   const canInvite = can(viewerRole, "member.invite");
   const canManageRoles = can(viewerRole, "member.role.assign");
   const canRemove = can(viewerRole, "member.remove");
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  const [revokeState, revoke, revoking] = useActionState<InviteState, FormData>(revokeInviteAction, null);
 
   const [inviteState, invite, inviting] = useActionState<InviteState, FormData>(createInviteAction, null);
   const [importState, runImport, importing] = useActionState<ImportState, FormData>(bulkImportMembersAction, null);
-  const [inviteRole, setInviteRole] = useState<MembershipRole>("provider");
+  const [inviteRole, setInviteRole] = useState<MembershipRole>("member");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     if (inviteState?.ok) {
-      toast({ title: "Invitation sent" });
+      toast({
+        title: "Invitation created",
+        description: "Share the link below so they can create their account.",
+      });
+      setInviteLink(inviteState.inviteUrl ?? null);
+      setLinkCopied(false);
       router.refresh();
     } else if (inviteState?.error) {
       toast({
@@ -70,6 +90,36 @@ export function TeamMembers({
       });
     }
   }, [inviteState, toast, router]);
+
+  async function copyInviteLink() {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  async function copyPendingLink(url: string, id: number) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1600);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  useEffect(() => {
+    if (revokeState?.ok) {
+      toast({ title: "Invitation revoked" });
+      router.refresh();
+    } else if (revokeState?.error) {
+      toast({ title: "Couldn't revoke invitation", description: revokeState.error, variant: "destructive" });
+    }
+  }, [revokeState, toast, router]);
 
   useEffect(() => {
     if (importState?.ok) {
@@ -152,6 +202,84 @@ export function TeamMembers({
               Invite
             </Button>
           </form>
+
+          {inviteLink ? (
+            <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.04] p-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                <Link2 className="h-3.5 w-3.5 text-primary" />
+                Invitation link
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                We emailed this link, but email delivery isn&apos;t guaranteed on every setup. Share it
+                directly with the invitee — they need it to create their account.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <Input readOnly value={inviteLink} className="h-8 flex-1 font-mono text-xs" />
+                <Button type="button" size="sm" variant="outline" className="h-8 shrink-0 gap-1.5" onClick={copyInviteLink}>
+                  {linkCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+                  {linkCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {canInvite && pendingInvites.length > 0 ? (
+        <Card className="p-5">
+          <h2 className="text-sm font-semibold">Pending invitations</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Invited people who haven&apos;t created an account yet. Copy a link to share it directly,
+            or revoke it to free up the email address for a fresh invite.
+          </p>
+          <div className="mt-4 space-y-2">
+            {pendingInvites.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium">{inv.email}</p>
+                    <Badge variant="outline" className="capitalize">{inv.role}</Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5"
+                    onClick={() => copyPendingLink(inv.url, inv.id)}
+                  >
+                    {copiedId === inv.id ? (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    ) : (
+                      <Link2 className="h-3.5 w-3.5" />
+                    )}
+                    {copiedId === inv.id ? "Copied" : "Copy link"}
+                  </Button>
+                  <form action={revoke}>
+                    <input type="hidden" name="inviteId" value={inv.id} />
+                    <input type="hidden" name="teamId" value={teamId} />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                      disabled={revoking}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Revoke
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       ) : null}
 
@@ -166,7 +294,7 @@ export function TeamMembers({
             <Textarea
               name="csv"
               rows={5}
-              placeholder={"email,name,role\njane@acme.co,Jane,provider"}
+              placeholder={"email,name,role\njane@acme.co,Jane,member"}
               required
             />
             <Button type="submit" variant="outline" disabled={importing}>

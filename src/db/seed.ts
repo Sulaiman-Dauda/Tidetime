@@ -51,7 +51,7 @@ async function seed() {
   const [team] = await db.insert(teams).values({ name: "Demo Company", slug: "demo-company" }).returning({ id: teams.id });
   await db.insert(memberships).values([
     { userId: owner.id, teamId: team.id, role: "owner", accepted: true },
-    { userId: provider.id, teamId: team.id, role: "provider", accepted: true },
+    { userId: provider.id, teamId: team.id, role: "member", accepted: true },
   ]);
   const [service] = await db.insert(services).values({
     teamId: team.id,

@@ -122,7 +122,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
             {weekly.map((rule) => {
               const enabled = rule.intervals.length > 0;
               return (
-                <div key={rule.day} className="flex items-start gap-4 border-b py-3 last:border-0">
+                <div key={rule.day} className="flex flex-col gap-3 border-b py-3 last:border-0 sm:flex-row sm:items-start sm:gap-4">
                   <div className="flex w-32 shrink-0 items-center gap-2 pt-1.5">
                     <Switch checked={enabled} onCheckedChange={(c) => toggleDay(rule.day, c)} />
                     <span className="text-sm font-medium">{weekdayLabel(rule.day).slice(0, 3)}</span>
@@ -136,14 +136,14 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                           <Input
                             type="time"
                             value={iv.start}
-                            className="w-28"
+                            className="w-28 min-w-0 flex-1 sm:flex-none"
                             onChange={(e) => updateInterval(rule.day, i, "start", e.target.value)}
                           />
                           <span className="text-muted-foreground">–</span>
                           <Input
                             type="time"
                             value={iv.end}
-                            className="w-28"
+                            className="w-28 min-w-0 flex-1 sm:flex-none"
                             onChange={(e) => updateInterval(rule.day, i, "end", e.target.value)}
                           />
                           <Tooltip content="Remove">
@@ -236,7 +236,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                         <Input
                           type="time"
                           value={iv.start}
-                          className="w-24"
+                          className="w-24 min-w-0 flex-1 sm:flex-none"
                           onChange={(e) =>
                             setOverrides((o) =>
                               o.map((x) =>
@@ -251,7 +251,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides }
                         <Input
                           type="time"
                           value={iv.end}
-                          className="w-24"
+                          className="w-24 min-w-0 flex-1 sm:flex-none"
                           onChange={(e) =>
                             setOverrides((o) =>
                               o.map((x) =>

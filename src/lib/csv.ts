@@ -88,15 +88,13 @@ export interface ImportResult {
 const VALID_ROLES = new Set([
   "owner",
   "admin",
-  "manager",
-  "provider",
-  "receptionist",
+  "scheduler",
   "member",
 ]);
 
 /**
  * Validate provider import records (from parseCsvRecords). Requires an `email`
- * column; `name` and `role` are optional (role defaults to "provider").
+ * column; `name` and `role` are optional (role defaults to "member").
  */
 export function validateProviderImport(records: Record<string, string>[]): ImportResult {
   const valid: ProviderImportRow[] = [];
@@ -118,7 +116,7 @@ export function validateProviderImport(records: Record<string, string>[]): Impor
       errors.push({ line, message: `Duplicate email: ${email}` });
       return;
     }
-    const role = (record.role || "provider").toLowerCase();
+    const role = (record.role || "member").toLowerCase();
     if (!VALID_ROLES.has(role)) {
       errors.push({ line, message: `Invalid role: ${role}` });
       return;

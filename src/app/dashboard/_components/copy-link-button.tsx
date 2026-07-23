@@ -21,14 +21,14 @@ export function CopyLinkButton({ url, label }: { url: string; label: string }) {
       <button
         type="button"
         onClick={copy}
-        className="group flex h-8 items-center gap-2 rounded-full border border-border/60 bg-card px-3 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+        className="group flex h-8 min-w-0 items-center gap-2 rounded-full border border-border/60 bg-card px-3 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
       >
         {copied ? (
           <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
         ) : (
           <Copy className="h-3.5 w-3.5 shrink-0" />
         )}
-        <span className="font-mono">{label}</span>
+        <span className="truncate font-mono max-w-[45vw] sm:max-w-none">{label}</span>
       </button>
       <a
         href={url}

@@ -22,9 +22,7 @@ import { relations } from "drizzle-orm";
 export const membershipRole = pgEnum("membership_role", [
   "owner",
   "admin",
-  "manager",
-  "provider",
-  "receptionist",
+  "scheduler",
   "member",
 ]);
 export const bookingStatus = pgEnum("booking_status", [

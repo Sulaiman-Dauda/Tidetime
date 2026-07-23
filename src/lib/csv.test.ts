@@ -25,7 +25,7 @@ describe("validateProviderImport", () => {
   it("accepts valid rows and defaults role/name", () => {
     const result = validateProviderImport([{ email: "A@B.CO", name: "", role: "" }]);
     expect(result.errors).toEqual([]);
-    expect(result.valid).toEqual([{ email: "a@b.co", name: "a", role: "provider" }]);
+    expect(result.valid).toEqual([{ email: "a@b.co", name: "a", role: "member" }]);
   });
 
   it("flags missing and invalid emails", () => {
@@ -37,8 +37,8 @@ describe("validateProviderImport", () => {
 
   it("flags duplicates and invalid roles", () => {
     const result = validateProviderImport([
-      { email: "a@b.co", role: "provider" },
-      { email: "a@b.co", role: "provider" },
+      { email: "a@b.co", role: "member" },
+      { email: "a@b.co", role: "member" },
       { email: "c@d.co", role: "wizard" },
     ]);
     const messages = result.errors.map((e) => e.message);

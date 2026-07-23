@@ -15,39 +15,30 @@ describe("role permissions", () => {
     expect(can("admin", "service.catalog.manage")).toBe(true);
   });
 
-  it("allows managers to operate the catalogue and company bookings", () => {
-    expect(can("manager", "service.catalog.manage")).toBe(true);
-    expect(can("manager", "booking.all.manage")).toBe(true);
-    expect(can("manager", "customer.all.view")).toBe(true);
-    expect(can("manager", "company.settings.manage")).toBe(false);
+  it("gives schedulers front-desk access without provider configuration", () => {
+    expect(can("scheduler", "booking.all.manage")).toBe(true);
+    expect(can("scheduler", "customer.all.view")).toBe(true);
+    expect(can("scheduler", "availability.own.manage")).toBe(false);
+    expect(can("scheduler", "service.catalog.view")).toBe(false);
+    expect(can("scheduler", "service.catalog.manage")).toBe(false);
+    expect(can("scheduler", "member.invite")).toBe(false);
   });
 
-  it("limits providers to their own operational scope", () => {
-    expect(can("provider", "service.assigned.view")).toBe(true);
-    expect(can("provider", "availability.own.manage")).toBe(true);
-    expect(can("provider", "booking.own.manage")).toBe(true);
-    expect(can("provider", "connection.own.manage")).toBe(true);
-    expect(can("provider", "service.catalog.manage")).toBe(false);
-    expect(can("provider", "booking.all.view")).toBe(false);
-    expect(can("provider", "customer.all.view")).toBe(false);
-    expect(can("provider", "member.invite")).toBe(false);
-  });
-
-  it("gives receptionists front-desk access without provider configuration", () => {
-    expect(can("receptionist", "booking.all.manage")).toBe(true);
-    expect(can("receptionist", "customer.all.view")).toBe(true);
-    expect(can("receptionist", "availability.own.manage")).toBe(false);
-    expect(can("receptionist", "service.catalog.manage")).toBe(false);
-  });
-
-  it("keeps members to the teammate directory", () => {
+  it("limits members to their own operational scope", () => {
     expect(can("member", "team.directory.view")).toBe(true);
-    expect(can("member", "booking.own.view")).toBe(false);
+    expect(can("member", "service.assigned.view")).toBe(true);
+    expect(can("member", "availability.own.manage")).toBe(true);
+    expect(can("member", "booking.own.manage")).toBe(true);
+    expect(can("member", "connection.own.manage")).toBe(true);
+    expect(can("member", "service.catalog.manage")).toBe(false);
+    expect(can("member", "booking.all.view")).toBe(false);
+    expect(can("member", "customer.all.view")).toBe(false);
+    expect(can("member", "member.invite")).toBe(false);
   });
 
   it("supports any-permission checks", () => {
     expect(
-      canAny("provider", ["customer.all.view", "service.assigned.view"]),
+      canAny("member", ["customer.all.view", "service.assigned.view"]),
     ).toBe(true);
   });
 });
@@ -59,13 +50,14 @@ describe("role assignment", () => {
   });
 
   it("allows admins to assign lower roles only", () => {
-    expect(canAssignRole("admin", "manager")).toBe(true);
+    expect(canAssignRole("admin", "scheduler")).toBe(true);
+    expect(canAssignRole("admin", "member")).toBe(true);
     expect(canAssignRole("admin", "admin")).toBe(false);
     expect(canAssignRole("admin", "owner")).toBe(false);
   });
 
   it("does not let operational roles assign roles", () => {
-    expect(canAssignRole("manager", "provider")).toBe(false);
-    expect(canAssignRole("provider", "member")).toBe(false);
+    expect(canAssignRole("scheduler", "member")).toBe(false);
+    expect(canAssignRole("member", "member")).toBe(false);
   });
 });

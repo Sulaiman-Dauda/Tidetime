@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import { NewServiceButton } from "./new-service-button";
+import { CountUp } from "./count-up";
 
 interface OverviewEvent {
   uid: string;
@@ -100,7 +101,7 @@ export function DashboardOverview({
             <Calendar className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="tabular-stat text-xl font-semibold">{data.today.length}</p>
+            <p className="tabular-stat text-xl font-semibold"><CountUp value={data.today.length} /></p>
             <p className="text-xs text-muted-foreground">Today</p>
           </div>
         </Link>
@@ -114,7 +115,7 @@ export function DashboardOverview({
             <Calendar className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="tabular-stat text-xl font-semibold">{data.upcoming}</p>
+            <p className="tabular-stat text-xl font-semibold"><CountUp value={data.upcoming} /></p>
             <p className="text-xs text-muted-foreground">Upcoming</p>
           </div>
         </Link>
@@ -128,7 +129,7 @@ export function DashboardOverview({
             <Clock className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="tabular-stat text-xl font-semibold">{data.pending}</p>
+            <p className="tabular-stat text-xl font-semibold"><CountUp value={data.pending} /></p>
             <p className="text-xs text-muted-foreground">Pending</p>
           </div>
         </Link>
@@ -156,7 +157,7 @@ export function DashboardOverview({
       {/* Today's events */}
       {data.today.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Today</h2>
+          <h2 className="mb-3 text-base font-semibold tracking-tight text-foreground">Today</h2>
           <div className="space-y-2">
             {data.today.map((event) => (
               <Link
@@ -187,7 +188,7 @@ export function DashboardOverview({
       {/* This week */}
       {data.thisWeek.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">This week</h2>
+          <h2 className="mb-3 text-base font-semibold tracking-tight text-foreground">This week</h2>
           <div className="space-y-2">
             {data.thisWeek.map((event) => (
               <Link

@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "../_components/page-header";
-import { Users } from "lucide-react";
 
 export const metadata = { title: "Customers" };
 
@@ -41,7 +40,7 @@ export default async function CustomersPage({
 
       {customers.length === 0 ? (
         <EmptyState
-          icon={Users}
+          brand
           title={q ? "No matching customers" : "No customers yet"}
           description={
             q

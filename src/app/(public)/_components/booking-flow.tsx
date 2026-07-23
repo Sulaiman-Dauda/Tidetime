@@ -66,6 +66,13 @@ type Host = {
   avatarUrl?: string | null;
 };
 
+export type BookingPrefill = {
+  name: string;
+  email: string;
+  responses: FieldValues;
+  guests: string[];
+};
+
 type Props = {
   slug: string;
   teamSlug: string;
@@ -75,6 +82,8 @@ type Props = {
   spamProtection?: boolean;
   botChallenge?: string;
   teamHosts?: Host[];
+  /** When rescheduling, the existing booking's details so the booker doesn't re-enter them */
+  prefill?: BookingPrefill;
 };
 
 function dayKey(date: Date): string {
@@ -148,6 +157,7 @@ export function BookingFlow({
   spamProtection,
   botChallenge,
   teamHosts = [],
+  prefill,
 }: Props) {
   const router = useRouter();
   const hostName = host.name ?? host.username;
@@ -261,39 +271,39 @@ export function BookingFlow({
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-14">
-      <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04]">
-        <div className="grid lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="border-b bg-muted/20 p-6 sm:p-8 lg:min-h-[650px] lg:border-b-0 lg:border-r">
+    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:py-10">
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04),0_16px_40px_-24px_rgba(16,24,40,0.24)]">
+        <div className="grid lg:grid-cols-[minmax(0,264px)_minmax(0,1fr)]">
+          <aside className="border-b bg-muted/20 p-6 lg:min-h-[532px] lg:border-b-0 lg:border-r">
             {rescheduleUid ? (
-              <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
-                You’re rescheduling an existing booking
+              <div className="mb-5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                Rescheduling your booking
               </div>
             ) : null}
 
-            <Avatar className="h-12 w-12 border bg-background shadow-sm">
+            <Avatar className="h-11 w-11 border bg-background shadow-sm">
               {host.avatarUrl ? <AvatarImage src={host.avatarUrl} alt={hostName} /> : null}
               <AvatarFallback>{initials(hostName)}</AvatarFallback>
             </Avatar>
-            <p className="mt-5 text-sm font-medium text-muted-foreground">{hostName}</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{service.title}</h1>
+            <p className="mt-4 text-[13px] font-medium text-muted-foreground">{hostName}</p>
+            <h1 className="mt-0.5 text-xl font-semibold tracking-tight">{service.title}</h1>
             {service.description ? (
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              <p className="mt-2.5 text-[13px] leading-6 text-muted-foreground">
                 {service.description}
               </p>
             ) : null}
 
-            <div className="mt-7 space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <Clock className="h-4 w-4 shrink-0" />
+            <div className="mt-5 space-y-2.5 text-[13px] text-muted-foreground">
+              <div className="flex items-center gap-2.5">
+                <Clock className="h-4 w-4 shrink-0 text-muted-foreground/80" />
                 <span>{formatDuration(duration)}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="h-4 w-4 shrink-0" />
+              <div className="flex items-center gap-2.5">
+                <MapPin className="h-4 w-4 shrink-0 text-muted-foreground/80" />
                 <span>{locationLabel(service.locations[0])}</span>
               </div>
-              <div className="flex items-start gap-3">
-                <Globe2 className="mt-2 h-4 w-4 shrink-0" />
+              <div className="flex items-start gap-2.5">
+                <Globe2 className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground/80" />
                 <Select
                   value={timeZone}
                   onValueChange={(value) => {
@@ -303,7 +313,7 @@ export function BookingFlow({
                 >
                   <SelectTrigger
                     aria-label="Timezone"
-                    className="h-8 min-w-0 border-0 bg-transparent px-0 shadow-none focus:ring-0"
+                    className="h-7 min-w-0 border-0 bg-transparent px-0 text-[13px] shadow-none focus:ring-0"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -319,14 +329,14 @@ export function BookingFlow({
             </div>
 
             {service.requiresConfirmation ? (
-              <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
-                Your request will be confirmed by the company after submission.
+              <div className="mt-5 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs leading-5 text-amber-700 dark:text-amber-300">
+                Your request will be confirmed after submission.
               </div>
             ) : null}
 
             {teamHosts.length > 1 && step === "time" ? (
-              <div className="mt-7">
-                <Label className="text-xs font-medium text-muted-foreground">Provider</Label>
+              <div className="mt-6">
+                <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Provider</Label>
                 <Select
                   value={providerId ? String(providerId) : "any"}
                   onValueChange={(value) => {
@@ -334,7 +344,7 @@ export function BookingFlow({
                     setSelectedDay(null);
                   }}
                 >
-                  <SelectTrigger className="mt-2 w-full bg-background">
+                  <SelectTrigger className="mt-1.5 h-9 w-full bg-background text-[13px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -350,9 +360,9 @@ export function BookingFlow({
             ) : null}
 
             {durations.length > 1 && step === "time" ? (
-              <div className="mt-6">
-                <Label className="text-xs font-medium text-muted-foreground">Duration</Label>
-                <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-5">
+                <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Duration</Label>
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {durations.map((value) => (
                     <button
                       key={value}
@@ -362,7 +372,7 @@ export function BookingFlow({
                         setSelectedDay(null);
                       }}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                        "rounded-full border px-2.5 py-1 text-xs font-medium transition",
                         duration === value
                           ? "border-primary bg-primary text-primary-foreground shadow-sm"
                           : "border-border bg-background hover:border-primary/40 hover:text-primary",
@@ -376,32 +386,7 @@ export function BookingFlow({
             ) : null}
           </aside>
 
-          <section className="min-w-0 p-6 sm:p-8">
-            <div className="mb-8 flex items-center gap-2" aria-label="Booking progress">
-              <span
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium",
-                  step === "time"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/10 text-primary",
-                )}
-              >
-                {step === "details" ? <Check className="mr-1 inline h-3 w-3" /> : null}
-                1. Date &amp; time
-              </span>
-              <div className="h-px w-5 bg-border" />
-              <span
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium",
-                  step === "details"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground",
-                )}
-              >
-                2. Your details
-              </span>
-            </div>
-
+          <section className="min-w-0 p-6">
             {step === "details" && selectedSlot ? (
               <BookingForm
                 slug={slug}
@@ -414,33 +399,32 @@ export function BookingFlow({
                 rescheduleUid={rescheduleUid}
                 spamProtection={spamProtection}
                 botChallenge={botChallenge}
+                prefill={prefill}
                 onBack={() => setStep("time")}
                 onBooked={finishBooking}
               />
             ) : (
               <>
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight">Choose a date and time</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Available times are shown in your selected timezone.
-                  </p>
-                </div>
+                <h2 className="text-lg font-semibold tracking-tight">Select a date &amp; time</h2>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
+                  Times are shown in your selected timezone.
+                </p>
 
-                <div className="mt-7 grid gap-8 md:grid-cols-[minmax(300px,1fr)_220px]">
+                <div className="mt-5 grid gap-6 md:grid-cols-[minmax(272px,1fr)_188px]">
                   <div>
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">
+                      <h3 className="text-[13px] font-semibold">
                         {viewDate.toLocaleDateString("en-US", {
                           month: "long",
                           year: "numeric",
                         })}
                       </h3>
-                      <div className="flex gap-1">
+                      <div className="flex gap-0.5">
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 rounded-full"
+                          className="h-8 w-8 rounded-full"
                           disabled={!canGoBack}
                           onClick={() => changeMonth(-1)}
                           aria-label="Previous month"
@@ -451,7 +435,7 @@ export function BookingFlow({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 rounded-full"
+                          className="h-8 w-8 rounded-full"
                           onClick={() => changeMonth(1)}
                           aria-label="Next month"
                         >
@@ -460,11 +444,11 @@ export function BookingFlow({
                       </div>
                     </div>
 
-                    <div className="mt-5 grid grid-cols-7 gap-1 text-center">
+                    <div className="mt-3 grid grid-cols-7 gap-1 text-center">
                       {WEEKDAY_SHORT.map((weekday) => (
                         <div
                           key={weekday}
-                          className="py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                          className="py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70"
                         >
                           {weekday.slice(0, 1)}
                         </div>
@@ -495,9 +479,9 @@ export function BookingFlow({
                               setSelectedSlot(null);
                             }}
                             className={cn(
-                              "relative aspect-square rounded-full text-sm font-medium transition",
+                              "relative aspect-square rounded-full text-[13px] font-medium transition",
                               selected &&
-                                "bg-primary text-primary-foreground shadow-md shadow-primary/20",
+                                "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
                               !selected &&
                                 available &&
                                 !past &&
@@ -515,16 +499,16 @@ export function BookingFlow({
                     </div>
 
                     {loading ? (
-                      <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         Loading availability…
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="min-w-0 border-t pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                    <div className="flex min-h-9 items-center gap-2 text-sm font-semibold">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div className="min-w-0 border-t pt-5 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                    <div className="flex min-h-8 items-center gap-2 text-[13px] font-semibold">
+                      <Calendar className="h-4 w-4 text-muted-foreground/80" />
                       {selectedDay
                         ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString("en-US", {
                             weekday: "short",
@@ -534,13 +518,13 @@ export function BookingFlow({
                         : "Select a date"}
                     </div>
 
-                    <div className="mt-4 max-h-[390px] space-y-2 overflow-y-auto pr-1">
+                    <div className="mt-3 max-h-[344px] space-y-1.5 overflow-y-auto pr-1">
                       {loading ? (
                         Array.from({ length: 6 }, (_, index) => (
-                          <Skeleton key={index} className="h-11 w-full rounded-xl" />
+                          <Skeleton key={index} className="h-10 w-full rounded-lg" />
                         ))
                       ) : slotError ? (
-                        <div className="rounded-xl border border-dashed p-4 text-sm">
+                        <div className="rounded-lg border border-dashed p-4 text-sm">
                           <AlertTriangle className="h-5 w-5 text-amber-500" />
                           <p className="mt-2 font-medium">Couldn’t load times</p>
                           <p className="mt-1 text-xs text-muted-foreground">{slotError}</p>
@@ -570,7 +554,7 @@ export function BookingFlow({
                             type="button"
                             data-testid="slot"
                             onClick={() => chooseSlot(slot)}
-                            className="w-full rounded-xl border border-primary/30 bg-background py-3 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-sm active:scale-[0.98]"
+                            className="w-full rounded-lg border border-input bg-background py-2.5 text-[13px] font-semibold text-foreground transition hover:border-primary hover:bg-primary hover:text-primary-foreground active:scale-[0.99]"
                           >
                             {new Date(slot).toLocaleTimeString("en-US", {
                               hour: "numeric",
@@ -603,6 +587,7 @@ function BookingForm({
   rescheduleUid,
   spamProtection,
   botChallenge,
+  prefill,
   onBack,
   onBooked,
 }: {
@@ -616,6 +601,7 @@ function BookingForm({
   rescheduleUid?: string;
   spamProtection?: boolean;
   botChallenge?: string;
+  prefill?: BookingPrefill;
   onBack: () => void;
   onBooked: (uid: string) => void;
 }) {
@@ -623,8 +609,12 @@ function BookingForm({
     bookAction,
     null,
   );
-  const [values, setValues] = useState<FieldValues>({ name: "", email: "" });
-  const [guestEmails, setGuestEmails] = useState("");
+  const [values, setValues] = useState<FieldValues>(() => ({
+    ...(prefill?.responses ?? {}),
+    name: prefill?.name ?? "",
+    email: prefill?.email ?? "",
+  }));
+  const [guestEmails, setGuestEmails] = useState(() => (prefill?.guests ?? []).join(", "));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [altcha, setAltcha] = useState<string | null>(null);
   const renderedAt = useRef(Date.now());
@@ -695,13 +685,13 @@ function BookingForm({
         Back to date and time
       </button>
 
-      <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4">
+      <div className="mt-4 rounded-xl border border-border/70 bg-muted/30 p-3.5">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 rounded-full bg-primary/10 p-2 text-primary">
+          <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
             <Calendar className="h-4 w-4" />
           </div>
           <div>
-            <p className="font-semibold">
+            <p className="text-[15px] font-semibold">
               {new Date(slot).toLocaleDateString("en-US", {
                 weekday: "long",
                 month: "long",
@@ -709,7 +699,7 @@ function BookingForm({
                 timeZone,
               })}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
               {new Date(slot).toLocaleTimeString("en-US", {
                 hour: "numeric",
                 minute: "2-digit",
@@ -724,14 +714,14 @@ function BookingForm({
         </div>
       </div>
 
-      <div className="mt-7">
-        <h2 className="text-xl font-semibold tracking-tight">Enter your details</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          We’ll send the confirmation and calendar invitation to your email.
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold tracking-tight">Enter your details</h2>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          We’ll send the confirmation and calendar invite to your email.
         </p>
       </div>
 
-      <form action={submit} className="mt-6 space-y-5" noValidate>
+      <form action={submit} className="mt-5 space-y-4" noValidate>
         <div
           aria-hidden="true"
           className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden"

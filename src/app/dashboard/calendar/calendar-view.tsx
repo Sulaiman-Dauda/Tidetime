@@ -190,9 +190,10 @@ export function CalendarView({ year, month, events, timeZone, services }: Props)
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        {/* Month grid */}
-        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="grid gap-6 lg:grid-cols-[1fr_300px] lg:items-start">
+        {/* Month grid — sticky on desktop so it stays in view while a busy day's
+            bookings scroll in the rail. Offset clears the sticky top bar (h-14). */}
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card lg:sticky lg:top-[72px] lg:self-start">
           <div className="grid grid-cols-7 border-b border-border/50 bg-muted/30 text-center text-xs font-semibold text-foreground/60">
             {WEEKDAY_SHORT.map((d) => (
               <div key={d} className="py-2.5">

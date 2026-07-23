@@ -8,6 +8,13 @@
       "when": 1784796417518,
       "tag": "0000_remarkable_silk_fever",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784834955869,
+      "tag": "0001_roles_consolidation",
+      "breakpoints": true
     }
   ]
 }

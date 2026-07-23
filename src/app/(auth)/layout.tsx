@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, hasAnyUser } from "@/lib/auth";
+import { AuthIntro } from "./_components/auth-motion";
 
 export const dynamic = "force-dynamic";
 
@@ -11,38 +12,49 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="relative flex min-h-screen bg-background">
+      <AuthIntro />
+
       {/* Dot grid background */}
       <div className="pointer-events-none absolute inset-0 bg-dot-grid opacity-40" aria-hidden />
 
       {/* Left brand rail — visible on lg+ */}
-      <div className="relative hidden w-[420px] shrink-0 flex-col justify-between border-r border-border bg-card/60 p-10 lg:flex">
-        <Link href="/" className="flex items-center gap-2.5">
+      <div className="relative hidden w-[440px] shrink-0 flex-col justify-between overflow-hidden border-r border-border bg-card/60 p-12 lg:flex xl:w-[520px]">
+        {/* Soft brand glow for depth */}
+        <div
+          className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
+          aria-hidden
+        />
+        <Link
+          href="/"
+          className="relative flex items-center gap-2.5"
+          style={{ animation: "tt-rise 0.5s cubic-bezier(0.22,1,0.36,1) both" }}
+        >
           <TideLogo />
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
+          <span className="text-base font-semibold tracking-[-0.01em] text-foreground">
             Tidetime
           </span>
         </Link>
 
-        <div className="space-y-6">
-          <blockquote className="space-y-3">
-            <p className="text-[22px] font-semibold leading-snug tracking-tight text-foreground">
+        <div className="relative space-y-9">
+          <blockquote className="space-y-4" style={{ animation: "tt-rise 0.6s cubic-bezier(0.22,1,0.36,1) 0.05s both" }}>
+            <p className="text-[30px] font-semibold leading-[1.12] tracking-tight text-foreground xl:text-[34px]">
               &ldquo;One link.<br />Infinite time back.&rdquo;
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="max-w-sm text-[15px] leading-relaxed text-muted-foreground">
               Share your booking page and let the right people find the right time — automatically.
             </p>
           </blockquote>
 
-          <ul className="space-y-2.5 text-sm text-muted-foreground">
+          <ul className="space-y-3.5 text-[15px] text-muted-foreground" style={{ animation: "tt-rise 0.6s cubic-bezier(0.22,1,0.36,1) 0.12s both" }}>
             {[
               "Timezone-aware scheduling",
               "Services with assigned providers",
               "Signed Zapier webhooks",
               "Open-source, self-hostable",
             ].map((item) => (
-              <li key={item} className="flex items-center gap-2.5">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <li key={item} className="flex items-center gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <span className="h-2 w-2 rounded-full bg-primary" />
                 </span>
                 {item}
               </li>
@@ -50,7 +62,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           </ul>
         </div>
 
-        <p className="text-xs text-muted-foreground/60">
+        <p className="relative text-xs text-muted-foreground/60">
           © {new Date().getFullYear()} Tidetime · MIT licensed
         </p>
       </div>

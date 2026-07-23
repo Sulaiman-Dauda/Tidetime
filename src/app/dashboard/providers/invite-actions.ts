@@ -15,10 +15,10 @@ import { randomToken } from "@/lib/crypto";
 const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   teamId: z.coerce.number().int(),
-  role: z.enum(["admin", "manager", "provider", "receptionist", "member"]),
+  role: z.enum(["admin", "scheduler", "member"]),
 });
 
-export type InviteState = { ok?: boolean; error?: string } | null;
+export type InviteState = { ok?: boolean; error?: string; inviteUrl?: string } | null;
 
 export async function createInviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {
   const user = await requireUser();
@@ -74,7 +74,43 @@ export async function createInviteAction(_prev: InviteState, formData: FormData)
     inviteUrl,
   });
 
+  // Email delivery is best-effort and may be unconfigured on self-hosted
+  // instances, so we always return the invite URL for the admin to copy/share
+  // directly — the invitee needs this link to create their account.
   await sendMail({ to: parsed.data.email, subject: email.subject, html: email.html });
+
+  revalidatePath("/dashboard/providers");
+  return { ok: true, inviteUrl };
+}
+
+const revokeSchema = z.object({
+  inviteId: z.coerce.number().int().positive(),
+  teamId: z.coerce.number().int().positive(),
+});
+
+/** Revoke a pending (unaccepted) invitation. Requires member.invite. */
+export async function revokeInviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {
+  const user = await requireUser();
+  const parsed = revokeSchema.safeParse({
+    inviteId: formData.get("inviteId"),
+    teamId: formData.get("teamId"),
+  });
+  if (!parsed.success) return { error: "Invalid request" };
+
+  const role = await teamRole(user.id, parsed.data.teamId);
+  if (!role || !can(role, "member.invite")) {
+    return { error: "You don't have permission to manage invitations" };
+  }
+
+  await db
+    .delete(invites)
+    .where(
+      and(
+        eq(invites.id, parsed.data.inviteId),
+        eq(invites.teamId, parsed.data.teamId),
+        isNull(invites.acceptedAt),
+      ),
+    );
 
   revalidatePath("/dashboard/providers");
   return { ok: true };

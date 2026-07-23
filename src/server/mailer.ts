@@ -1,7 +1,8 @@
 import "server-only";
 import { createTransport, type Transporter } from "nodemailer";
-import { getSmtpConfig } from "@/server/settings";
+import { getEmailProvider, getSmtpConfig } from "@/server/settings";
 import { sha256 } from "@/lib/crypto";
+import { sendMicrosoftMail } from "@/server/microsoft-email";
 
 interface MailAttachment {
   filename: string;
@@ -47,11 +48,21 @@ async function transporter(): Promise<Transporter | null> {
  * development still surfaces what would have been sent (no silent failures).
  */
 export async function sendMail(args: SendMailArgs): Promise<void> {
+  const provider = await getEmailProvider();
+  if (provider === "microsoft365") {
+    try {
+      await sendMicrosoftMail(args);
+    } catch (err) {
+      console.error("[email:microsoft365] send failed:", err);
+    }
+    return;
+  }
+
   const t = await transporter();
   const smtp = await resolveSmtp();
   if (!t || !smtp) {
     console.info(
-      `\n[email:dev] To: ${args.to}\n[email:dev] Subject: ${args.subject}\n[email:dev] (SMTP not configured — set in Settings → Email)\n`,
+      `\n[email:dev] To: ${args.to}\n[email:dev] Subject: ${args.subject}\n[email:dev] (Email is not configured — set it in Connections → Email delivery)\n`,
     );
     return;
   }

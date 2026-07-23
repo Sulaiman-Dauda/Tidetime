@@ -12,6 +12,7 @@ import { isValidTimeZone } from "@/lib/time";
 import { requestPasswordReset, resetPassword } from "@/server/password-reset";
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
 import { fieldErrorsFromIssues } from "@/lib/schemas";
+import { isAdminRole } from "@/lib/rbac";
 
 /** Best-effort client IP for rate-limit keys, from forwarding headers. */
 async function clientIp(): Promise<string> {
@@ -36,11 +37,11 @@ const signupSchema = z.object({
     .max(48)
     .regex(/^[a-z0-9_-]+$/, "Use lowercase letters, numbers, - and _ only"),
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
-  timeZone: z.string().optional(),
+  timeZone: z.string().nullish(),
   inviteToken: z.string(),
 });
 
-export type ActionResult = { error?: string; fieldErrors?: Record<string, string> };
+export type ActionResult = { error?: string; fieldErrors?: Record<string, string>; ok?: boolean };
 
 export async function signupAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const parsed = signupSchema.safeParse({
@@ -121,7 +122,9 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
 
     const [user] = await tx
       .insert(users)
-      .values({ name, email, username, passwordHash, timeZone })
+      // owner/admin roles are instance administrators — keep the isAdmin flag
+      // (which gates company settings, SMTP/M365, domain and webhooks) in sync.
+      .values({ name, email, username, passwordHash, timeZone, isAdmin: isAdminRole(lockedInvite.role) })
       .returning({ id: users.id });
     await tx.insert(memberships).values({
       userId: user.id,
@@ -195,7 +198,10 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
   }
 
   await createSession(user.id);
-  redirect("/dashboard");
+  // Return success (instead of a server redirect) so the client can play the
+  // brief sign-in animation before navigating to the dashboard. The session
+  // cookie is already set, so the subsequent client navigation is authenticated.
+  return { ok: true };
 }
 
 export async function logoutAction(): Promise<void> {

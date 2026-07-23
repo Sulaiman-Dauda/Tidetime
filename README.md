@@ -16,7 +16,7 @@ A focused booking app for one company with multiple services and multiple provid
 ## Intentionally removed
 
 Payments, polls, routing forms, reviews, categories, temporary links, personal booking pages,
-public API keys/API v1, CRM, AI/licensing, Microsoft/CalDAV calendars, Zoom/Daily, travel and
+public API keys/API v1, CRM, AI/licensing, Microsoft/CalDAV calendar sync, Zoom/Daily, travel and
 blocked-period engines, multi-attendant/collective events, group seats, recurring series,
 analytics dashboards, embeds/PWA, and the command palette.
 
@@ -41,6 +41,11 @@ npm run dev
 
 Open `http://localhost:3100/setup` to create the company owner. Setup creates the company and
 the first provider. Add providers under **Providers**, then assign them to services.
+
+The instance administrator can configure both generic SMTP and Microsoft 365
+email under **Connections**, test each independently, and choose the active
+outgoing provider. Microsoft 365 setup uses an Entra Web app registration and
+the callback URL shown by TideTime; see [deployment notes](docs/DEPLOYMENT.md).
 
 Earlier pre-release databases are intentionally unsupported. To replace an old local prototype
 database, confirm its exact database name and then apply the clean baseline:

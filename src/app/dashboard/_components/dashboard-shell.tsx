@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent } from "./sidebar";
 import { UserMenu } from "./user-menu";
+import { RouteProgress } from "./route-progress";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
@@ -58,6 +59,7 @@ export function DashboardShell({
 
   return (
     <TooltipProvider delayDuration={300}>
+      <RouteProgress />
       <div className="flex min-h-screen bg-background">
         {/* Desktop Sidebar */}
         <Sidebar user={user} />

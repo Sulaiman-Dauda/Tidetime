@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AlertTriangle } from "lucide-react";
 import { getTeamService, getTeamHosts } from "@/server/teams-public";
+import { getBookingByUid } from "@/server/bookings";
 import { getCompanySettings } from "@/server/company-settings";
 import { issueBotChallenge } from "@/lib/bot-challenge";
 import { env } from "@/lib/env";
-import { BookingFlow } from "../../../_components/booking-flow";
+import type { FieldValues } from "@/lib/booking-fields";
+import { BookingFlow, type BookingPrefill } from "../../../_components/booking-flow";
 import { PublicLegal } from "../../../_components/public-legal";
 import { CompanyBrandHeader } from "../../../_components/company-brand-header";
 
@@ -40,6 +42,32 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
   const { team: teamRow, service } = data;
   const disabled = settings.booking.bookingDisabled;
   const teamHosts = await getTeamHosts(service.id);
+
+  // On reschedule, prefill the booker's existing details so they don't re-enter
+  // them. Only trust the stored booking when it belongs to this same service and
+  // is still active — otherwise the reschedule would be rejected anyway.
+  let prefill: BookingPrefill | undefined;
+  if (reschedule) {
+    const existing = await getBookingByUid(reschedule);
+    if (
+      existing &&
+      existing.booking.serviceId === service.id &&
+      (existing.booking.status === "accepted" || existing.booking.status === "pending")
+    ) {
+      const primary =
+        existing.attendees.find((a) => a.isPrimary) ?? existing.attendees[0];
+      if (primary) {
+        prefill = {
+          name: primary.name,
+          email: primary.email,
+          responses: (existing.booking.responses ?? {}) as FieldValues,
+          guests: existing.attendees
+            .filter((a) => !a.isPrimary)
+            .map((a) => a.email),
+        };
+      }
+    }
+  }
 
   if (disabled) {
     return (
@@ -83,6 +111,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
         spamProtection={settings.booking.spamProtectionEnabled}
         botChallenge={issueBotChallenge(env.authSecret)}
         teamHosts={teamHosts}
+        prefill={prefill}
       />
       <PublicLegal />
     </main>
