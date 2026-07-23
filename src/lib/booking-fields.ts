@@ -19,6 +19,32 @@ const PHONE_RE = /^[+]?[\d\s().-]{6,}$/;
  * enforced and type-specific checks run on present values. Returns a
  * map of field name -> error message (empty when valid).
  */
+/**
+ * Turn stored booking responses into displayable label/value answers, in form
+ * order. System fields (name/email) are skipped; `excludeValue` drops the
+ * answer that already became the booking description so callers rendering a
+ * separate Notes row don't show it twice.
+ */
+export function answersFromResponses(
+  fields: BookingField[],
+  responses: Record<string, unknown>,
+  excludeValue?: string | null,
+): { label: string; value: string }[] {
+  const answers: { label: string; value: string }[] = [];
+  for (const field of fields) {
+    if (field.system) continue;
+    const value = responses[field.name];
+    let rendered: string | null = null;
+    if (typeof value === "string" && value.trim()) rendered = value.trim();
+    else if (typeof value === "number") rendered = String(value);
+    else if (value === true) rendered = "Yes";
+    if (rendered === null) continue;
+    if (excludeValue && rendered === excludeValue) continue;
+    answers.push({ label: field.label, value: rendered });
+  }
+  return answers;
+}
+
 export function validateResponses(
   fields: BookingField[],
   values: FieldValues,

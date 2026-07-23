@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { CancelBooking } from "./cancel";
 import { CompanyBrandHeader } from "../../_components/company-brand-header";
 import { PublicLegal } from "../../_components/public-legal";
-import { CalendarCheck, Clock, MapPin, User, Mail, AlertCircle, CalendarClock, XCircle } from "lucide-react";
+import { CalendarCheck, Clock, MapPin, Users, AlertCircle, CalendarClock, XCircle, MessageSquare, Phone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
+import { answersFromResponses } from "@/lib/booking-fields";
 
 export const metadata: Metadata = { title: "Your booking · Tidetime" };
 
@@ -30,10 +31,15 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
   const data = await getBookingByUid(uid);
   if (!data) notFound();
 
-  const { booking, attendees, host, slug, team } = data;
+  const { booking, attendees, host, slug, team, service } = data;
   const primary = attendees.find((a) => a.isPrimary) ?? attendees[0];
   const tz = primary?.timeZone ?? "UTC";
   const when = formatRange(booking.startTime, booking.endTime, tz);
+  const answers = answersFromResponses(
+    service?.bookingFields ?? [],
+    (booking.responses ?? {}) as Record<string, unknown>,
+    booking.description,
+  );
 
   const cancelled = booking.status === "cancelled" || booking.status === "rejected";
   const pending = booking.status === "pending";
@@ -97,15 +103,30 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
           </p>
 
           <dl className="mt-8 space-y-4 border-t pt-6 text-sm">
-            <Detail icon={CalendarCheck} label="What" value={booking.title} />
+            <Detail icon={CalendarCheck} label="What" value={service?.title ?? booking.title} />
             <Detail icon={Clock} label="When" value={`${when} (${tz.replace(/_/g, " ")})`} />
-            {host ? <Detail icon={User} label="Who" value={host.name ?? host.username} /> : null}
-            {team ? <Detail icon={User} label="Team" value={team.name} /> : null}
-            {primary ? (
+            {host || primary ? (
               <Detail
-                icon={Mail}
-                label="Email"
-                value={<a href={`mailto:${primary.email}`} className="text-primary hover:underline">{primary.email}</a>}
+                icon={Users}
+                label="Who"
+                value={
+                  <span className="space-y-0.5">
+                    {host ? (
+                      <span className="block">
+                        {host.name ?? host.username}{" "}
+                        <span className="font-normal text-muted-foreground">· Host{team ? `, ${team.name}` : ""}</span>
+                      </span>
+                    ) : null}
+                    {primary ? (
+                      <span className="block">
+                        {primary.name}{" "}
+                        <span className="font-normal text-muted-foreground">
+                          · <a href={`mailto:${primary.email}`} className="hover:underline">{primary.email}</a>
+                        </span>
+                      </span>
+                    ) : null}
+                  </span>
+                }
               />
             ) : null}
             <Detail
@@ -121,6 +142,15 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
                 )
               }
             />
+            {primary?.phoneNumber ? (
+              <Detail icon={Phone} label="Phone" value={primary.phoneNumber} />
+            ) : null}
+            {booking.description ? (
+              <Detail icon={MessageSquare} label="Notes" value={booking.description} />
+            ) : null}
+            {answers.map((answer) => (
+              <Detail key={answer.label} icon={MessageSquare} label={answer.label} value={answer.value} />
+            ))}
           </dl>
 
           {!cancelled ? (

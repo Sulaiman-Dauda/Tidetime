@@ -20,9 +20,12 @@ interface EmailBookingView {
   timeZone: string;
   hostName: string;
   attendeeName: string;
+  attendeeEmail?: string | null;
   location: string;
   meetingUrl: string | null;
   description?: string | null;
+  /** answers to the service's custom booking questions, in form order */
+  answers?: { label: string; value: string }[];
   manageUrl: string;
   hour12?: boolean;
   /** signed Accept / Decline / Tentative links for attendee RSVP round-tripping */
@@ -49,9 +52,11 @@ function toBookingProps(
     timeZone: v.timeZone,
     hostName: v.hostName,
     attendeeName: v.attendeeName,
+    attendeeEmail: v.attendeeEmail,
     location: v.location,
     meetingUrl: v.meetingUrl,
     description: v.description,
+    answers: v.answers,
     manageUrl: v.manageUrl,
     rsvp: v.rsvp ?? null,
   };

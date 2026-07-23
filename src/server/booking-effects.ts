@@ -21,6 +21,7 @@ import {
 import { dispatchWebhook } from "./webhooks";
 import { createCalendarEvents, deleteCalendarEvent, updateCalendarEvents } from "./calendar";
 import { buildRsvpLinks } from "./rsvp";
+import { answersFromResponses } from "@/lib/booking-fields";
 
 interface LoadedBookingContext {
   booking: typeof bookings.$inferSelect;
@@ -122,6 +123,16 @@ async function silentlyCancelSupersededBooking(uid: string): Promise<void> {
   await db.delete(bookingReferences).where(eq(bookingReferences.bookingId, original.id));
 }
 
+/** Custom-question answers for emails; the notes answer that became the
+ *  booking description is excluded — it renders as its own Notes row. */
+function bookingAnswers(ctx: LoadedBookingContext): { label: string; value: string }[] {
+  return answersFromResponses(
+    ctx.service?.bookingFields ?? [],
+    (ctx.booking.responses ?? {}) as Record<string, unknown>,
+    ctx.booking.description,
+  );
+}
+
 async function buildEmailView(ctx: LoadedBookingContext): Promise<EmailBookingView | null> {
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
   if (!primary) return null;
@@ -135,15 +146,20 @@ async function buildEmailView(ctx: LoadedBookingContext): Promise<EmailBookingVi
     timeZone: primary.timeZone,
     hostName,
     attendeeName: primary.name,
+    attendeeEmail: primary.email,
     location: ctx.booking.location ?? "Online",
     meetingUrl: ctx.booking.meetingUrl,
     description: ctx.booking.description,
+    answers: bookingAnswers(ctx),
     manageUrl: `${appUrl}/booking/${ctx.booking.uid}`,
     hour12: true,
   };
 }
 
-async function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: string): Promise<EmailBookingView> {
+async function buildHostEmailView(
+  ctx: LoadedBookingContext,
+  attendee: { name: string; email: string },
+): Promise<EmailBookingView> {
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
   const title = ctx.service?.title ?? ctx.booking.title;
   const appUrl = await getAppUrl();
@@ -153,10 +169,12 @@ async function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: strin
     end: ctx.booking.endTime,
     timeZone: ctx.host?.timeZone ?? "UTC",
     hostName,
-    attendeeName,
+    attendeeName: attendee.name,
+    attendeeEmail: attendee.email,
     location: ctx.booking.location ?? "Online",
     meetingUrl: ctx.booking.meetingUrl,
     description: ctx.booking.description,
+    answers: bookingAnswers(ctx),
     manageUrl: `${appUrl}/booking/${ctx.booking.uid}`,
     hour12: (ctx.host?.timeFormat ?? 12) === 12,
   };
@@ -222,7 +240,7 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
   );
 
   if (ctx.host) {
-    const hostMessage = await bookingConfirmedHost(await buildHostEmailView(ctx, primary.name));
+    const hostMessage = await bookingConfirmedHost(await buildHostEmailView(ctx, primary));
     tasks.push(
       sendMail({
         to: ctx.host.email,
@@ -451,7 +469,7 @@ export async function runPendingApprovalEffects(bookingId: number): Promise<void
   );
 
   if (ctx.host) {
-    const hostMessage = await bookingConfirmedHost(await buildHostEmailView(ctx, primary.name));
+    const hostMessage = await bookingConfirmedHost(await buildHostEmailView(ctx, primary));
     tasks.push(
       sendMail({
         to: ctx.host.email,

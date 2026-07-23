@@ -1,4 +1,4 @@
-# Tide Time Lite
+# Tidetime
 
 A focused booking app for one company with multiple services and multiple providers.
 
@@ -45,7 +45,7 @@ the first provider. Add providers under **Providers**, then assign them to servi
 The instance administrator can configure both generic SMTP and Microsoft 365
 email under **Connections**, test each independently, and choose the active
 outgoing provider. Microsoft 365 setup uses an Entra Web app registration and
-the callback URL shown by TideTime; see [deployment notes](docs/DEPLOYMENT.md).
+the callback URL shown by Tidetime; see [deployment notes](docs/DEPLOYMENT.md).
 
 Earlier pre-release databases are intentionally unsupported. To replace an old local prototype
 database, confirm its exact database name and then apply the clean baseline:

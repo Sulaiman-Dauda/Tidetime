@@ -6,7 +6,7 @@ Set `APP_URL`, `DATABASE_URL`, a URL-safe random `POSTGRES_PASSWORD`, a random `
 of at least 32 characters, and a separate `CRON_SECRET` of at least 32 characters. The
 production Compose file intentionally refuses to start with a default database password.
 Set Google OAuth credentials only if providers will connect Google Calendar.
-Outgoing email is configured in the administrator UI after startup. TideTime
+Outgoing email is configured in the administrator UI after startup. Tidetime
 can retain both a generic SMTP connection and a Microsoft 365 connection; the
 administrator explicitly chooses which one is active.
 
@@ -27,11 +27,11 @@ using `AUTH_SECRET`; changing `AUTH_SECRET` invalidates the stored credentials.
    **Value** immediately; the Secret ID is not the credential.
 5. From the registration's **Overview** page, copy its Directory (tenant) ID
    and Application (client) ID. Paste those and the client-secret value into
-   TideTime, save, and select **Connect Microsoft 365**.
+   Tidetime, save, and select **Connect Microsoft 365**.
 6. Sign in as the dedicated sending mailbox, send a test email, then select
    **Use Microsoft 365**.
 
-The registered redirect URI must exactly match TideTime's displayed callback
+The registered redirect URI must exactly match Tidetime's displayed callback
 URL, including `https`, hostname, and path. Configure the final `APP_URL` or
 custom domain before connecting. Use a dedicated licensed/shared sending
 mailbox appropriate to the organisation's Exchange configuration, rotate the

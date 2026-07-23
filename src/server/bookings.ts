@@ -143,13 +143,25 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     .limit(1);
   if (u) assignedHost = u;
 
-  const attendeePhone = typeof input.responses.phone === "string" ? input.responses.phone : undefined;
+  // Resolve phone and notes from the field *types*, not hardcoded names — an
+  // admin can retype the default "notes" field into a phone question (the
+  // internal name stays "notes"), so name-based lookups misfile the answers.
+  const responseForType = (type: BookingField["type"]): string | undefined => {
+    const field = service.bookingFields.find((f) => !f.system && f.type === type);
+    const value = field ? input.responses[field.name] : undefined;
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  };
+  // Manual dashboard bookings (`force`) submit a bare { notes } that never went
+  // through the service's form, so the literal key is authoritative there.
+  const attendeePhone = input.force ? undefined : responseForType("phone");
   // uid is needed up-front so the built-in Jitsi room can be derived from it.
   const uid = shortId(12);
   const { location, meetingUrl } = resolveLocation(service.locations[0], attendeePhone, uid);
 
   const status = !input.force && service.requiresConfirmation ? "pending" : "accepted";
-  const notes = typeof input.responses.notes === "string" ? (input.responses.notes as string) : null;
+  const notes = input.force
+    ? (typeof input.responses.notes === "string" && input.responses.notes.trim() ? input.responses.notes.trim() : null)
+    : responseForType("textarea") ?? null;
 
   // A reschedule inherits the prior booking's iCalendar SEQUENCE + 1, so the
   // confirmation .ics supersedes the attendee's existing calendar entry.
@@ -330,13 +342,17 @@ export async function cancelBooking(
 
   const primary = ats.find((a) => a.isPrimary) ?? ats[0];
   if (primary) {
+    const [hostUser] = b.userId
+      ? await db.select({ name: users.name, username: users.username }).from(users).where(eq(users.id, b.userId)).limit(1)
+      : [];
     const view: EmailBookingView = {
       title: et?.title ?? b.title,
       start: b.startTime,
       end: b.endTime,
       timeZone: primary.timeZone,
-      hostName: "your host",
+      hostName: hostUser?.name ?? hostUser?.username ?? "your host",
       attendeeName: primary.name,
+      attendeeEmail: primary.email,
       location: b.location ?? "Online",
       meetingUrl: b.meetingUrl,
       manageUrl: `${await getAppUrl()}/booking/${uid}`,
@@ -439,17 +455,19 @@ export async function getBookingByUid(uid: string) {
   let host: { username: string; name: string | null; avatarUrl: string | null } | null = null;
   let slug: string | null = null;
   let team: { slug: string; name: string } | null = null;
+  let service: { title: string; bookingFields: BookingField[] } | null = null;
   if (b.userId) {
     const [u] = await db.select({ username: users.username, name: users.name, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, b.userId)).limit(1);
     host = u ?? null;
   }
   if (b.serviceId) {
     const [et] = await db
-      .select({ slug: services.slug, teamId: services.teamId })
+      .select({ slug: services.slug, teamId: services.teamId, title: services.title, bookingFields: services.bookingFields })
       .from(services)
       .where(eq(services.id, b.serviceId))
       .limit(1);
     slug = et?.slug ?? null;
+    service = et ? { title: et.title, bookingFields: et.bookingFields } : null;
 
     if (et?.teamId) {
       const [teamRow] = await db
@@ -460,5 +478,5 @@ export async function getBookingByUid(uid: string) {
       team = teamRow ?? null;
     }
   }
-  return { booking: b, attendees: ats, host, slug, team };
+  return { booking: b, attendees: ats, host, slug, team, service };
 }

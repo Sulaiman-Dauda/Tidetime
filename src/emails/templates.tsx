@@ -207,9 +207,13 @@ export interface BookingEmailProps {
   timeZone: string;
   hostName: string;
   attendeeName: string;
+  /** primary attendee's email, shown under their name in the Who row */
+  attendeeEmail?: string | null;
   location: string;
   meetingUrl: string | null;
   description?: string | null;
+  /** answers to the service's custom booking questions, in form order */
+  answers?: { label: string; value: string }[];
   manageUrl: string;
   manageLabel?: string;
   /** signed Accept / Decline / Tentative links — when present, an RSVP row renders */
@@ -245,7 +249,15 @@ export function BookingEmail(p: BookingEmailProps) {
           {p.when} <span style={{ color: "#94a3b8", fontWeight: 400 }}>({p.timeZone.replace(/_/g, " ")})</span>
         </DetailRow>
         <DetailRow label="Who">
-          {p.hostName} &amp; {p.attendeeName}
+          <span style={{ display: "block" }}>
+            {p.hostName} <span style={{ color: "#94a3b8", fontWeight: 400 }}>· Host</span>
+          </span>
+          <span style={{ display: "block" }}>
+            {p.attendeeName}
+            {p.attendeeEmail ? (
+              <span style={{ color: "#94a3b8", fontWeight: 400 }}> · {p.attendeeEmail}</span>
+            ) : null}
+          </span>
         </DetailRow>
         <DetailRow label="Where">
           {p.meetingUrl ? (
@@ -257,6 +269,9 @@ export function BookingEmail(p: BookingEmailProps) {
           )}
         </DetailRow>
         {p.description ? <DetailRow label="Notes">{p.description}</DetailRow> : null}
+        {(p.answers ?? []).map((answer) => (
+          <DetailRow key={answer.label} label={answer.label}>{answer.value}</DetailRow>
+        ))}
       </Section>
       {p.rsvp ? (
         <Section style={{ marginBottom: "20px" }}>
