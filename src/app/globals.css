@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* ── Charcoal + Yellow Light ── */
+    /* ── Indigo + neutral light ── */
     /* Surfaces */
     --background: 0 0% 100%;
     --foreground: 220 12% 10%;
@@ -13,20 +13,15 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 12% 10%;
 
-    /*
-     * Primary: "Sol" — warm golden yellow.
-     * hsl(44, 82%, 64%) — bright, optimistic, premium.
-     */
-    --brand: 44 82% 64%;
-    --brand-foreground: 220 14% 8%;
-    --primary: 44 82% 64%;
-    --primary-foreground: 220 14% 8%;
+    /* Indigo 600: strong contrast on white and consistent with company branding. */
+    --brand: 243 75% 59%;
+    --brand-foreground: 0 0% 100%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
 
-    /*
-     * Accent: slightly deeper yellow for hover states.
-     */
-    --accent: 44 75% 58%;
-    --accent-foreground: 220 14% 8%;
+    /* A restrained indigo tint for hover and selected surfaces. */
+    --accent: 239 84% 95%;
+    --accent-foreground: 243 75% 35%;
 
     /* Secondary & muted — charcoal-tinted */
     --secondary: 220 10% 96%;
@@ -41,7 +36,7 @@
     /* Chrome */
     --border: 220 12% 90%;
     --input: 220 12% 90%;
-    --ring: 44 78% 52%;
+    --ring: 243 75% 59%;
     --radius: 0.75rem;
 
     /* Sidebar — same as background */
@@ -50,7 +45,7 @@
   }
 
   .dark {
-    /* ── Deep Charcoal + Yellow Dark ── */
+    /* ── Deep charcoal + luminous indigo dark ── */
     --background: 220 12% 6.5%;
     --foreground: 38 18% 92%;
     --card: 220 10% 10%;
@@ -58,15 +53,14 @@
     --popover: 220 10% 10%;
     --popover-foreground: 38 18% 92%;
 
-    /* Warm yellow glow */
-    --brand: 44 72% 62%;
-    --brand-foreground: 220 14% 6%;
-    --primary: 44 72% 62%;
-    --primary-foreground: 220 14% 6%;
+    /* Indigo 400 stays vivid without blooming against charcoal surfaces. */
+    --brand: 234 89% 74%;
+    --brand-foreground: 240 21% 10%;
+    --primary: 234 89% 74%;
+    --primary-foreground: 240 21% 10%;
 
-    /* Deeper yellow accent */
-    --accent: 44 65% 58%;
-    --accent-foreground: 220 14% 6%;
+    --accent: 235 30% 18%;
+    --accent-foreground: 234 89% 82%;
 
     --secondary: 220 8% 15%;
     --secondary-foreground: 38 16% 84%;
@@ -78,7 +72,7 @@
 
     --border: 220 10% 16%;
     --input: 220 10% 18%;
-    --ring: 44 70% 52%;
+    --ring: 234 89% 74%;
     --radius: 0.75rem;
 
     --sidebar: 220 12% 6.5%;
@@ -100,7 +94,14 @@
 
   h1, h2, h3, h4 {
     font-family: var(--font-serif), ui-serif, Georgia, serif;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  h1 {
+    line-height: 1.08;
+  }
+  h2 {
+    line-height: 1.15;
   }
 }
 
@@ -112,20 +113,20 @@
 }
 
 @layer utilities {
-  /* Gradient text — charcoal to gold */
+  /* Gradient text — foreground to indigo */
   .text-gradient-brand {
     background-image: linear-gradient(
       135deg,
       hsl(var(--foreground)) 0%,
       hsl(var(--brand)) 55%,
-      hsl(44 85% 68%) 100%
+      hsl(234 89% 74%) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
-  /* Warm golden aura behind hero surfaces */
+  /* Restrained indigo aura behind hero surfaces */
   .bg-brand-aura {
     background:
       radial-gradient(45% 55% at 50% -5%, hsl(var(--brand) / 0.10), transparent 70%),
@@ -146,7 +147,7 @@
       0 14px 36px hsl(0 0% 0% / 0.22);
   }
 
-  /* Yellow glow on interactive elements */
+  /* Indigo glow on interactive elements */
   .shadow-brand {
     box-shadow: 0 0 0 1px hsl(var(--brand) / 0.3), 0 4px 20px hsl(var(--brand) / 0.22);
   }
