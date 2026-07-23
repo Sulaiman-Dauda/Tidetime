@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { attendees, bookings, memberships, services, teams, users } from "@/db/schema";
 import { and, asc, count, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { getZonedParts, zonedTimeToUtc, addDaysToKey } from "@/lib/time";
+import { resolveLocale } from "@/lib/format";
 
 export const metadata = { title: "Overview" };
 
@@ -161,7 +162,7 @@ export default async function DashboardPage() {
   const parts = getZonedParts(new Date(), user.timeZone);
   const greeting = parts.hour < 12 ? "Good morning" : parts.hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = (user.name ?? user.username).split(/\s+/)[0];
-  const todayLabel = new Intl.DateTimeFormat("en-US", {
+  const todayLabel = new Intl.DateTimeFormat(resolveLocale(user.locale), {
     timeZone: user.timeZone,
     weekday: "long",
     month: "long",
@@ -175,6 +176,7 @@ export default async function DashboardPage() {
         todayLabel={todayLabel}
         timeZone={user.timeZone}
         hour12={user.timeFormat === 12}
+        locale={resolveLocale(user.locale)}
         bookingUrl={company ? `${appUrl}/book/${company.slug}` : null}
         data={overview}
       />

@@ -35,6 +35,8 @@ interface Props {
   truncated: boolean;
   timeZone: string;
   hour12: boolean;
+  /** BCP-47 locale for date/time rendering */
+  locale?: string;
   /** 0=Sunday .. 6=Saturday, from the viewer's profile */
   weekStart: number;
   services: CalendarService[];
@@ -82,6 +84,7 @@ export function CalendarView({
   truncated,
   timeZone,
   hour12,
+  locale = "en-US",
   weekStart,
   services,
   teamMembers,
@@ -99,7 +102,7 @@ export function CalendarView({
   );
 
   function timeInTz(iso: string): string {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(locale, {
       timeZone,
       hour: "numeric",
       minute: "2-digit",
@@ -183,14 +186,14 @@ export function CalendarView({
   const [todayYear, todayMonth] = todayKey.split("-").map(Number);
   const thisMonth = monthKey(todayYear, todayMonth - 1);
 
-  const monthLabel = new Date(year, month, 1).toLocaleString("en-US", {
+  const monthLabel = new Date(year, month, 1).toLocaleString(locale, {
     month: "long",
     year: "numeric",
   });
 
   const selectedEvents = selected ? byDay.get(selected) ?? [] : [];
   const selectedLabel = selected
-    ? new Date(`${selected}T00:00:00`).toLocaleDateString("en-US", {
+    ? new Date(`${selected}T00:00:00`).toLocaleDateString(locale, {
         weekday: "long",
         month: "long",
         day: "numeric",

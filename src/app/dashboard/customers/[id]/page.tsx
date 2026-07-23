@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/guard";
 import { getCustomerWithBookings } from "@/server/customers";
-import { formatRange } from "@/lib/format";
+import { formatRange, resolveLocale } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "../../_components/page-header";
@@ -33,7 +33,7 @@ export default async function CustomerDetailPage({
   const { customer, history } = data;
   const hour12 = user.timeFormat === 12;
 
-  const sinceFmt = new Intl.DateTimeFormat("en-US", {
+  const sinceFmt = new Intl.DateTimeFormat(resolveLocale(user.locale), {
     timeZone: user.timeZone,
     year: "numeric",
     month: "long",
@@ -98,7 +98,7 @@ export default async function CustomerDetailPage({
                     <div className="min-w-0">
                       <p className="font-medium">{b.serviceTitle ?? b.title}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatRange(b.startTime, b.endTime, user.timeZone, hour12)}
+                        {formatRange(b.startTime, b.endTime, user.timeZone, hour12, user.locale)}
                         {b.location ? ` · ${b.location}` : ""}
                       </p>
                     </div>

@@ -195,6 +195,7 @@ export default async function BookingsPage({ searchParams }: Props) {
   const canManage = can(role, "booking.all.manage") || can(role, "booking.own.manage");
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hour12 = user.timeFormat === 12;
+  const locale = user.locale;
 
   const queryFor = (overrides: Record<string, string | undefined>) => {
     const next = new URLSearchParams();
@@ -298,6 +299,7 @@ export default async function BookingsPage({ searchParams }: Props) {
                     filter={active}
                     userTz={user.timeZone}
                     hour12={hour12}
+                    locale={locale}
                     canManage={canManage}
                     index={i}
                   />
@@ -343,6 +345,7 @@ function BookingRow({
   filter,
   userTz,
   hour12,
+  locale,
   canManage,
   index,
 }: {
@@ -350,10 +353,11 @@ function BookingRow({
   filter: Filter;
   userTz: string;
   hour12: boolean;
+  locale: string;
   canManage: boolean;
   index: number;
 }) {
-  const when = formatRange(booking.startTime, booking.endTime, userTz, hour12);
+  const when = formatRange(booking.startTime, booking.endTime, userTz, hour12, locale);
   const expired = filter === "pending" && booking.endTime.getTime() < Date.now();
   const attendeeSummary =
     booking.attendeeNames.length <= 1

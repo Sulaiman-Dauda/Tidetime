@@ -36,6 +36,7 @@ export function DashboardOverview({
   todayLabel,
   timeZone,
   hour12,
+  locale,
   bookingUrl,
   data,
 }: {
@@ -43,13 +44,14 @@ export function DashboardOverview({
   todayLabel: string;
   timeZone: string;
   hour12: boolean;
+  locale: string;
   bookingUrl: string | null;
   data: OverviewData;
 }) {
   const [copied, setCopied] = useState(false);
 
   function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString("en-US", {
+    return new Date(iso).toLocaleTimeString(locale, {
       hour: "numeric",
       minute: "2-digit",
       hour12,
@@ -58,7 +60,7 @@ export function DashboardOverview({
   }
 
   function formatDay(iso: string): string {
-    return new Date(iso).toLocaleDateString("en-US", {
+    return new Date(iso).toLocaleDateString(locale, {
       weekday: "short",
       month: "short",
       day: "numeric",

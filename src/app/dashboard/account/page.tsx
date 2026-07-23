@@ -26,6 +26,7 @@ export default async function AccountPage() {
           timeZone: user.timeZone,
           timeFormat: user.timeFormat,
           weekStart: user.weekStart,
+          locale: user.locale,
           hasPassword: Boolean(user.passwordHash),
           totpEnabled: Boolean(user.totpSecret),
         }}

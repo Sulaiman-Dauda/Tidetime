@@ -1,8 +1,18 @@
 import { addDaysToKey, formatDateKey, getZonedParts } from "./time";
 
+/** BCP-47 tag with a safe fallback — user.locale drives dashboard formatting. */
+export function resolveLocale(locale?: string | null): string {
+  try {
+    if (locale) return Intl.DateTimeFormat.supportedLocalesOf(locale)[0] ?? "en-US";
+  } catch {
+    /* invalid tag */
+  }
+  return "en-US";
+}
+
 /** Render a UTC instant as a localized time string in a given zone. */
-function formatTime(date: Date, timeZone: string, hour12 = true): string {
-  return new Intl.DateTimeFormat("en-US", {
+function formatTime(date: Date, timeZone: string, hour12 = true, locale = "en-US"): string {
+  return new Intl.DateTimeFormat(locale, {
     timeZone,
     hour: "numeric",
     minute: "2-digit",
@@ -11,15 +21,16 @@ function formatTime(date: Date, timeZone: string, hour12 = true): string {
 }
 
 /** Render a full date+time range, e.g. "Mon, Jun 1 · 9:00–9:30 AM (GMT+1)". */
-export function formatRange(start: Date, end: Date, timeZone: string, hour12 = true): string {
-  const date = new Intl.DateTimeFormat("en-US", {
+export function formatRange(start: Date, end: Date, timeZone: string, hour12 = true, locale = "en-US"): string {
+  const tag = resolveLocale(locale);
+  const date = new Intl.DateTimeFormat(tag, {
     timeZone,
     weekday: "short",
     month: "short",
     day: "numeric",
   }).format(start);
-  const s = formatTime(start, timeZone, hour12);
-  const e = formatTime(end, timeZone, hour12);
+  const s = formatTime(start, timeZone, hour12, tag);
+  const e = formatTime(end, timeZone, hour12, tag);
   return `${date} · ${s} – ${e}`;
 }
 

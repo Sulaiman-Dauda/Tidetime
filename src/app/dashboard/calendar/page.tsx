@@ -161,6 +161,7 @@ export default async function CalendarPage({ searchParams }: Props) {
       truncated={truncated}
       timeZone={user.timeZone}
       hour12={user.timeFormat === 12}
+      locale={user.locale}
       weekStart={user.weekStart}
       services={calendarServices}
       teamMembers={teamMembers.map((m) => ({ id: m.id, name: m.name ?? m.username }))}

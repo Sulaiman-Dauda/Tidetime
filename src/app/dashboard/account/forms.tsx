@@ -36,9 +36,21 @@ interface UserView {
   timeZone: string;
   timeFormat: number;
   weekStart: number;
+  locale: string;
   hasPassword: boolean;
   totpEnabled: boolean;
 }
+
+const LOCALES: { value: string; label: string }[] = [
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "de-DE", label: "Deutsch" },
+  { value: "fr-FR", label: "Français" },
+  { value: "es-ES", label: "Español" },
+  { value: "pt-BR", label: "Português (BR)" },
+  { value: "it-IT", label: "Italiano" },
+  { value: "nl-NL", label: "Nederlands" },
+];
 
 export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: string[] }) {
   const { toast } = useToast();
@@ -116,10 +128,18 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
               Your job title, shown with your name and photo on the public booking page.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Time zone</Label>
               <SelectField name="timeZone" defaultValue={user.timeZone} options={timeZones.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Date format</Label>
+              <SelectField
+                name="locale"
+                defaultValue={LOCALES.some((l) => l.value === user.locale) ? user.locale : "en-US"}
+                options={LOCALES}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Time format</Label>

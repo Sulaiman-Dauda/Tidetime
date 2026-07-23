@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { requirePermission } from "@/lib/guard";
 import { listCustomers, type CustomerSort } from "@/server/customers";
+import { resolveLocale } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ export default async function CustomersPage({
   });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const dateFmt = new Intl.DateTimeFormat("en-US", {
+  const dateFmt = new Intl.DateTimeFormat(resolveLocale(user.locale), {
     timeZone: user.timeZone,
     year: "numeric",
     month: "short",

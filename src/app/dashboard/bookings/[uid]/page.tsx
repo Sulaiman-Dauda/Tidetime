@@ -7,7 +7,7 @@ import { bookings, attendees, memberships, services, teams } from "@/db/schema";
 import { can } from "@/lib/rbac";
 import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
-import { formatRange } from "@/lib/format";
+import { formatRange, resolveLocale } from "@/lib/format";
 import { answersFromResponses } from "@/lib/booking-fields";
 import { Badge } from "@/components/ui/badge";
 import { AcceptButton, CancelBookingButton, DeclineButton } from "../_components/booking-actions";
@@ -101,7 +101,7 @@ export default async function BookingDetailPage({ params }: Props) {
   const rescheduleHref =
     teamRow && serviceRow ? `/book/${teamRow.slug}/${serviceRow.slug}?reschedule=${booking.uid}` : null;
 
-  const when = formatRange(booking.startTime, booking.endTime, user.timeZone, user.timeFormat === 12);
+  const when = formatRange(booking.startTime, booking.endTime, user.timeZone, user.timeFormat === 12, user.locale);
   // Custom-question answers via the shared helper: system name/email fields are
   // excluded (they already render on the attendee rows above).
   const answers = serviceRow
@@ -110,7 +110,7 @@ export default async function BookingDetailPage({ params }: Props) {
         .filter(([key, value]) => !["name", "email"].includes(key) && typeof value === "string" && value.trim())
         .map(([key, value]) => ({ label: key, value: String(value) }));
   const canCancel = booking.status === "accepted" && booking.endTime.getTime() >= Date.now();
-  const activityTime = new Intl.DateTimeFormat("en-US", {
+  const activityTime = new Intl.DateTimeFormat(resolveLocale(user.locale), {
     timeZone: user.timeZone,
     dateStyle: "medium",
     timeStyle: "short",

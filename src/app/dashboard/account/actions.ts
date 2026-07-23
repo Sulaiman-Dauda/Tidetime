@@ -11,6 +11,7 @@ import { isValidTimeZone } from "@/lib/time";
 import { generateTotpSecret, totpUri, verifyTotp } from "@/lib/totp";
 import { env } from "@/lib/env";
 import { requestEmailChange } from "@/server/email-change";
+import { resolveLocale } from "@/lib/format";
 
 export type SettingsState = { ok?: boolean; error?: string } | null;
 
@@ -25,6 +26,7 @@ const profileSchema = z.object({
   timeZone: z.string().min(1),
   timeFormat: z.coerce.number().int().refine((v) => v === 12 || v === 24),
   weekStart: z.coerce.number().int().min(0).max(6),
+  locale: z.string().min(2).max(16).regex(/^[a-zA-Z-]+$/),
 });
 
 export async function updateProfileAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
@@ -36,6 +38,7 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
     timeZone: formData.get("timeZone"),
     timeFormat: formData.get("timeFormat"),
     weekStart: formData.get("weekStart"),
+    locale: formData.get("locale") || "en-US",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   if (!isValidTimeZone(parsed.data.timeZone)) return { error: "Invalid time zone" };
@@ -57,6 +60,7 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
       timeZone: parsed.data.timeZone,
       timeFormat: parsed.data.timeFormat,
       weekStart: parsed.data.weekStart,
+      locale: resolveLocale(parsed.data.locale),
       updatedAt: new Date(),
     })
     .where(eq(users.id, user.id));
