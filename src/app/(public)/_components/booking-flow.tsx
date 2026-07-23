@@ -64,6 +64,8 @@ type Host = {
   name: string | null;
   username: string;
   avatarUrl?: string | null;
+  /** public job title, e.g. "Consultant" */
+  position?: string | null;
 };
 
 export type BookingPrefill = {
@@ -78,7 +80,8 @@ type Props = {
   teamSlug: string;
   rescheduleUid?: string;
   service: ServiceView;
-  host: { name: string | null; username: string; avatarUrl?: string | null };
+  /** company branding shown at the top of the booking card */
+  company: { name: string; logoUrl?: string | null };
   spamProtection?: boolean;
   botChallenge?: string;
   teamHosts?: Host[];
@@ -153,14 +156,13 @@ export function BookingFlow({
   teamSlug,
   rescheduleUid,
   service,
-  host,
+  company,
   spamProtection,
   botChallenge,
   teamHosts = [],
   prefill,
 }: Props) {
   const router = useRouter();
-  const hostName = host.name ?? host.username;
   const [duration, setDuration] = useState(service.length);
   const [timeZone, setTimeZone] = useState(service.scheduleTimeZone);
   const [providerId, setProviderId] = useState<number | null>(null);
@@ -243,6 +245,14 @@ export function BookingFlow({
     () => [...new Set([service.length, ...service.durations])].sort((a, b) => a - b),
     [service.durations, service.length],
   );
+  // The member profile shown in the sidebar: the explicitly chosen provider,
+  // or the only provider when there is no choice to make.
+  const displayHost = useMemo(
+    () =>
+      teamHosts.find((member) => member.id === providerId) ??
+      (teamHosts.length === 1 ? teamHosts[0] : null),
+    [teamHosts, providerId],
+  );
   const timeZones = useMemo(() => listTimeZones(), []);
   const calendarDays = monthMatrix(viewDate.getFullYear(), viewDate.getMonth());
   const today = dayKey(new Date());
@@ -281,12 +291,66 @@ export function BookingFlow({
               </div>
             ) : null}
 
-            <Avatar className="h-11 w-11 border bg-background shadow-sm">
-              {host.avatarUrl ? <AvatarImage src={host.avatarUrl} alt={hostName} /> : null}
-              <AvatarFallback>{initials(hostName)}</AvatarFallback>
-            </Avatar>
-            <p className="mt-4 text-[13px] font-medium text-muted-foreground">{hostName}</p>
-            <h1 className="mt-0.5 text-xl font-semibold tracking-tight">{service.title}</h1>
+            {/* Company brand */}
+            <div className="-mx-6 flex items-center gap-2.5 border-b border-border/60 px-6 pb-5">
+              {company.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={company.logoUrl} alt={company.name} className="h-7 w-auto object-contain" />
+              ) : (
+                <Avatar className="h-7 w-7 border bg-background">
+                  <AvatarFallback className="text-[10px] font-semibold">{initials(company.name)}</AvatarFallback>
+                </Avatar>
+              )}
+              <span className="text-sm font-semibold tracking-tight">{company.name}</span>
+            </div>
+
+            {/* Member profile — follows the provider selection below */}
+            {displayHost ? (
+              <div className="mt-6">
+                <Avatar className="h-14 w-14 border-2 border-background bg-background shadow-md ring-1 ring-border/60">
+                  {displayHost.avatarUrl ? (
+                    <AvatarImage src={displayHost.avatarUrl} alt={displayHost.name ?? displayHost.username} />
+                  ) : null}
+                  <AvatarFallback className="text-sm font-semibold">
+                    {initials(displayHost.name ?? displayHost.username)}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="mt-3.5 text-sm font-medium text-muted-foreground">
+                  {displayHost.name ?? displayHost.username}
+                </p>
+                {displayHost.position ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground/80">{displayHost.position}</p>
+                ) : null}
+              </div>
+            ) : teamHosts.length > 1 ? (
+              <div className="mt-6">
+                <div className="flex -space-x-2.5">
+                  {teamHosts.slice(0, 4).map((member) => (
+                    <Avatar
+                      key={member.id}
+                      className="h-11 w-11 border-2 border-card bg-background shadow-sm"
+                    >
+                      {member.avatarUrl ? (
+                        <AvatarImage src={member.avatarUrl} alt={member.name ?? member.username} />
+                      ) : null}
+                      <AvatarFallback className="text-xs font-semibold">
+                        {initials(member.name ?? member.username)}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                </div>
+                <p className="mt-3.5 text-sm font-medium text-muted-foreground">Any available provider</p>
+              </div>
+            ) : null}
+
+            <h1
+              className={cn(
+                "text-xl font-semibold tracking-tight",
+                displayHost || teamHosts.length > 1 ? "mt-1" : "mt-6",
+              )}
+            >
+              {service.title}
+            </h1>
             {service.description ? (
               <p className="mt-2.5 text-[13px] leading-6 text-muted-foreground">
                 {service.description}

@@ -15,6 +15,13 @@
       "when": 1784834955869,
       "tag": "0001_roles_consolidation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784844349811,
+      "tag": "0002_lying_doctor_octopus",
+      "breakpoints": true
     }
   ]
 }

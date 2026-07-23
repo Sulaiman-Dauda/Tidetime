@@ -13,6 +13,7 @@ export type SettingsState = { ok?: boolean; error?: string } | null;
 
 const profileSchema = z.object({
   name: z.string().max(128).optional(),
+  position: z.string().trim().max(128).optional(),
   username: z
     .string()
     .min(3, "Username must be at least 3 characters")
@@ -27,6 +28,7 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
   const user = await requireUser();
   const parsed = profileSchema.safeParse({
     name: formData.get("name") || undefined,
+    position: formData.get("position") ?? undefined,
     username: formData.get("username"),
     timeZone: formData.get("timeZone"),
     timeFormat: formData.get("timeFormat"),
@@ -47,6 +49,7 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
     .update(users)
     .set({
       name: parsed.data.name ?? null,
+      position: parsed.data.position || null,
       username: parsed.data.username,
       timeZone: parsed.data.timeZone,
       timeFormat: parsed.data.timeFormat,

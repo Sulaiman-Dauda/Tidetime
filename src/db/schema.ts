@@ -51,6 +51,8 @@ export const users = pgTable(
     username: varchar("username", { length: 64 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     name: varchar("name", { length: 128 }),
+    /** Job title shown publicly on the booking page (e.g. "Consultant"). */
+    position: varchar("position", { length: 128 }),
     /** scrypt hash "salt:hash" */
     passwordHash: text("password_hash").notNull(),
     avatarUrl: text("avatar_url"),

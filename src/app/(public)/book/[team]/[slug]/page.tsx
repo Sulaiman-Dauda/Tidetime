@@ -107,7 +107,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
           disableGuests: service.disableGuests,
           scheduleTimeZone: service.scheduleTimeZone,
         }}
-        host={{ name: teamRow.name, username: teamRow.slug, avatarUrl: teamRow.logoUrl }}
+        company={{ name: teamRow.name, logoUrl: teamRow.logoUrl }}
         spamProtection={settings.booking.spamProtectionEnabled}
         botChallenge={issueBotChallenge(env.authSecret)}
         teamHosts={teamHosts}

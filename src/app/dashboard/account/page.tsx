@@ -19,6 +19,7 @@ export default async function AccountPage() {
         timeZones={timeZones}
         user={{
           name: user.name,
+          position: user.position,
           username: user.username,
           email: user.email,
           avatarUrl: user.avatarUrl,

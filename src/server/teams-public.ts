@@ -109,6 +109,8 @@ export interface TeamHost {
   name: string | null;
   username: string;
   avatarUrl: string | null;
+  /** public job title, e.g. "Consultant" */
+  position: string | null;
 }
 
 /**
@@ -122,6 +124,7 @@ export async function getTeamHosts(serviceId: number): Promise<TeamHost[]> {
       name: users.name,
       username: users.username,
       avatarUrl: users.avatarUrl,
+      position: users.position,
     })
     .from(serviceProviders)
     .innerJoin(users, eq(serviceProviders.userId, users.id))

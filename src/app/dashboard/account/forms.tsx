@@ -23,6 +23,7 @@ import { WEEKDAY_SHORT } from "@/lib/format";
 
 interface UserView {
   name: string | null;
+  position: string | null;
   username: string;
   email: string;
   avatarUrl: string | null;
@@ -78,6 +79,19 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
               <Label htmlFor="username">Username</Label>
               <Input id="username" name="username" defaultValue={user.username} required />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="position">Position</Label>
+            <Input
+              id="position"
+              name="position"
+              defaultValue={user.position ?? ""}
+              placeholder="e.g. Consultant"
+              maxLength={128}
+            />
+            <p className="text-xs text-muted-foreground">
+              Your job title, shown with your name and photo on the public booking page.
+            </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">
