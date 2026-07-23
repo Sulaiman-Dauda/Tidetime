@@ -15,7 +15,7 @@ import {
   Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { can } from "@/lib/rbac";
+import { can, canAny } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
 import { UserMenu } from "./user-menu";
 
@@ -41,7 +41,13 @@ const NAV_GROUPS = [
       { href: "/dashboard/integrations", label: "Connections", icon: Plug },
     ],
   },
-  { label: "Company", items: [{ href: "/dashboard/providers", label: "Providers", icon: Building2 }] },
+  {
+    label: "Company",
+    items: [
+      { href: "/dashboard/team", label: "Team", icon: Users },
+      { href: "/dashboard/providers", label: "Manage providers", icon: Building2 },
+    ],
+  },
 ] as const;
 
 const ADMIN_GROUP = {
@@ -68,13 +74,36 @@ export function SidebarContent({ user, onNavigate }: SidebarProps) {
   // Filter nav groups based on role permissions
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => {
-      if (item.href === "/dashboard/providers") return can(role, "team.view");
-      if (item.href === "/dashboard/services") return can(role, "service.manage");
-      if (item.href === "/dashboard/availability") return can(role, "availability.manage");
-      if (item.href === "/dashboard/integrations") return user.isAdmin || can(role, "availability.manage");
-      return true;
-    }),
+    items: group.items
+      .filter((item) => {
+        if (item.href === "/dashboard/calendar" || item.href === "/dashboard/bookings") {
+          return canAny(role, ["booking.own.view", "booking.all.view"]);
+        }
+        if (item.href === "/dashboard/customers") return can(role, "customer.all.view");
+        if (item.href === "/dashboard/team") return can(role, "team.directory.view");
+        if (item.href === "/dashboard/providers") {
+          return canAny(role, ["member.invite", "member.remove", "member.role.assign"]);
+        }
+        if (item.href === "/dashboard/services") {
+          return canAny(role, [
+            "service.catalog.view",
+            "service.catalog.manage",
+            "service.assigned.view",
+          ]);
+        }
+        if (item.href === "/dashboard/availability") {
+          return can(role, "availability.own.manage");
+        }
+        if (item.href === "/dashboard/integrations") {
+          return can(role, "connection.own.manage");
+        }
+        return true;
+      })
+      .map((item) =>
+        item.href === "/dashboard/services" && role === "provider"
+          ? { ...item, label: "My services" }
+          : item,
+      ),
   })).filter((g) => g.items.length > 0);
 
   const showAdmin = user.isAdmin;

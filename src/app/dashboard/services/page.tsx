@@ -1,10 +1,9 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Clock, Copy, ExternalLink, EyeOff, Settings2, Zap, ChevronUp, ChevronDown } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { memberships, teams } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { teams } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import {
   listServices,
   duplicateServiceAction,
@@ -18,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatDuration } from "@/lib/format";
 import { getAppUrl } from "@/server/app-url";
 import { locationLabel } from "@/lib/locations";
+import { can } from "@/lib/rbac";
+import { requireAnyPermission } from "@/lib/guard";
 
 export const metadata = { title: "Services" };
 
@@ -27,24 +28,34 @@ interface Props {
 
 export default async function ServicesPage({ searchParams }: Props) {
   const { welcome } = await searchParams;
-  const user = (await getCurrentUser())!;
+  const { role, teamId } = await requireAnyPermission([
+    "service.catalog.view",
+    "service.catalog.manage",
+    "service.assigned.view",
+  ]);
   const items = await listServices();
   const appUrl = await getAppUrl();
-  const [company] = await db.select({ slug: teams.slug }).from(memberships)
-    .innerJoin(teams, eq(teams.id, memberships.teamId))
-    .where(and(eq(memberships.userId, user.id), eq(memberships.accepted, true)))
-    .orderBy(asc(memberships.id)).limit(1);
+  const [company] = await db
+    .select({ slug: teams.slug })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  const canManage = can(role, "service.catalog.manage");
 
   return (
     <div className="animate-fade-in space-y-8">
       <PageHeader
         title="Services"
-        description="Create the services people can book with you — like a 30-minute consultation."
-        action={<NewServiceButton />}
+        description={
+          canManage
+            ? "Create and manage the services people can book."
+            : "Services you are currently assigned to deliver."
+        }
+        action={canManage ? <NewServiceButton /> : undefined}
       />
 
       {items.length === 0 ? (
-        <EmptyState firstRun={welcome === "1"} />
+        <EmptyState firstRun={welcome === "1"} canManage={canManage} />
       ) : (
         <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
           {items.map((et) => {
@@ -94,6 +105,8 @@ export default async function ServicesPage({ searchParams }: Props) {
                 </Link>
 
                 <div className="flex shrink-0 items-center gap-0.5">
+                  {canManage ? (
+                    <>
                   {/* Move up / down controls */}
                   <form action={reorderServicesAction} className="flex">
                     <input type="hidden" name="id" value={et.id} />
@@ -118,6 +131,8 @@ export default async function ServicesPage({ searchParams }: Props) {
                   </form>
 
                   <DeleteServiceButton id={et.id} label={et.title} />
+                    </>
+                  ) : null}
                   <a
                     href={publicUrl}
                     target="_blank"
@@ -127,7 +142,7 @@ export default async function ServicesPage({ searchParams }: Props) {
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
-                  <form action={duplicateServiceAction}>
+                  {canManage ? <form action={duplicateServiceAction}>
                     <input type="hidden" name="id" value={et.id} />
                     <button
                       type="submit"
@@ -136,8 +151,8 @@ export default async function ServicesPage({ searchParams }: Props) {
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </button>
-                  </form>
-                  <form action={toggleHiddenAction}>
+                  </form> : null}
+                  {canManage ? <form action={toggleHiddenAction}>
                     <input type="hidden" name="id" value={et.id} />
                     <input type="hidden" name="hidden" value={String(et.hidden)} />
                     <button
@@ -147,10 +162,10 @@ export default async function ServicesPage({ searchParams }: Props) {
                     >
                       <EyeOff className="h-3.5 w-3.5" />
                     </button>
-                  </form>
+                  </form> : null}
                   <Link
                     href={`/dashboard/services/${et.id}` as Route}
-                    title="Edit"
+                    title={canManage ? "Edit" : "View"}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                   >
                     <Settings2 className="h-3.5 w-3.5" />
@@ -165,23 +180,33 @@ export default async function ServicesPage({ searchParams }: Props) {
   );
 }
 
-function EmptyState({ firstRun = false }: { firstRun?: boolean }) {
+function EmptyState({
+  firstRun = false,
+  canManage,
+}: {
+  firstRun?: boolean;
+  canManage: boolean;
+}) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
       {firstRun ? <Badge variant="secondary" className="mb-4">Step 2 of 2</Badge> : null}
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
         <Zap className="h-6 w-6 text-primary" />
       </div>
-      <h2 className="text-lg font-semibold tracking-tight text-foreground">Create your first service</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-foreground">
+        {canManage ? "Create your first service" : "No assigned services"}
+      </h2>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        {firstRun
+        {!canManage
+          ? "An owner or manager can assign you to a company service."
+          : firstRun
           ? "Your workspace is ready. Create the first service people can book with you — we’ll open the editor right away so you can adjust duration, availability, questions, pricing, and more."
           : "Services are what people book — like a 30-minute consultation, a haircut, or a class. Each one gets its own booking page."}
       </p>
-      <div className="mt-6">
+      {canManage ? <div className="mt-6">
         <NewServiceButton label="Create your first service" size="default" />
-      </div>
-      <div className="mt-8 max-w-md space-y-3 text-left text-xs text-muted-foreground">
+      </div> : null}
+      {canManage ? <div className="mt-8 max-w-md space-y-3 text-left text-xs text-muted-foreground">
         <p className="font-medium text-foreground/70">After you create a service you can:</p>
         <ul className="space-y-1.5">
           <li className="flex items-start gap-2">
@@ -197,7 +222,7 @@ function EmptyState({ firstRun = false }: { firstRun?: boolean }) {
             Connect Google Calendar, email, and Zapier in <strong>Connections</strong>
           </li>
         </ul>
-      </div>
+      </div> : null}
     </div>
   );
 }

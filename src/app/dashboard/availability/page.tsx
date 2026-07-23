@@ -1,11 +1,11 @@
 import { eq } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { db } from "@/db";
 import { schedules, availabilities } from "@/db/schema";
 import { AvailabilityEditor, type WeeklyRule, type DateOverride } from "./editor";
 
 export default async function AvailabilityPage() {
-  const user = (await getCurrentUser())!;
+  const { user } = await requirePermission("availability.own.manage");
 
   // Use the default schedule, or the first one.
   const all = await db.select().from(schedules).where(eq(schedules.userId, user.id));

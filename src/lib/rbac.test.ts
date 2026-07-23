@@ -1,84 +1,78 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { can, canAll, canAny, canAssignRole, compareRoles, permissionsFor } from "./rbac";
 
-describe("can", () => {
-  it("grants owner every permission", () => {
+describe("role permissions", () => {
+  it("gives owners every company and personal permission", () => {
     expect(can("owner", "team.delete")).toBe(true);
-    expect(can("owner", "billing.manage")).toBe(true);
-    expect(can("owner", "member.role.assign")).toBe(true);
+    expect(can("owner", "service.catalog.manage")).toBe(true);
+    expect(can("owner", "booking.all.manage")).toBe(true);
+    expect(can("owner", "company.settings.manage")).toBe(true);
   });
 
-  it("denies admin team.delete and billing", () => {
+  it("keeps admins from deleting the company", () => {
     expect(can("admin", "team.delete")).toBe(false);
-    expect(can("admin", "billing.manage")).toBe(false);
-    expect(can("admin", "member.invite")).toBe(true);
+    expect(can("admin", "member.role.assign")).toBe(true);
+    expect(can("admin", "service.catalog.manage")).toBe(true);
   });
 
-  it("limits manager to people + scheduling ops", () => {
-    expect(can("manager", "member.invite")).toBe(true);
-    expect(can("manager", "booking.manage")).toBe(true);
-    expect(can("manager", "team.manage")).toBe(false);
-    expect(can("manager", "billing.manage")).toBe(false);
+  it("allows managers to operate the catalogue and company bookings", () => {
+    expect(can("manager", "service.catalog.manage")).toBe(true);
+    expect(can("manager", "booking.all.manage")).toBe(true);
+    expect(can("manager", "customer.all.view")).toBe(true);
+    expect(can("manager", "company.settings.manage")).toBe(false);
   });
 
-  it("scopes provider to own config + view", () => {
-    expect(can("provider", "availability.manage")).toBe(true);
-    expect(can("provider", "service.manage")).toBe(true);
+  it("limits providers to their own operational scope", () => {
+    expect(can("provider", "service.assigned.view")).toBe(true);
+    expect(can("provider", "availability.own.manage")).toBe(true);
+    expect(can("provider", "booking.own.manage")).toBe(true);
+    expect(can("provider", "connection.own.manage")).toBe(true);
+    expect(can("provider", "service.catalog.manage")).toBe(false);
+    expect(can("provider", "booking.all.view")).toBe(false);
+    expect(can("provider", "customer.all.view")).toBe(false);
     expect(can("provider", "member.invite")).toBe(false);
-    expect(can("provider", "booking.manage")).toBe(false);
   });
 
-  it("lets receptionist manage bookings but not config", () => {
-    expect(can("receptionist", "booking.manage")).toBe(true);
-    expect(can("receptionist", "booking.view")).toBe(true);
-    expect(can("receptionist", "availability.manage")).toBe(false);
-    expect(can("receptionist", "service.manage")).toBe(false);
+  it("gives receptionists front-desk access without provider configuration", () => {
+    expect(can("receptionist", "booking.all.manage")).toBe(true);
+    expect(can("receptionist", "customer.all.view")).toBe(true);
+    expect(can("receptionist", "availability.own.manage")).toBe(false);
+    expect(can("receptionist", "service.catalog.manage")).toBe(false);
   });
 
-  it("restricts member to read-only visibility", () => {
-    expect(can("member", "team.view")).toBe(true);
-    expect(can("member", "booking.view")).toBe(false);
-  });
-});
-
-describe("canAll / canAny", () => {
-  it("canAll requires every permission", () => {
-    expect(canAll("manager", ["member.invite", "booking.manage"])).toBe(true);
-    expect(canAll("manager", ["member.invite", "billing.manage"])).toBe(false);
+  it("keeps members to the teammate directory", () => {
+    expect(permissionsFor("member")).toEqual(["team.directory.view"]);
   });
 
-  it("canAny needs only one", () => {
-    expect(canAny("provider", ["billing.manage", "availability.manage"])).toBe(true);
-    expect(canAny("member", ["billing.manage", "booking.manage"])).toBe(false);
+  it("supports all/any checks", () => {
+    expect(
+      canAll("provider", ["booking.own.view", "availability.own.manage"]),
+    ).toBe(true);
+    expect(
+      canAny("provider", ["customer.all.view", "service.assigned.view"]),
+    ).toBe(true);
   });
 });
 
-describe("canAssignRole", () => {
-  it("lets owner assign any role", () => {
+describe("role assignment", () => {
+  it("allows owners to assign every role", () => {
     expect(canAssignRole("owner", "admin")).toBe(true);
     expect(canAssignRole("owner", "owner")).toBe(true);
   });
 
-  it("lets admin assign only lower roles", () => {
+  it("allows admins to assign lower roles only", () => {
     expect(canAssignRole("admin", "manager")).toBe(true);
     expect(canAssignRole("admin", "admin")).toBe(false);
     expect(canAssignRole("admin", "owner")).toBe(false);
   });
 
-  it("denies roles without assign permission", () => {
+  it("does not let operational roles assign roles", () => {
+    expect(canAssignRole("manager", "provider")).toBe(false);
     expect(canAssignRole("provider", "member")).toBe(false);
-    expect(canAssignRole("receptionist", "member")).toBe(false);
-  });
-});
-
-describe("compareRoles / permissionsFor", () => {
-  it("ranks owner above member", () => {
-    expect(compareRoles("owner", "member")).toBeGreaterThan(0);
-    expect(compareRoles("member", "owner")).toBeLessThan(0);
   });
 
-  it("returns the permission list for a role", () => {
-    expect(permissionsFor("member")).toEqual(["team.view"]);
-    expect(permissionsFor("owner").length).toBeGreaterThan(5);
+  it("compares privilege rank", () => {
+    expect(compareRoles("owner", "admin")).toBeGreaterThan(0);
+    expect(compareRoles("provider", "receptionist")).toBe(0);
   });
 });

@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/guard";
+import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { teams, memberships } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -14,7 +14,11 @@ import { Users } from "lucide-react";
 export const metadata = { title: "Providers" };
 
 export default async function ProvidersPage() {
-  const { user } = await requirePermission("team.view");
+  const { user } = await requireAnyPermission([
+    "member.invite",
+    "member.remove",
+    "member.role.assign",
+  ]);
 
   const rows = await db
     .select({ team: teams, role: memberships.role })
@@ -26,7 +30,7 @@ export default async function ProvidersPage() {
     <div className="animate-fade-in space-y-8">
       <PageHeader
         title="Providers"
-        description="Manage the people who can be assigned to company services."
+        description="Invite providers and manage company membership."
       />
 
       {rows.length === 0 ? (

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, services } from "@/db/schema";
 import { listBookingActivity } from "@/server/activity";
@@ -45,7 +45,7 @@ function formatResponseValue(value: unknown): string {
 }
 
 export default async function BookingDetailPage({ params }: Props) {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.view", "booking.all.view"]);
   const { uid } = await params;
 
 

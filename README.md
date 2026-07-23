@@ -20,6 +20,14 @@ public API keys/API v1, CRM, AI/licensing, Microsoft/CalDAV calendars, Zoom/Dail
 blocked-period engines, multi-attendant/collective events, group seats, recurring series,
 analytics dashboards, embeds/PWA, and the command palette.
 
+## Access model
+
+- Owners and authorized managers control provider assignments and the service catalog.
+- Providers can manage only their own availability, bookings, and calendar connection; they can
+  view assigned services and accepted teammates but cannot change either.
+
+These boundaries are enforced in server queries and mutations as well as the dashboard UI.
+
 ## Local development
 
 Requires Node.js 20+ and PostgreSQL.

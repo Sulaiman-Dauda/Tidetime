@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { listCustomersForActor } from "@/server/customers";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const user = await requireUser();
+  const { user } = await requirePermission("customer.all.view");
   const { q } = await searchParams;
   const customers = await listCustomersForActor({ userId: user.id, search: q });
 

@@ -61,7 +61,7 @@ export async function upsertCustomerFromBooking(input: {
     });
 }
 
-/** List company customers for an actor who may view bookings. */
+/** List the company-wide customer directory for an authorized actor. */
 export async function listCustomersForActor(opts: {
   userId: number;
   search?: string;
@@ -72,7 +72,7 @@ export async function listCustomersForActor(opts: {
     .where(and(eq(memberships.userId, opts.userId), eq(memberships.accepted, true)))
     .orderBy(asc(memberships.id))
     .limit(1);
-  if (!membership || !can(membership.role, "booking.view")) return [];
+  if (!membership || !can(membership.role, "customer.all.view")) return [];
 
   const filters = [eq(customers.teamId, membership.teamId)];
   const search = opts.search?.trim();

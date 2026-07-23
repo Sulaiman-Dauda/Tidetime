@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { schedules, availabilities } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { isValidTimeZone } from "@/lib/time";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -31,7 +31,7 @@ const saveSchema = z.object({
 export type SaveScheduleInput = z.infer<typeof saveSchema>;
 
 export async function saveScheduleAction(input: SaveScheduleInput) {
-  const user = await requireUser();
+  const { user } = await requirePermission("availability.own.manage");
   const data = saveSchema.parse(input);
   const tz = isValidTimeZone(data.timeZone) ? data.timeZone : "UTC";
 
@@ -87,7 +87,7 @@ export async function saveScheduleAction(input: SaveScheduleInput) {
 
 export async function deleteScheduleAction(formData: FormData) {
   "use server";
-  const user = await requireUser();
+  const { user } = await requirePermission("availability.own.manage");
   const id = Number(formData.get("scheduleId"));
   await db.delete(schedules).where(and(eq(schedules.id, id), eq(schedules.userId, user.id)));
   revalidatePath("/dashboard/availability");

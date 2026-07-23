@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentAuthorization } from "@/lib/guard";
+import { can } from "@/lib/rbac";
 import { getGoogleAuthUrl } from "@/server/google-calendar";
 
 export const dynamic = "force-dynamic";
 
 /** GET /api/google-calendar/auth — redirect to Google OAuth consent page. */
 export async function GET(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authorization = await getCurrentAuthorization();
+  if (!authorization) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (
+    !authorization.role ||
+    !can(authorization.role, "connection.own.manage")
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
-    const url = await getGoogleAuthUrl(user.id);
+    const url = await getGoogleAuthUrl(authorization.user.id);
     return NextResponse.redirect(url);
   } catch (err) {
     return NextResponse.redirect(

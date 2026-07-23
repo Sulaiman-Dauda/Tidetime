@@ -4,13 +4,13 @@
   "private": true,
   "description": "Lightweight company service booking with provider assignment and Zapier webhooks.",
   "license": "MIT",
-  "homepage": "https://github.com/Sulaiman-Dauda/tidetime#readme",
+  "homepage": "https://github.com/Sulaiman-Dauda/tidetime-lite#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Sulaiman-Dauda/tidetime.git"
+    "url": "git+https://github.com/Sulaiman-Dauda/tidetime-lite.git"
   },
   "bugs": {
-    "url": "https://github.com/Sulaiman-Dauda/tidetime/issues"
+    "url": "https://github.com/Sulaiman-Dauda/tidetime-lite/issues"
   },
   "keywords": [
     "scheduling",

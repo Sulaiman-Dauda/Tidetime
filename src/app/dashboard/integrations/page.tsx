@@ -1,5 +1,5 @@
 import { asc } from "drizzle-orm";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/guard";
 import { db } from "@/db";
 import { webhooks } from "@/db/schema";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
@@ -10,7 +10,7 @@ import { WebhookManager } from "./webhook-manager";
 export const metadata = { title: "Connections" };
 
 export default async function IntegrationsPage() {
-  const user = await requireUser();
+  const { user } = await requirePermission("connection.own.manage");
   const hooks = user.isAdmin
     ? await db.select().from(webhooks).orderBy(asc(webhooks.createdAt))
     : [];

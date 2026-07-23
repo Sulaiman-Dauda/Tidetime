@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentAuthorization } from "@/lib/guard";
+import { can } from "@/lib/rbac";
 import {
   getGoogleDestinationCalendar,
   getSelectedCalendars,
@@ -11,10 +12,22 @@ import {
 
 export const dynamic = "force-dynamic";
 
+async function authorize() {
+  const authorization = await getCurrentAuthorization();
+  if (!authorization) {
+    return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  if (!authorization.role || !can(authorization.role, "connection.own.manage")) {
+    return { response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  return { user: authorization.user };
+}
+
 /** GET /api/google-calendar/calendars — list user's Google calendars. */
 export async function GET(_req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authorization = await authorize();
+  if ("response" in authorization) return authorization.response;
+  const { user } = authorization;
 
   const connected = await isGoogleConnected(user.id);
   if (!connected) {
@@ -36,8 +49,9 @@ export async function GET(_req: NextRequest) {
 
 /** POST /api/google-calendar/calendars — save selected calendars. */
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authorization = await authorize();
+  if ("response" in authorization) return authorization.response;
+  const { user } = authorization;
 
   const connected = await isGoogleConnected(user.id);
   if (!connected) {

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/guard";
 import { decideBooking } from "@/server/bookings";
 import { cancelBooking } from "@/server/bookings";
 
@@ -15,7 +15,7 @@ const decideSchema = z.object({
 });
 
 export async function decideBookingAction(formData: FormData) {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.manage", "booking.all.manage"]);
   const parsed = decideSchema.safeParse({
     uid: formData.get("uid"),
     decision: formData.get("decision"),
@@ -27,7 +27,7 @@ export async function decideBookingAction(formData: FormData) {
 }
 
 export async function cancelByHostAction(formData: FormData) {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.manage", "booking.all.manage"]);
   const uid = formData.get("uid");
   if (typeof uid !== "string") return;
 

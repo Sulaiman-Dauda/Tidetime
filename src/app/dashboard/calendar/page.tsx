@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, services, serviceProviders, teams } from "@/db/schema";
 import { CalendarView, type CalendarEvent } from "./calendar-view";
@@ -84,7 +84,7 @@ async function loadServices(userId: number): Promise<CalendarService[]> {
 }
 
 export default async function CalendarPage({ searchParams }: Props) {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.view", "booking.all.view"]);
   const { year, month } = parseMonth((await searchParams).month);
   const [events, services] = await Promise.all([
     loadEvents(user.id, year, month),

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/guard";
 import { moveBooking, createBooking } from "@/server/bookings";
 import { zonedTimeToUtc } from "@/lib/time";
 
@@ -9,7 +9,7 @@ export type MoveState = { ok?: boolean; error?: string } | null;
 
 /** Drag-to-reschedule from the dashboard calendar: move a booking to newStartIso. */
 export async function moveBookingAction(uid: string, newStartIso: string): Promise<MoveState> {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.manage", "booking.all.manage"]);
   const res = await moveBooking(uid, user.id, newStartIso);
   if (!res.ok) return { error: res.error };
   revalidatePath("/dashboard/calendar");
@@ -39,7 +39,7 @@ export type ManualBookingState = { ok?: boolean; uid?: string; error?: string } 
 export async function createManualBookingAction(
   input: ManualBookingInput,
 ): Promise<ManualBookingState> {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.manage", "booking.all.manage"]);
 
   const [y, mo, d] = input.date.split("-").map(Number);
   const [hh, mm] = input.time.split(":").map(Number);

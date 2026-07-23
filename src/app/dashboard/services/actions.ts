@@ -36,8 +36,13 @@ async function companyForUser(userId: number) {
     .orderBy(asc(memberships.id))
     .limit(1);
   if (!row) throw new Error("COMPANY_NOT_FOUND");
-  if (!can(row.role, "service.manage")) throw new Error("FORBIDDEN");
   return row;
+}
+
+async function companyForServiceManager(userId: number) {
+  const company = await companyForUser(userId);
+  if (!can(company.role, "service.catalog.manage")) throw new Error("FORBIDDEN");
+  return company;
 }
 
 async function uniqueSlug(teamId: number, title: string, excludeId?: number) {
@@ -61,7 +66,7 @@ async function nextPosition(teamId: number) {
 
 export async function createServiceAction(formData: FormData) {
   const user = await requireUser();
-  const company = await companyForUser(user.id);
+  const company = await companyForServiceManager(user.id);
   const title = String(formData.get("title") ?? "").trim() || "New service";
   const [created] = await db
     .insert(services)
@@ -105,7 +110,7 @@ export type UpdateServiceResult = { ok: true } | { ok: false; error: string };
 
 export async function updateServiceAction(input: UpdateServiceInput): Promise<UpdateServiceResult> {
   const user = await requireUser();
-  const company = await companyForUser(user.id);
+  const company = await companyForServiceManager(user.id);
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid service" };
   const data = parsed.data;
@@ -151,19 +156,40 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
 export async function listServices() {
   const user = await requireUser();
   const company = await companyForUser(user.id);
-  return db.select().from(services).where(eq(services.teamId, company.teamId)).orderBy(asc(services.position), asc(services.createdAt));
+  if (can(company.role, "service.catalog.view") || can(company.role, "service.catalog.manage")) {
+    return db
+      .select()
+      .from(services)
+      .where(eq(services.teamId, company.teamId))
+      .orderBy(asc(services.position), asc(services.createdAt));
+  }
+  if (can(company.role, "service.assigned.view")) {
+    return db
+      .select({ service: services })
+      .from(serviceProviders)
+      .innerJoin(services, eq(services.id, serviceProviders.serviceId))
+      .where(
+        and(
+          eq(serviceProviders.userId, user.id),
+          eq(services.teamId, company.teamId),
+        ),
+      )
+      .orderBy(asc(services.position), asc(services.createdAt))
+      .then((rows) => rows.map((row) => row.service));
+  }
+  throw new Error("FORBIDDEN");
 }
 
 export async function deleteServiceAction(formData: FormData) {
   const user = await requireUser();
-  const company = await companyForUser(user.id);
+  const company = await companyForServiceManager(user.id);
   await db.delete(services).where(and(eq(services.id, Number(formData.get("id"))), eq(services.teamId, company.teamId)));
   revalidatePath("/dashboard/services");
 }
 
 export async function toggleHiddenAction(formData: FormData) {
   const user = await requireUser();
-  const company = await companyForUser(user.id);
+  const company = await companyForServiceManager(user.id);
   const id = Number(formData.get("id"));
   await db.update(services).set({ hidden: formData.get("hidden") !== "true" })
     .where(and(eq(services.id, id), eq(services.teamId, company.teamId)));
@@ -172,7 +198,7 @@ export async function toggleHiddenAction(formData: FormData) {
 
 export async function duplicateServiceAction(formData: FormData) {
   const user = await requireUser();
-  const company = await companyForUser(user.id);
+  const company = await companyForServiceManager(user.id);
   const id = Number(formData.get("id"));
   const [original] = await db.select().from(services).where(and(eq(services.id, id), eq(services.teamId, company.teamId))).limit(1);
   if (!original) return;
@@ -190,7 +216,7 @@ export async function duplicateServiceAction(formData: FormData) {
 
 export async function reorderServicesAction(formData: FormData) {
   const user = await requireUser();
-  const company = await companyForUser(user.id);
+  const company = await companyForServiceManager(user.id);
   const rows = await db.select({ id: services.id, position: services.position }).from(services)
     .where(eq(services.teamId, company.teamId)).orderBy(asc(services.position), asc(services.createdAt));
   const index = rows.findIndex((row) => row.id === Number(formData.get("id")));

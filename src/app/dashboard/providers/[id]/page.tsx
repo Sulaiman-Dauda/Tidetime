@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { teams, memberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -17,7 +17,11 @@ export default async function ProviderDetailPage({ params }: Props) {
   const teamId = Number(id);
   if (!Number.isInteger(teamId)) notFound();
 
-  const user = await requireUser();
+  const { user } = await requireAnyPermission([
+    "member.invite",
+    "member.remove",
+    "member.role.assign",
+  ]);
 
   const [self] = await db
     .select({ role: memberships.role })

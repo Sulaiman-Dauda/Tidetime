@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
-import { requireUser } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, services } from "@/db/schema";
 import { formatRange } from "@/lib/format";
@@ -96,7 +96,7 @@ const FILTER_LABELS: Record<Filter, string> = {
 };
 
 export default async function BookingsPage({ searchParams }: Props) {
-  const user = await requireUser();
+  const { user } = await requireAnyPermission(["booking.own.view", "booking.all.view"]);
   const { tab } = await searchParams;
   const active: Filter = FILTERS.includes(tab as Filter) ? (tab as Filter) : "upcoming";
   const rows = await loadBookings(user.id, active);
