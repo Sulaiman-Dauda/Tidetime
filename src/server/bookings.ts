@@ -13,7 +13,7 @@ import { getTeamService } from "./teams-public";
 import { deleteCalendarEvent } from "./calendar";
 import { validateResponses as validateFieldResponses, type FieldValues } from "@/lib/booking-fields";
 import { logBookingActivity } from "./activity";
-import { upsertCustomerFromBooking } from "./customers";
+import { upsertCustomerFromBooking, decrementCustomerBookingCount } from "./customers";
 import { getAppUrl } from "@/server/app-url";
 import { isValidTimeZone } from "@/lib/time";
 import {
@@ -343,6 +343,26 @@ export async function cancelBooking(
     actor,
     message: reason ? `Cancelled: ${reason}` : "Booking cancelled",
   });
+
+  // Keep the customer directory's tally honest — a cancelled booking is not a
+  // completed one.
+  if (b.serviceId) {
+    const [svc] = await db
+      .select({ teamId: services.teamId })
+      .from(services)
+      .where(eq(services.id, b.serviceId))
+      .limit(1);
+    if (svc) {
+      const [primaryAttendee] = await db
+        .select({ email: attendees.email })
+        .from(attendees)
+        .where(and(eq(attendees.bookingId, b.id), eq(attendees.isPrimary, true)))
+        .limit(1);
+      if (primaryAttendee) {
+        await decrementCustomerBookingCount(svc.teamId, primaryAttendee.email).catch(() => undefined);
+      }
+    }
+  }
 
   // Delete external calendar events for this booking across every provider (best-effort).
   if (b.userId) {
