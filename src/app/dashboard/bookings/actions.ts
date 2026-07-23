@@ -33,6 +33,8 @@ export async function decideBookingAction(formData: FormData) {
   await decideBooking(parsed.data.uid, parsed.data.decision, booking.userId);
   revalidatePath("/dashboard/bookings");
   revalidatePath(`/dashboard/bookings/${parsed.data.uid}`);
+  revalidatePath("/dashboard/calendar");
+  revalidatePath("/dashboard");
 }
 
 export async function cancelByHostAction(formData: FormData) {
@@ -56,4 +58,6 @@ export async function cancelByHostAction(formData: FormData) {
   await cancelBooking(uid, typeof reason === "string" ? reason : undefined, "host");
   revalidatePath("/dashboard/bookings");
   revalidatePath(`/dashboard/bookings/${uid}`);
+  revalidatePath("/dashboard/calendar");
+  revalidatePath("/dashboard");
 }

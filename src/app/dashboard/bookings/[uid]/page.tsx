@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
-import { bookings, attendees, memberships, services } from "@/db/schema";
+import { bookings, attendees, memberships, services, teams } from "@/db/schema";
 import { can } from "@/lib/rbac";
 import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
@@ -58,17 +58,28 @@ export default async function BookingDetailPage({ params }: Props) {
   const [booking] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!booking) notFound();
   let authorized = booking.userId === user.id;
-  if (!authorized && can(role, "booking.all.view") && booking.userId !== null) {
-    const [hostMembership] = await db
-      .select({ id: memberships.id })
-      .from(memberships)
-      .where(and(
-        eq(memberships.userId, booking.userId),
-        eq(memberships.teamId, teamId),
-        eq(memberships.accepted, true),
-      ))
-      .limit(1);
-    authorized = Boolean(hostMembership);
+  if (!authorized && can(role, "booking.all.view")) {
+    if (booking.userId !== null) {
+      const [hostMembership] = await db
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(
+          eq(memberships.userId, booking.userId),
+          eq(memberships.teamId, teamId),
+          eq(memberships.accepted, true),
+        ))
+        .limit(1);
+      authorized = Boolean(hostMembership);
+    }
+    // Removed member but the service belongs to this team — still visible.
+    if (!authorized && booking.serviceId !== null) {
+      const [teamService] = await db
+        .select({ id: services.id })
+        .from(services)
+        .where(and(eq(services.id, booking.serviceId), eq(services.teamId, teamId)))
+        .limit(1);
+      authorized = Boolean(teamService);
+    }
   }
   if (!authorized) notFound();
 
@@ -77,13 +88,18 @@ export default async function BookingDetailPage({ params }: Props) {
     listBookingActivity(booking.id),
     booking.serviceId
       ? db
-          .select({ bookingFields: services.bookingFields })
+          .select({ bookingFields: services.bookingFields, slug: services.slug, teamId: services.teamId })
           .from(services)
           .where(eq(services.id, booking.serviceId))
           .limit(1)
           .then((rows) => rows[0] ?? null)
       : Promise.resolve(null),
   ]);
+  const [teamRow] = serviceRow
+    ? await db.select({ slug: teams.slug }).from(teams).where(eq(teams.id, serviceRow.teamId)).limit(1)
+    : [];
+  const rescheduleHref =
+    teamRow && serviceRow ? `/book/${teamRow.slug}/${serviceRow.slug}?reschedule=${booking.uid}` : null;
 
   const when = formatRange(booking.startTime, booking.endTime, user.timeZone, user.timeFormat === 12);
   // Custom-question answers via the shared helper: system name/email fields are
@@ -201,7 +217,18 @@ export default async function BookingDetailPage({ params }: Props) {
           ) : canCancel ? (
             <div className="space-y-3 border-b border-border/60 pb-4">
               <h2 className="text-sm font-medium text-foreground">Actions</h2>
-              <CancelBookingButton uid={booking.uid} />
+              <div className="flex flex-wrap gap-2">
+                {rescheduleHref ? (
+                  <a
+                    href={rescheduleHref}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Reschedule
+                  </a>
+                ) : null}
+                <CancelBookingButton uid={booking.uid} />
+              </div>
             </div>
           ) : null}
 

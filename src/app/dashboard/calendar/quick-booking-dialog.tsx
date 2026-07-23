@@ -36,6 +36,8 @@ interface Props {
   /** YYYY-MM-DD the booking is being created on (host timezone). */
   date: string | null;
   services: CalendarService[];
+  /** team roster — managers can book on behalf of a provider; empty otherwise */
+  providers?: { id: number; name: string }[];
 }
 
 /**
@@ -43,7 +45,7 @@ interface Props {
  * or by drag-creating on an empty day. The host picks a service, time, and
  * attendee; the booking is confirmed immediately (manual host booking).
  */
-export function QuickBookingDialog({ open, onOpenChange, date, services }: Props) {
+export function QuickBookingDialog({ open, onOpenChange, date, services, providers = [] }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -54,6 +56,8 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
+  const [providerId, setProviderId] = useState<number | null>(null);
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
 
   // Reset volatile fields each time the dialog opens for a new day.
   useEffect(() => {
@@ -63,6 +67,7 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
       setName("");
       setEmail("");
       setNotes("");
+      setConflictWarning(null);
     }
   }, [open, services]);
 
@@ -73,7 +78,7 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
     if (svc) setDuration(svc.length);
   }
 
-  function submit() {
+  function submit(allowConflict = false) {
     if (!date) return;
     start(async () => {
       const res = await createManualBookingAction({
@@ -85,11 +90,15 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
         name,
         email,
         notes,
+        preferredHostId: providerId ?? undefined,
+        allowConflict,
       });
       if (res?.ok) {
         toast({ title: "Booking created", description: "The attendee was sent a confirmation." });
         onOpenChange(false);
         router.refresh();
+      } else if (res?.conflict) {
+        setConflictWarning(res.error ?? "That provider already has a booking in this time range.");
       } else {
         toast({
           title: "Couldn't create booking",
@@ -138,6 +147,29 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
               </Select>
             </div>
 
+            {providers.length > 1 ? (
+              <div className="space-y-1.5">
+                <Label>Provider</Label>
+                <Select
+                  value={providerId === null ? "auto" : String(providerId)}
+                  onValueChange={(value) => {
+                    setProviderId(value === "auto" ? null : Number(value));
+                    setConflictWarning(null);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto-assign (least busy)</SelectItem>
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="qb-time">Start time</Label>
@@ -181,13 +213,32 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
               />
             </div>
 
+            {conflictWarning ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[13px] text-amber-700 dark:text-amber-300"
+              >
+                {conflictWarning} Booking anyway creates an overlapping appointment.
+              </div>
+            ) : null}
+
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
                 Cancel
               </Button>
-              <Button onClick={submit} disabled={pending || !slug || !name || !email}>
-                {pending ? "Creating…" : "Create booking"}
-              </Button>
+              {conflictWarning ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => submit(true)}
+                  disabled={pending}
+                >
+                  {pending ? "Creating…" : "Book anyway"}
+                </Button>
+              ) : (
+                <Button onClick={() => submit()} disabled={pending || !slug || !name || !email}>
+                  {pending ? "Creating…" : "Create booking"}
+                </Button>
+              )}
             </div>
           </div>
         )}

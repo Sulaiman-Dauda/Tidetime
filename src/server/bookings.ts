@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, attendees, services, serviceProviders, teams, users, bookingReferences, type BookingField } from "@/db/schema";
 import { shortId } from "@/lib/crypto";
@@ -123,26 +123,47 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 
   // Assign exactly one available provider.
   let assignedHost = { id: host.id, name: host.name, username: host.username };
-  const assignment = await assignTeamHost(
-    service.id,
-    start,
-    end,
-    input.preferredHostId,
-  );
-  if (!assignment) {
-    return {
-      ok: false,
-      error: input.preferredHostId
-        ? "That provider isn't available for the selected time. Try another time or pick “Any available”."
-        : "No provider is available for that time",
-      code: "slot_taken",
-    };
+  let assignedUserId: number;
+  if (input.force && input.preferredHostId) {
+    // Manual host bookings choose the provider deliberately and may override
+    // availability — only verify the provider is actually assigned.
+    const [assigned] = await db
+      .select({ userId: serviceProviders.userId })
+      .from(serviceProviders)
+      .where(and(
+        eq(serviceProviders.serviceId, service.id),
+        eq(serviceProviders.userId, input.preferredHostId),
+      ))
+      .limit(1);
+    if (!assigned) return { ok: false, error: "That provider isn't assigned to this service" };
+    assignedUserId = input.preferredHostId;
+  } else {
+    const assignment = await assignTeamHost(
+      service.id,
+      start,
+      end,
+      input.preferredHostId,
+    );
+    if (assignment) {
+      assignedUserId = assignment;
+    } else if (input.force) {
+      // Off-hours manual booking with auto-assign: fall back to the first
+      // assigned provider rather than refusing the host's deliberate action.
+      assignedUserId = host.id;
+    } else {
+      return {
+        ok: false,
+        error: input.preferredHostId
+          ? "That provider isn't available for the selected time. Try another time or pick “Any available”."
+          : "No provider is available for that time",
+        code: "slot_taken",
+      };
+    }
   }
-  const assignedUserId = assignment;
   const [u] = await db
     .select({ id: users.id, name: users.name, username: users.username })
     .from(users)
-    .where(eq(users.id, assignment))
+    .where(eq(users.id, assignedUserId))
     .limit(1);
   if (u) assignedHost = u;
 

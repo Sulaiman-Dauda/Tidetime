@@ -470,6 +470,7 @@ export function CalendarView({
         onOpenChange={setCreateOpen}
         date={createDate}
         services={services}
+        providers={teamMembers}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, memberships, services, serviceProviders, teams, users } from "@/db/schema";
@@ -57,7 +57,11 @@ async function loadEvents(
     .leftJoin(users, eq(users.id, bookings.userId))
     .where(
       and(
-        inArray(bookings.userId, scopeIds),
+        // Members' bookings OR this team's services — robust to both deleted
+        // services and removed members.
+        teamWide
+          ? or(inArray(bookings.userId, scopeIds), eq(services.teamId, teamId))
+          : inArray(bookings.userId, scopeIds),
         inArray(bookings.status, ["accepted", "pending"]),
         gte(bookings.startTime, rangeStart),
         lt(bookings.startTime, rangeEnd),

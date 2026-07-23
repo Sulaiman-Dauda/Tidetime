@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAnyPermission } from "@/lib/guard";
 import { moveBooking, createBooking } from "@/server/bookings";
+import { hostHasConflict } from "@/server/availability";
 import { zonedTimeToUtc } from "@/lib/time";
 import { bookingForActor } from "@/server/booking-authorization";
 import { can } from "@/lib/rbac";
@@ -40,9 +41,19 @@ export interface ManualBookingInput {
   name: string;
   email: string;
   notes?: string;
+  /** team managers can book on behalf of a specific provider */
+  preferredHostId?: number;
+  /** set after the user explicitly confirmed a double-booking warning */
+  allowConflict?: boolean;
 }
 
-export type ManualBookingState = { ok?: boolean; uid?: string; error?: string } | null;
+export type ManualBookingState = {
+  ok?: boolean;
+  uid?: string;
+  error?: string;
+  /** the chosen provider already has a booking then — needs explicit confirm */
+  conflict?: boolean;
+} | null;
 
 /**
  * Drag-to-create / quick-add from the dashboard calendar: the host books a slot
@@ -71,10 +82,28 @@ export async function createManualBookingAction(
   }
 
   const start = zonedTimeToUtc(y, mo, d, hh, mm, user.timeZone);
+  const end = new Date(start.getTime() + input.durationMin * 60_000);
+
+  // Managers may book for any provider; members always book themselves.
+  const teamManager = can(role, "booking.all.manage");
+  const preferredHostId = teamManager ? input.preferredHostId : user.id;
+
+  // The trusted force path skips availability on purpose, but a silent
+  // double-booking is never what the host meant — warn once and require an
+  // explicit confirm.
+  if (preferredHostId && !input.allowConflict) {
+    if (await hostHasConflict(preferredHostId, start, end)) {
+      return {
+        conflict: true,
+        error: "That provider already has a booking in this time range.",
+      };
+    }
+  }
+
   const res = await createBooking({
     slug: input.slug,
     teamSlug: input.teamSlug,
-    preferredHostId: can(role, "booking.all.manage") ? undefined : user.id,
+    preferredHostId,
     start: start.toISOString(),
     duration: input.durationMin,
     timeZone: user.timeZone,
@@ -85,5 +114,7 @@ export async function createManualBookingAction(
   });
   if (!res.ok) return { error: res.error };
   revalidatePath("/dashboard/calendar");
+  revalidatePath("/dashboard/bookings");
+  revalidatePath("/dashboard");
   return { ok: true, uid: res.uid };
 }

@@ -21,10 +21,7 @@ export default function Loading() {
                 <Skeleton className="h-3 w-24" />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-8 w-20 rounded-md" />
-              <Skeleton className="h-8 w-20 rounded-md" />
-            </div>
+            <Skeleton className="h-8 w-24 rounded-md" />
           </div>
         ))}
       </div>

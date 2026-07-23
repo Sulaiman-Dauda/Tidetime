@@ -5,7 +5,7 @@ import { DashboardOverview, type OverviewData } from "./_components/dashboard-ov
 import { getAppUrl } from "@/server/app-url";
 import { db } from "@/db";
 import { attendees, bookings, memberships, services, teams, users } from "@/db/schema";
-import { and, asc, count, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { getZonedParts, zonedTimeToUtc, addDaysToKey } from "@/lib/time";
 
 export const metadata = { title: "Overview" };
@@ -30,7 +30,11 @@ async function loadOverview(
         .where(and(eq(memberships.teamId, teamId), eq(memberships.accepted, true)))
     : [];
   const scopeIds = teamWide ? memberRows.map((row) => row.userId) : [userId];
-  const scope = inArray(bookings.userId, scopeIds);
+  // Members' bookings OR this team's services — robust to both deleted
+  // services and removed members. Every query below left-joins services.
+  const scope = teamWide
+    ? or(inArray(bookings.userId, scopeIds), eq(services.teamId, teamId))!
+    : inArray(bookings.userId, scopeIds);
 
   // Day windows in the viewer's timezone — the server's clock must not decide
   // what "today" means.
@@ -59,17 +63,17 @@ async function loadOverview(
 
   const [upcomingCount, pendingCount, todayCount, todayRows, weekRows, nextRows] =
     await Promise.all([
-      db.select({ value: count() }).from(bookings).where(and(
+      db.select({ value: count() }).from(bookings).leftJoin(services, eq(services.id, bookings.serviceId)).where(and(
         scope,
         eq(bookings.status, "accepted"),
         gte(bookings.endTime, now),
       )),
-      db.select({ value: count() }).from(bookings).where(and(
+      db.select({ value: count() }).from(bookings).leftJoin(services, eq(services.id, bookings.serviceId)).where(and(
         scope,
         eq(bookings.status, "pending"),
         gte(bookings.endTime, now),
       )),
-      db.select({ value: count() }).from(bookings).where(and(
+      db.select({ value: count() }).from(bookings).leftJoin(services, eq(services.id, bookings.serviceId)).where(and(
         scope,
         eq(bookings.status, "accepted"),
         gte(bookings.startTime, todayStart),
