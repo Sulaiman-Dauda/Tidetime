@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { webhooks } from "@/db/schema";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { GoogleCalendarSettings } from "./google-calendar-settings";
+import { MicrosoftCalendarSettings } from "./microsoft-calendar-settings";
 import { EmailSettings } from "./email-settings";
 import { WebhookManager } from "./webhook-manager";
 
@@ -23,8 +24,9 @@ export default async function IntegrationsPage() {
           ? "Connect calendars, email delivery, and Zapier webhooks."
           : "Connect your calendar to prevent conflicts and keep bookings in sync."}
       />
-      <div className={user.isAdmin ? "grid gap-6 lg:grid-cols-2" : "max-w-2xl"}>
+      <div className={user.isAdmin ? "grid gap-6 lg:grid-cols-2" : "grid max-w-2xl gap-6"}>
         <GoogleCalendarSettings />
+        <MicrosoftCalendarSettings />
         {user.isAdmin ? <EmailSettings /> : null}
       </div>
       {user.isAdmin ? <WebhookManager hooks={hooks} /> : null}

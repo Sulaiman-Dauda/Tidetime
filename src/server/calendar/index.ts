@@ -7,6 +7,7 @@ import {
   updateGoogleCalendarEvent,
   type BusyInterval,
 } from "../google-calendar";
+import { fetchMicrosoftBusyTime, isMicrosoftCalendarConnected } from "../microsoft-calendar";
 import { invalidateCalendarCache, readBusyCache, writeBusyCache } from "./cache";
 
 export type { BusyInterval };
@@ -30,7 +31,7 @@ export interface CreatedCalendarRef {
   meetingUrl?: string;
 }
 
-/** Fetch Google busy-times with a short read-through cache. */
+/** External busy-times (Google + Microsoft 365) with a short read-through cache. */
 export async function fetchBusyTimes(
   userId: number,
   rangeStart: Date,
@@ -38,9 +39,18 @@ export async function fetchBusyTimes(
 ): Promise<BusyInterval[]> {
   const cached = await readBusyCache(userId, rangeStart, rangeEnd).catch(() => null);
   if (cached) return cached;
-  if (!(await isGoogleConnected(userId).catch(() => false))) return [];
 
-  const busy = await fetchGoogleBusyTime(userId, rangeStart, rangeEnd).catch(() => []);
+  const [googleConnected, microsoftConnected] = await Promise.all([
+    isGoogleConnected(userId).catch(() => false),
+    isMicrosoftCalendarConnected(userId).catch(() => false),
+  ]);
+  if (!googleConnected && !microsoftConnected) return [];
+
+  const [googleBusy, microsoftBusy] = await Promise.all([
+    googleConnected ? fetchGoogleBusyTime(userId, rangeStart, rangeEnd).catch(() => []) : [],
+    microsoftConnected ? fetchMicrosoftBusyTime(userId, rangeStart, rangeEnd).catch(() => []) : [],
+  ]);
+  const busy = [...googleBusy, ...microsoftBusy];
   await writeBusyCache(userId, rangeStart, rangeEnd, busy).catch(() => undefined);
   return busy;
 }

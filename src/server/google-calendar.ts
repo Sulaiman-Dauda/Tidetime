@@ -71,12 +71,12 @@ export async function exchangeGoogleCode(code: string, userId: number): Promise<
   const { tokens } = await oauth.getToken(code);
   if (!tokens.access_token) throw new Error("Google returned no access token");
 
-  await db.delete(credentials).where(eq(credentials.userId, userId));
+  await db.delete(credentials).where(and(eq(credentials.userId, userId), eq(credentials.provider, "google")));
 
   const encrypted = encrypt(JSON.stringify(tokens));
   await db
     .insert(credentials)
-    .values({ userId, key: encrypted });
+    .values({ userId, provider: "google", key: encrypted });
 }
 
 /** Retrieve and refresh the Google credential for a user. */
@@ -84,7 +84,7 @@ async function getGoogleCredential(userId: number): Promise<{ oauth: Awaited<Ret
   const [cred] = await db
     .select()
     .from(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.invalid, false)))
+    .where(and(eq(credentials.userId, userId), eq(credentials.provider, "google"), eq(credentials.invalid, false)))
     .limit(1);
   if (!cred) return null;
 
@@ -114,7 +114,7 @@ async function getGoogleCredential(userId: number): Promise<{ oauth: Awaited<Ret
 
 /** Disconnect Google Calendar for a user. */
 export async function disconnectGoogleCalendar(userId: number): Promise<void> {
-  await db.delete(credentials).where(eq(credentials.userId, userId));
+  await db.delete(credentials).where(and(eq(credentials.userId, userId), eq(credentials.provider, "google")));
   await db.delete(selectedCalendars).where(eq(selectedCalendars.userId, userId));
   await db.delete(destinationCalendars).where(eq(destinationCalendars.userId, userId));
 }
@@ -125,7 +125,7 @@ export async function isGoogleConnected(userId: number): Promise<boolean> {
   const [cred] = await db
     .select({ id: credentials.id })
     .from(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.invalid, false)))
+    .where(and(eq(credentials.userId, userId), eq(credentials.provider, "google"), eq(credentials.invalid, false)))
     .limit(1);
   return Boolean(cred);
 }
@@ -140,7 +140,7 @@ export async function hasExpiredGoogleCredential(userId: number): Promise<boolea
   const [cred] = await db
     .select({ id: credentials.id })
     .from(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.invalid, true)))
+    .where(and(eq(credentials.userId, userId), eq(credentials.provider, "google"), eq(credentials.invalid, true)))
     .limit(1);
   return Boolean(cred);
 }
