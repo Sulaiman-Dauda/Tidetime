@@ -7,7 +7,8 @@ import { getCompanySettings } from "@/server/company-settings";
 import { issueBotChallenge } from "@/lib/bot-challenge";
 import { env } from "@/lib/env";
 import type { FieldValues } from "@/lib/booking-fields";
-import { BookingFlow, type BookingPrefill } from "../../../_components/booking-flow";
+import { formatDuration } from "@/lib/format";
+import { BookingFlow, type BookingPrefill, type LegalLink } from "../../../_components/booking-flow";
 import { PublicLegal } from "../../../_components/public-legal";
 import { CompanyBrandHeader } from "../../../_components/company-brand-header";
 
@@ -24,9 +25,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { team, slug } = await params;
   const data = await getTeamService(team, slug);
   if (!data) return { title: "Not found" };
+  const title = `${data.service.title} · ${data.team.name}`;
+  const description =
+    data.service.description ??
+    `Book ${data.service.title} (${formatDuration(data.service.length)}) with ${data.team.name}.`;
+  // Open Graph/Twitter cards make shared booking links render professionally
+  // in chat apps and social feeds.
   return {
-    title: `${data.service.title} · ${data.team.name}`,
-    description: data.service.description ?? `Book ${data.service.title} with ${data.team.name}.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: data.team.name,
+      type: "website",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
   };
 }
 
@@ -42,6 +60,15 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
   const { team: teamRow, service } = data;
   const disabled = settings.booking.bookingDisabled;
   const teamHosts = await getTeamHosts(service.id);
+
+  // Same visibility rules as the PublicLegal footer.
+  const legalLinks: LegalLink[] = [];
+  if (settings.legal.termsEnabled && settings.legal.termsContent.trim()) {
+    legalLinks.push({ label: "Terms & Conditions", href: "/legal/terms", external: false });
+  }
+  if (settings.legal.privacyEnabled && settings.legal.privacyContent.trim()) {
+    legalLinks.push({ label: "Privacy Policy", href: "/legal/privacy", external: false });
+  }
 
   // On reschedule, prefill the booker's existing details so they don't re-enter
   // them. Only trust the stored booking when it belongs to this same service and
@@ -112,6 +139,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
         botChallenge={issueBotChallenge(env.authSecret)}
         teamHosts={teamHosts}
         prefill={prefill}
+        legalLinks={legalLinks}
       />
       <PublicLegal />
     </main>

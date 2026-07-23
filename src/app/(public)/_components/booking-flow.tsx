@@ -75,6 +75,22 @@ export type BookingPrefill = {
   guests: string[];
 };
 
+export type LegalLink = { label: string; href: string; external: boolean };
+
+/** First day of week (0=Sun) from the visitor's locale, when the browser knows it. */
+function localeWeekStart(): number {
+  try {
+    const locale = new Intl.Locale(navigator.language);
+    const info = (locale as unknown as { weekInfo?: { firstDay?: number } }).weekInfo
+      ?? (locale as unknown as { getWeekInfo?: () => { firstDay?: number } }).getWeekInfo?.();
+    // weekInfo.firstDay is 1-7 with 7 = Sunday
+    if (info?.firstDay) return info.firstDay % 7;
+  } catch {
+    // fall through to Sunday
+  }
+  return 0;
+}
+
 type Props = {
   slug: string;
   teamSlug: string;
@@ -87,15 +103,17 @@ type Props = {
   teamHosts?: Host[];
   /** When rescheduling, the existing booking's details so the booker doesn't re-enter them */
   prefill?: BookingPrefill;
+  /** configured legal pages, linked in the consent microcopy under the submit button */
+  legalLinks?: LegalLink[];
 };
 
 function dayKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function monthMatrix(year: number, month: number): (Date | null)[] {
+function monthMatrix(year: number, month: number, weekStart: number): (Date | null)[] {
   const cells: (Date | null)[] = [];
-  const firstWeekday = new Date(year, month, 1).getDay();
+  const firstWeekday = (new Date(year, month, 1).getDay() - weekStart + 7) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   for (let index = 0; index < firstWeekday; index += 1) cells.push(null);
@@ -161,6 +179,7 @@ export function BookingFlow({
   botChallenge,
   teamHosts = [],
   prefill,
+  legalLinks = [],
 }: Props) {
   const router = useRouter();
   const [duration, setDuration] = useState(service.length);
@@ -171,10 +190,36 @@ export function BookingFlow({
   const [loading, setLoading] = useState(true);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  // Day selection is remembered per month, so paging to another month and back
+  // doesn't lose the choice.
+  const [dayByMonth, setDayByMonth] = useState<Record<string, string>>({});
+  const [pendingSlot, setPendingSlot] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [hour12, setHour12] = useState(true);
+  const [weekStart, setWeekStart] = useState(0);
   const [step, setStep] = useState<"time" | "details">("time");
+  const [nextAvailable, setNextAvailable] = useState<{ month: Date; day: string } | null>(null);
+  // Preserved form answers after a slot conflict bounced the booker back.
+  const [draft, setDraft] = useState<{ values: FieldValues; guests: string } | null>(null);
+  const [conflictNotice, setConflictNotice] = useState(false);
   const slotCache = useRef<Record<string, Record<string, string[]>>>({});
+
+  const monthKey = `${viewDate.getFullYear()}-${viewDate.getMonth()}`;
+  const selectedDay = dayByMonth[monthKey] ?? null;
+  const setSelectedDay = useCallback(
+    (day: string | null) => {
+      setDayByMonth((current) => {
+        if (day === null) {
+          if (!(monthKey in current)) return current;
+          const next = { ...current };
+          delete next[monthKey];
+          return next;
+        }
+        return { ...current, [monthKey]: day };
+      });
+    },
+    [monthKey],
+  );
 
   useEffect(() => {
     try {
@@ -182,6 +227,7 @@ export function BookingFlow({
     } catch {
       // The schedule timezone remains the safe fallback.
     }
+    setWeekStart(localeWeekStart());
   }, [service.scheduleTimeZone]);
 
   useEffect(() => {
@@ -239,7 +285,55 @@ export function BookingFlow({
       .sort()
       .find((key) => slots[key]?.length);
     if (firstAvailableDay) setSelectedDay(firstAvailableDay);
-  }, [loading, selectedDay, slotError, slots]);
+  }, [loading, selectedDay, slotError, slots, setSelectedDay]);
+
+  // When the visible month has no availability at all, probe ahead (up to six
+  // months) so the empty state can offer a one-click jump to the next opening.
+  useEffect(() => {
+    const hasAvailability = Object.values(slots).some((day) => day.length > 0);
+    if (loading || slotError || hasAvailability) {
+      setNextAvailable(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      for (let offset = 1; offset <= 6 && !cancelled; offset += 1) {
+        const probe = new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1);
+        const query = new URLSearchParams({
+          team: teamSlug,
+          slug,
+          start: dayKey(probe),
+          end: dayKey(new Date(probe.getFullYear(), probe.getMonth() + 1, 0)),
+          duration: String(duration),
+          tz: timeZone,
+        });
+        if (providerId) query.set("host", String(providerId));
+        try {
+          const cached = slotCache.current[query.toString()];
+          const byDay =
+            cached ??
+            ((await (await fetch(`/api/slots/team?${query}`)).json()) as {
+              byDay?: Record<string, string[]>;
+            }).byDay ??
+            {};
+          slotCache.current[query.toString()] = byDay;
+          const first = Object.keys(byDay)
+            .sort()
+            .find((key) => byDay[key]?.length);
+          if (first) {
+            if (!cancelled) setNextAvailable({ month: probe, day: first });
+            return;
+          }
+        } catch {
+          break;
+        }
+      }
+      if (!cancelled) setNextAvailable(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, slotError, slots, viewDate, teamSlug, slug, duration, timeZone, providerId]);
 
   const durations = useMemo(
     () => [...new Set([service.length, ...service.durations])].sort((a, b) => a - b),
@@ -254,7 +348,11 @@ export function BookingFlow({
     [teamHosts, providerId],
   );
   const timeZones = useMemo(() => listTimeZones(), []);
-  const calendarDays = monthMatrix(viewDate.getFullYear(), viewDate.getMonth());
+  const calendarDays = monthMatrix(viewDate.getFullYear(), viewDate.getMonth(), weekStart);
+  const weekdays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => WEEKDAY_SHORT[(i + weekStart) % 7]),
+    [weekStart],
+  );
   const today = dayKey(new Date());
   const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const canGoBack =
@@ -263,7 +361,8 @@ export function BookingFlow({
   const daySlots = selectedDay ? slots[selectedDay] ?? [] : [];
 
   const finishBooking = useCallback(
-    (uid: string) => router.push(`/booking/${uid}`),
+    // confirmed=1 triggers the one-time success animation on the detail page.
+    (uid: string) => router.push(`/booking/${uid}?confirmed=1`),
     [router],
   );
 
@@ -271,14 +370,34 @@ export function BookingFlow({
     setViewDate(
       (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
-    setSelectedDay(null);
+    // The per-month day selection survives paging; only the unconfirmed slot resets.
+    setPendingSlot(null);
+    setSelectedSlot(null);
+  }
+
+  /** Availability inputs changed — every remembered selection is stale. */
+  function resetSelection() {
+    setDayByMonth({});
+    setPendingSlot(null);
     setSelectedSlot(null);
   }
 
   function chooseSlot(slot: string) {
     setSelectedSlot(slot);
+    setConflictNotice(false);
     setStep("details");
   }
+
+  const handleSlotTaken = useCallback((values: FieldValues, guests: string) => {
+    setDraft({ values, guests });
+    setConflictNotice(true);
+    // The cached availability is what let the booker pick a dead slot — drop it.
+    slotCache.current = {};
+    setReloadNonce((value) => value + 1);
+    setPendingSlot(null);
+    setSelectedSlot(null);
+    setStep("time");
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:py-10">
@@ -372,7 +491,7 @@ export function BookingFlow({
                   value={timeZone}
                   onValueChange={(value) => {
                     setTimeZone(value);
-                    setSelectedDay(null);
+                    resetSelection();
                   }}
                 >
                   <SelectTrigger
@@ -405,7 +524,7 @@ export function BookingFlow({
                   value={providerId ? String(providerId) : "any"}
                   onValueChange={(value) => {
                     setProviderId(value === "any" ? null : Number(value));
-                    setSelectedDay(null);
+                    resetSelection();
                   }}
                 >
                   <SelectTrigger className="mt-1.5 h-9 w-full bg-background text-[13px]">
@@ -433,7 +552,7 @@ export function BookingFlow({
                       type="button"
                       onClick={() => {
                         setDuration(value);
-                        setSelectedDay(null);
+                        resetSelection();
                       }}
                       className={cn(
                         "rounded-full border px-2.5 py-1 text-xs font-medium transition",
@@ -458,17 +577,35 @@ export function BookingFlow({
                 service={service}
                 duration={duration}
                 timeZone={timeZone}
+                hour12={hour12}
                 slot={selectedSlot}
+                provider={displayHost}
+                anyProvider={!displayHost && teamHosts.length > 1}
                 preferredHostId={providerId ?? undefined}
                 rescheduleUid={rescheduleUid}
                 spamProtection={spamProtection}
                 botChallenge={botChallenge}
                 prefill={prefill}
+                draft={draft}
+                legalLinks={legalLinks}
+                onSlotTaken={handleSlotTaken}
                 onBack={() => setStep("time")}
                 onBooked={finishBooking}
               />
             ) : (
               <>
+                {conflictNotice ? (
+                  <div
+                    role="alert"
+                    className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
+                  >
+                    <p className="font-semibold">That time was just taken</p>
+                    <p className="mt-0.5 text-[13px]">
+                      Someone booked it while you were filling in your details. Your answers are
+                      saved — just pick another time.
+                    </p>
+                  </div>
+                ) : null}
                 <h2 className="text-lg font-semibold tracking-tight">Select a date &amp; time</h2>
                 <p className="mt-0.5 text-[13px] text-muted-foreground">
                   Times are shown in your selected timezone.
@@ -477,8 +614,8 @@ export function BookingFlow({
                 <div className="mt-5 grid gap-6 md:grid-cols-[minmax(272px,1fr)_188px]">
                   <div>
                     <div className="flex items-center justify-between">
-                      <h3 className="text-[13px] font-semibold">
-                        {viewDate.toLocaleDateString("en-US", {
+                      <h3 className="text-[13px] font-semibold" suppressHydrationWarning>
+                        {viewDate.toLocaleDateString(undefined, {
                           month: "long",
                           year: "numeric",
                         })}
@@ -509,7 +646,7 @@ export function BookingFlow({
                     </div>
 
                     <div className="mt-3 grid grid-cols-7 gap-1 text-center">
-                      {WEEKDAY_SHORT.map((weekday) => (
+                      {weekdays.map((weekday) => (
                         <div
                           key={weekday}
                           className="py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70"
@@ -518,7 +655,14 @@ export function BookingFlow({
                         </div>
                       ))}
                     </div>
-                    <div className="grid grid-cols-7 gap-1">
+                    {loading && Object.keys(slots).length === 0 ? (
+                      <div className="grid grid-cols-7 gap-1">
+                        {Array.from({ length: 35 }, (_, index) => (
+                          <Skeleton key={index} className="aspect-square rounded-full" />
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className={cn("grid grid-cols-7 gap-1", loading && Object.keys(slots).length === 0 && "hidden")}>
                       {calendarDays.map((date, index) => {
                         if (!date) return <div key={`empty-${index}`} />;
                         const key = dayKey(date);
@@ -532,7 +676,7 @@ export function BookingFlow({
                             type="button"
                             data-testid={available && !past ? "day-available" : undefined}
                             disabled={!available || past || loading}
-                            aria-label={date.toLocaleDateString("en-US", {
+                            aria-label={date.toLocaleDateString(undefined, {
                               weekday: "long",
                               month: "long",
                               day: "numeric",
@@ -540,6 +684,7 @@ export function BookingFlow({
                             aria-pressed={selected}
                             onClick={() => {
                               setSelectedDay(key);
+                              setPendingSlot(null);
                               setSelectedSlot(null);
                             }}
                             className={cn(
@@ -568,18 +713,76 @@ export function BookingFlow({
                         Loading availability…
                       </div>
                     ) : null}
+
+                    {!loading && !slotError && nextAvailable ? (
+                      <div className="mt-4 rounded-xl border border-dashed border-border/80 bg-muted/30 px-4 py-3 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          No availability this month.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => {
+                            const key = `${nextAvailable.month.getFullYear()}-${nextAvailable.month.getMonth()}`;
+                            setViewDate(nextAvailable.month);
+                            setDayByMonth((current) => ({ ...current, [key]: nextAvailable.day }));
+                            setPendingSlot(null);
+                            setSelectedSlot(null);
+                          }}
+                        >
+                          Next available:{" "}
+                          {new Date(`${nextAvailable.day}T12:00:00`).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="min-w-0 border-t pt-5 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                    <div className="flex min-h-8 items-center gap-2 text-[13px] font-semibold">
-                      <Calendar className="h-4 w-4 text-muted-foreground/80" />
-                      {selectedDay
-                        ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString("en-US", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : "Select a date"}
+                    <div className="flex min-h-8 items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-[13px] font-semibold">
+                        <Calendar className="h-4 w-4 text-muted-foreground/80" />
+                        {selectedDay
+                          ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString(undefined, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "Select a date"}
+                      </div>
+                      <div
+                        className="flex overflow-hidden rounded-md border border-border/80 text-[11px] font-semibold"
+                        role="group"
+                        aria-label="Time format"
+                      >
+                        <button
+                          type="button"
+                          aria-pressed={hour12}
+                          onClick={() => setHour12(true)}
+                          className={cn(
+                            "px-1.5 py-0.5 transition",
+                            hour12 ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          12h
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={!hour12}
+                          onClick={() => setHour12(false)}
+                          className={cn(
+                            "px-1.5 py-0.5 transition",
+                            !hour12 ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          24h
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-3 max-h-[344px] space-y-1.5 overflow-y-auto pr-1">
@@ -612,21 +815,42 @@ export function BookingFlow({
                           No times available on this date.
                         </p>
                       ) : (
-                        daySlots.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            data-testid="slot"
-                            onClick={() => chooseSlot(slot)}
-                            className="w-full rounded-lg border border-input bg-background py-2.5 text-[13px] font-semibold text-foreground transition hover:border-primary hover:bg-primary hover:text-primary-foreground active:scale-[0.99]"
-                          >
-                            {new Date(slot).toLocaleTimeString("en-US", {
-                              hour: "numeric",
-                              minute: "2-digit",
-                              timeZone,
-                            })}
-                          </button>
-                        ))
+                        daySlots.map((slot) => {
+                          const label = new Date(slot).toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12,
+                            timeZone,
+                          });
+                          // Calendly-style confirm: the first click arms the slot,
+                          // splitting it into the time + an explicit Next button.
+                          return pendingSlot === slot ? (
+                            <div key={slot} className="flex gap-1.5">
+                              <div className="flex-1 select-none rounded-lg border border-transparent bg-muted py-2.5 text-center text-[13px] font-semibold text-muted-foreground">
+                                {label}
+                              </div>
+                              <button
+                                type="button"
+                                data-testid="slot-confirm"
+                                autoFocus
+                                onClick={() => chooseSlot(slot)}
+                                className="flex-1 rounded-lg bg-primary py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-[0.99]"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              key={slot}
+                              type="button"
+                              data-testid="slot"
+                              onClick={() => setPendingSlot(slot)}
+                              className="w-full rounded-lg border border-input bg-background py-2.5 text-[13px] font-semibold text-foreground transition hover:border-primary hover:bg-primary hover:text-primary-foreground active:scale-[0.99]"
+                            >
+                              {label}
+                            </button>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -646,12 +870,18 @@ function BookingForm({
   service,
   duration,
   timeZone,
+  hour12,
   slot,
+  provider,
+  anyProvider,
   preferredHostId,
   rescheduleUid,
   spamProtection,
   botChallenge,
   prefill,
+  draft,
+  legalLinks = [],
+  onSlotTaken,
   onBack,
   onBooked,
 }: {
@@ -660,12 +890,21 @@ function BookingForm({
   service: ServiceView;
   duration: number;
   timeZone: string;
+  hour12: boolean;
   slot: string;
+  /** the provider this meeting will be with, when known */
+  provider?: Host | null;
+  /** multiple providers and none chosen — round-robin assigns one */
+  anyProvider?: boolean;
   preferredHostId?: number;
   rescheduleUid?: string;
   spamProtection?: boolean;
   botChallenge?: string;
   prefill?: BookingPrefill;
+  /** answers preserved from a submit that lost its slot */
+  draft?: { values: FieldValues; guests: string } | null;
+  legalLinks?: LegalLink[];
+  onSlotTaken: (values: FieldValues, guests: string) => void;
   onBack: () => void;
   onBooked: (uid: string) => void;
 }) {
@@ -673,19 +912,35 @@ function BookingForm({
     bookAction,
     null,
   );
-  const [values, setValues] = useState<FieldValues>(() => ({
-    ...(prefill?.responses ?? {}),
-    name: prefill?.name ?? "",
-    email: prefill?.email ?? "",
-  }));
-  const [guestEmails, setGuestEmails] = useState(() => (prefill?.guests ?? []).join(", "));
+  const [values, setValues] = useState<FieldValues>(() =>
+    draft
+      ? draft.values
+      : {
+          ...(prefill?.responses ?? {}),
+          name: prefill?.name ?? "",
+          email: prefill?.email ?? "",
+        },
+  );
+  const [guestEmails, setGuestEmails] = useState(() =>
+    draft ? draft.guests : (prefill?.guests ?? []).join(", "),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [altcha, setAltcha] = useState<string | null>(null);
   const renderedAt = useRef(Date.now());
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const guestsRef = useRef(guestEmails);
+  guestsRef.current = guestEmails;
 
   useEffect(() => {
     if (state?.uid) onBooked(state.uid);
   }, [state?.uid, onBooked]);
+
+  // The slot was taken mid-form: hand the answers back to the parent so the
+  // booker can pick a new time without retyping anything.
+  useEffect(() => {
+    if (state?.conflict) onSlotTaken(valuesRef.current, guestsRef.current);
+  }, [state, onSlotTaken]);
 
   const customFields = service.bookingFields.filter(
     (field) => !["name", "email"].includes(field.name),
@@ -756,7 +1011,7 @@ function BookingForm({
           </div>
           <div>
             <p className="text-[15px] font-semibold">
-              {new Date(slot).toLocaleDateString("en-US", {
+              {new Date(slot).toLocaleDateString(undefined, {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
@@ -764,9 +1019,10 @@ function BookingForm({
               })}
             </p>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              {new Date(slot).toLocaleTimeString("en-US", {
+              {new Date(slot).toLocaleTimeString(undefined, {
                 hour: "numeric",
                 minute: "2-digit",
+                hour12,
                 timeZone,
               })}
               {" · "}
@@ -776,6 +1032,39 @@ function BookingForm({
             </p>
           </div>
         </div>
+        {provider || anyProvider ? (
+          <div className="mt-3 flex items-center gap-2.5 border-t border-border/60 pt-3">
+            {provider ? (
+              <>
+                <Avatar className="h-8 w-8 border bg-background">
+                  {provider.avatarUrl ? (
+                    <AvatarImage src={provider.avatarUrl} alt={provider.name ?? provider.username} />
+                  ) : null}
+                  <AvatarFallback className="text-[10px] font-semibold">
+                    {initials(provider.name ?? provider.username)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium">
+                    {provider.name ?? provider.username}
+                  </p>
+                  {provider.position ? (
+                    <p className="truncate text-xs text-muted-foreground">{provider.position}</p>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Users className="h-4 w-4" />
+                </div>
+                <p className="text-[13px] text-muted-foreground">
+                  With the first available provider
+                </p>
+              </>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-6">
@@ -865,7 +1154,7 @@ function BookingForm({
           </div>
         ) : null}
 
-        {state?.error ? (
+        {state?.error && !state.conflict ? (
           <div
             role="alert"
             className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -896,7 +1185,27 @@ function BookingForm({
         </Button>
 
         <p className="text-center text-xs leading-5 text-muted-foreground">
-          By continuing, you agree to receive emails about this booking.
+          By continuing, you agree to receive emails about this booking
+          {legalLinks.length > 0 ? (
+            <>
+              {" "}
+              and accept our{" "}
+              {legalLinks.map((link, index) => (
+                <span key={link.label}>
+                  {index > 0 ? (index === legalLinks.length - 1 ? " and " : ", ") : null}
+                  <a
+                    href={link.href}
+                    target={link.external ? "_blank" : undefined}
+                    rel={link.external ? "noopener noreferrer" : undefined}
+                    className="font-medium text-foreground underline-offset-2 hover:underline"
+                  >
+                    {link.label}
+                  </a>
+                </span>
+              ))}
+            </>
+          ) : null}
+          .
         </p>
       </form>
     </div>
@@ -966,6 +1275,7 @@ function CustomField({
       label={field.label}
       htmlFor={field.name}
       required={field.required}
+      hint={field.type === "phone" ? "Include your country code, e.g. +44" : undefined}
       error={error}
     >
       {field.type === "textarea" ? (
@@ -980,6 +1290,9 @@ function CustomField({
         <Input
           id={field.name}
           type={inputType}
+          inputMode={field.type === "phone" ? "tel" : field.type === "number" ? "numeric" : undefined}
+          autoComplete={field.type === "phone" ? "tel" : undefined}
+          placeholder={field.type === "phone" ? "+44 7700 900123" : undefined}
           aria-invalid={Boolean(error)}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}

@@ -38,7 +38,12 @@ const bookingSchema = z.object({
   altcha: z.string().optional(),
 });
 
-export type BookActionState = { error?: string; uid?: string } | null;
+export type BookActionState = {
+  error?: string;
+  uid?: string;
+  /** the chosen slot was taken while the booker filled the form */
+  conflict?: boolean;
+} | null;
 
 export async function bookAction(_prev: BookActionState, formData: FormData): Promise<BookActionState> {
   const raw = formData.get("payload");
@@ -100,7 +105,12 @@ export async function bookAction(_prev: BookActionState, formData: FormData): Pr
 
   const { hp: _hp, ts: _ts, bc: _bc, altcha: _altcha, ...bookingInput } = result.data;
   const booking = await createBooking({ ...bookingInput, idempotencyKey });
-  if (!booking.ok) return { error: booking.error ?? "Could not complete booking" };
+  if (!booking.ok) {
+    return {
+      error: booking.error ?? "Could not complete booking",
+      conflict: booking.code === "slot_taken",
+    };
+  }
   return { uid: booking.uid };
 }
 

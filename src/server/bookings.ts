@@ -58,6 +58,8 @@ export interface BookingResult {
   ok: boolean;
   uid?: string;
   error?: string;
+  /** machine-readable failure kind — "slot_taken" lets the UI recover gracefully */
+  code?: "slot_taken";
 }
 
 function validateResponses(fields: BookingField[], responses: Record<string, unknown>): string | null {
@@ -133,6 +135,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       error: input.preferredHostId
         ? "That provider isn't available for the selected time. Try another time or pick “Any available”."
         : "No provider is available for that time",
+      code: "slot_taken",
     };
   }
   const assignedUserId = assignment;
@@ -153,7 +156,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   };
   // Manual dashboard bookings (`force`) submit a bare { notes } that never went
   // through the service's form, so the literal key is authoritative there.
-  const attendeePhone = input.force ? undefined : responseForType("phone");
+  // Keep a leading "+" and digits only so stored numbers are dialable.
+  const rawPhone = input.force ? undefined : responseForType("phone");
+  const attendeePhone = rawPhone
+    ? `${rawPhone.startsWith("+") ? "+" : ""}${rawPhone.replace(/\D/g, "")}`.slice(0, 32)
+    : undefined;
   // uid is needed up-front so the built-in Jitsi room can be derived from it.
   const uid = shortId(12);
   const { location, meetingUrl } = resolveLocation(service.locations[0], attendeePhone, uid);
@@ -253,7 +260,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   });
 
   if ("conflict" in txResult) {
-    return { ok: false, error: "That time is no longer available" };
+    return { ok: false, error: "That time is no longer available", code: "slot_taken" };
   }
   if ("duplicateUid" in txResult) {
     return { ok: true, uid: txResult.duplicateUid };
@@ -452,12 +459,12 @@ export async function getBookingByUid(uid: string) {
   const [b] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!b) return null;
   const ats = await db.select().from(attendees).where(eq(attendees.bookingId, b.id));
-  let host: { username: string; name: string | null; avatarUrl: string | null } | null = null;
+  let host: { username: string; name: string | null; avatarUrl: string | null; position: string | null } | null = null;
   let slug: string | null = null;
   let team: { slug: string; name: string } | null = null;
   let service: { title: string; bookingFields: BookingField[] } | null = null;
   if (b.userId) {
-    const [u] = await db.select({ username: users.username, name: users.name, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, b.userId)).limit(1);
+    const [u] = await db.select({ username: users.username, name: users.name, avatarUrl: users.avatarUrl, position: users.position }).from(users).where(eq(users.id, b.userId)).limit(1);
     host = u ?? null;
   }
   if (b.serviceId) {
