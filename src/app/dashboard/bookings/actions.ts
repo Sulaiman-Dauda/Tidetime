@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, bookingHosts } from "@/db/schema";
+import { bookings } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { decideBooking } from "@/server/bookings";
 import { cancelBooking } from "@/server/bookings";
@@ -31,25 +31,14 @@ export async function cancelByHostAction(formData: FormData) {
   const uid = formData.get("uid");
   if (typeof uid !== "string") return;
 
-  // Ownership: only the assigned host or a co-host on the booking may cancel it
-  // (mirrors decideBooking). Without this any signed-in user who learns a uid
-  // could cancel a booking they don't own.
+  // Ownership: only the assigned provider may cancel the booking.
   const [b] = await db
     .select({ id: bookings.id, userId: bookings.userId })
     .from(bookings)
     .where(eq(bookings.uid, uid))
     .limit(1);
   if (!b) return;
-  let owns = b.userId === user.id;
-  if (!owns) {
-    const [co] = await db
-      .select({ userId: bookingHosts.userId })
-      .from(bookingHosts)
-      .where(and(eq(bookingHosts.bookingId, b.id), eq(bookingHosts.userId, user.id)))
-      .limit(1);
-    owns = Boolean(co);
-  }
-  if (!owns) return;
+  if (b.userId !== user.id) return;
 
   const reason = formData.get("reason");
   await cancelBooking(uid, typeof reason === "string" ? reason : undefined);

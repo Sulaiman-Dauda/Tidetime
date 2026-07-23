@@ -22,7 +22,7 @@ describe("formatRetentionSummary", () => {
       sessions: 1,
       verificationTokens: 2,
       calendarCache: 3,
-      draftEventTypes: 4,
+      draftServices: 4,
       webhookDeliveries: 5,
       bookings: 6,
     });

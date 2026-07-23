@@ -23,7 +23,7 @@ describe("can", () => {
 
   it("scopes provider to own config + view", () => {
     expect(can("provider", "availability.manage")).toBe(true);
-    expect(can("provider", "eventType.manage")).toBe(true);
+    expect(can("provider", "service.manage")).toBe(true);
     expect(can("provider", "member.invite")).toBe(false);
     expect(can("provider", "booking.manage")).toBe(false);
   });
@@ -32,7 +32,7 @@ describe("can", () => {
     expect(can("receptionist", "booking.manage")).toBe(true);
     expect(can("receptionist", "booking.view")).toBe(true);
     expect(can("receptionist", "availability.manage")).toBe(false);
-    expect(can("receptionist", "eventType.manage")).toBe(false);
+    expect(can("receptionist", "service.manage")).toBe(false);
   });
 
   it("restricts member to read-only visibility", () => {

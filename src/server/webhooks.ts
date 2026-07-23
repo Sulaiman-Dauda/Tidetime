@@ -15,9 +15,7 @@ export type WebhookTrigger =
   | "booking_rescheduled"
   | "booking_cancelled"
   | "booking_rejected"
-  | "booking_requested"
-  | "meeting_started"
-  | "meeting_ended";
+  | "booking_requested";
 
 /**
  * Enqueue a webhook event for every matching subscriber, then attempt delivery
@@ -29,12 +27,10 @@ export async function dispatchWebhook(
   trigger: WebhookTrigger,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const subs = await db
-    .select()
-    .from(webhooks)
-    .where(and(eq(webhooks.userId, userId), eq(webhooks.active, true)));
+  void userId;
+  const subs = await db.select().from(webhooks).where(eq(webhooks.active, true));
 
-  const matching = subs.filter((w) => w.triggers.includes(trigger));
+  const matching = subs.filter((webhook) => webhook.triggers.includes(trigger));
   if (matching.length === 0) return;
 
   const body = { triggerEvent: trigger, createdAt: new Date().toISOString(), payload };
@@ -128,7 +124,7 @@ async function sendOnce(
 
 /**
  * Cron worker: retry all pending deliveries whose backoff window has elapsed.
- * Run alongside the reminder worker.
+ * Run from the protected background-job endpoint.
  */
 export async function processDueWebhookDeliveries(limit = 100): Promise<{
   processed: number;

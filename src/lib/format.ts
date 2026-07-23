@@ -1,7 +1,7 @@
 import { addDaysToKey, formatDateKey, getZonedParts } from "./time";
 
 /** Render a UTC instant as a localized time string in a given zone. */
-export function formatTime(date: Date, timeZone: string, hour12 = true): string {
+function formatTime(date: Date, timeZone: string, hour12 = true): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour: "numeric",
@@ -46,7 +46,7 @@ export function initials(name: string | null | undefined): string {
 }
 
 /** Build "YYYY-MM-DD" for "today" in a viewer's zone. */
-export function todayKey(timeZone: string): string {
+function todayKey(timeZone: string): string {
   const p = getZonedParts(new Date(), timeZone);
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`;

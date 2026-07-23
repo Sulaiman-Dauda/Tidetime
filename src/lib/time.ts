@@ -64,7 +64,7 @@ export function getZonedParts(date: Date, timeZone: string): ZonedParts {
 }
 
 /** Offset (in minutes) of a zone at a given instant. East of UTC is positive. */
-export function getOffsetMinutes(date: Date, timeZone: string): number {
+function getOffsetMinutes(date: Date, timeZone: string): number {
   const p = getZonedParts(date, timeZone);
   const asUTC = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
   return Math.round((asUTC - date.getTime()) / 60000);

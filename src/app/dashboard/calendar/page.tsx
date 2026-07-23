@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
-import { bookings, attendees, eventTypes } from "@/db/schema";
+import { bookings, attendees, services, serviceProviders, teams } from "@/db/schema";
 import { CalendarView, type CalendarEvent } from "./calendar-view";
 import type { CalendarService } from "./quick-booking-dialog";
 
@@ -66,13 +66,21 @@ async function loadEvents(userId: number, year: number, month: number): Promise<
 /** The host's own bookable services, for quick-create from the calendar. */
 async function loadServices(userId: number): Promise<CalendarService[]> {
   const rows = await db
-    .select({ slug: eventTypes.slug, title: eventTypes.title, length: eventTypes.length, hidden: eventTypes.hidden })
-    .from(eventTypes)
-    .where(eq(eventTypes.userId, userId))
-    .orderBy(asc(eventTypes.position), asc(eventTypes.createdAt));
+    .select({
+      slug: services.slug,
+      teamSlug: teams.slug,
+      title: services.title,
+      length: services.length,
+      hidden: services.hidden,
+    })
+    .from(serviceProviders)
+    .innerJoin(services, eq(services.id, serviceProviders.serviceId))
+    .innerJoin(teams, eq(teams.id, services.teamId))
+    .where(eq(serviceProviders.userId, userId))
+    .orderBy(asc(services.position), asc(services.createdAt));
   return rows
     .filter((r) => !r.hidden)
-    .map((r) => ({ slug: r.slug, title: r.title, length: r.length }));
+    .map((r) => ({ slug: r.slug, teamSlug: r.teamSlug, title: r.title, length: r.length }));
 }
 
 export default async function CalendarPage({ searchParams }: Props) {

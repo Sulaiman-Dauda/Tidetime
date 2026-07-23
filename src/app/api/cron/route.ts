@@ -21,9 +21,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
   }
 
   const auth = req.headers.get("authorization");
-  const provided = auth?.startsWith("Bearer ")
-    ? auth.slice(7)
-    : req.nextUrl.searchParams.get("secret") ?? "";
+  const provided = auth?.startsWith("Bearer ") ? auth.slice(7) : "";
 
   // Constant-time comparison over fixed-length hashes.
   const a = Buffer.from(sha256(provided));
@@ -37,9 +35,5 @@ async function handle(req: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(req: NextRequest) {
-  return handle(req);
-}
-
-export async function GET(req: NextRequest) {
   return handle(req);
 }

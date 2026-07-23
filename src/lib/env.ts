@@ -7,9 +7,7 @@ const DEFAULT_DATABASE_URL = "postgres://postgres:postgres@localhost:5432/tideti
 const DEFAULT_AUTH_SECRET = "dev-insecure-secret-change-me";
 
 /**
- * Only bootstrap config lives in .env.
- * Everything else (SMTP, Stripe, etc.) is managed via Settings → UI and stored
- * encrypted in the database. No ambiguity — DB always wins.
+ * Runtime configuration is deliberately small in the lite build.
  */
 const rawEnvSchema = z.object({
   APP_URL: z.string().trim().url().optional(),
@@ -18,21 +16,20 @@ const rawEnvSchema = z.object({
   AUTH_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  MICROSOFT_CLIENT_ID: z.string().optional(),
-  MICROSOFT_CLIENT_SECRET: z.string().optional(),
-  ZOOM_CLIENT_ID: z.string().optional(),
-  ZOOM_CLIENT_SECRET: z.string().optional(),
-  DAILY_API_KEY: z.string().optional(),
-  DAILY_SUBDOMAIN: z.string().optional(),
-  HUBSPOT_CLIENT_ID: z.string().optional(),
-  HUBSPOT_CLIENT_SECRET: z.string().optional(),
   CRON_SECRET: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
-  LICENSE_KEY: z.string().optional(),
-  LICENSE_PUBLIC_KEY: z.string().optional(),
 });
 
-const validated = rawEnvSchema.safeParse(process.env);
+// Read keys explicitly. Passing the whole `process.env` object allows some
+// standalone bundlers to snapshot an empty build-time environment.
+const validated = rawEnvSchema.safeParse({
+  APP_URL: process.env.APP_URL,
+  APP_NAME: process.env.APP_NAME,
+  DATABASE_URL: process.env.DATABASE_URL,
+  AUTH_SECRET: process.env.AUTH_SECRET,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  CRON_SECRET: process.env.CRON_SECRET,
+});
 
 if (!validated.success && isProd) {
   console.error("❌ Invalid environment variables:");
@@ -72,6 +69,16 @@ if (isProd) {
       if (authSecret.length < 32) {
         startupErrors.push("AUTH_SECRET must be at least 32 characters in production.");
       }
+    }
+    if (!raw.CRON_SECRET?.trim()) {
+      startupErrors.push("CRON_SECRET must be set in production.");
+    } else if (raw.CRON_SECRET.trim().length < 32) {
+      startupErrors.push("CRON_SECRET must be at least 32 characters in production.");
+    }
+    if (Boolean(raw.GOOGLE_CLIENT_ID?.trim()) !== Boolean(raw.GOOGLE_CLIENT_SECRET?.trim())) {
+      startupErrors.push(
+        "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must either both be set or both be omitted.",
+      );
     }
   }
 

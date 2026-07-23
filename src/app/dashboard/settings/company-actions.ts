@@ -3,12 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { isValidTimeZone } from "@/lib/time";
-import { normalizeCurrency } from "@/lib/company-settings";
 import {
   setCompanyBookingDefaults,
   setCompanyLegalContents,
-  setCompanyLocalization,
   setCompanyProfile,
 } from "@/server/company-settings";
 
@@ -25,7 +22,6 @@ const profileSchema = z.object({
     .string()
     .trim()
     .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Enter a hex colour, e.g. #4f46e5"),
-  defaultCurrency: z.string().trim().default("usd"),
 });
 
 export async function updateCompanyProfileAction(
@@ -39,47 +35,11 @@ export async function updateCompanyProfileAction(
     websiteUrl: formData.get("websiteUrl") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
     brandColor: formData.get("brandColor"),
-    defaultCurrency: formData.get("defaultCurrency") ?? "usd",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  await setCompanyProfile({
-    ...parsed.data,
-    defaultCurrency: normalizeCurrency(parsed.data.defaultCurrency),
-  });
+  await setCompanyProfile(parsed.data);
   revalidatePath("/dashboard/settings");
   revalidatePath("/", "layout");
-  return { ok: true };
-}
-
-/* ------------------------------- Localization ----------------------------- */
-
-const localizationSchema = z.object({
-  dateFormat: z.enum(["DMY", "MDY", "YMD"]),
-  timeFormat: z.coerce.number().int().refine((v) => v === 12 || v === 24, "Invalid time format"),
-  weekStart: z.coerce.number().int().min(0).max(6),
-  defaultLocale: z.string().trim().min(2).max(16),
-  defaultTimeZone: z.string().trim().min(1),
-});
-
-export async function updateCompanyLocalizationAction(
-  _prev: CompanySettingsState,
-  formData: FormData,
-): Promise<CompanySettingsState> {
-  await requireAdmin();
-  const parsed = localizationSchema.safeParse({
-    dateFormat: formData.get("dateFormat"),
-    timeFormat: formData.get("timeFormat"),
-    weekStart: formData.get("weekStart"),
-    defaultLocale: formData.get("defaultLocale"),
-    defaultTimeZone: formData.get("defaultTimeZone"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  if (!isValidTimeZone(parsed.data.defaultTimeZone)) return { error: "Invalid time zone" };
-  await setCompanyLocalization({
-    ...parsed.data,
-    timeFormat: parsed.data.timeFormat as 12 | 24,
-  });
-  revalidatePath("/dashboard/settings");
   return { ok: true };
 }
 

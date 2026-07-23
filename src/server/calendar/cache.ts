@@ -2,12 +2,15 @@ import "server-only";
 import { and, desc, eq, gt, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { calendarCache } from "@/db/schema";
-import type { BusyInterval } from "./types";
+export interface BusyInterval {
+  start: string;
+  end: string;
+}
 
 /** How long a cached busy-window stays fresh. External calendars can change
  * out from under us, so this is deliberately short — it absorbs the burst of
  * repeated slot queries from a single booking session, not long-term drift. */
-export const CALENDAR_CACHE_TTL_MS = 5 * 60 * 1000;
+const CALENDAR_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** Keep only intervals that overlap the requested window. Pure — unit tested. */
 export function busyWithinRange(

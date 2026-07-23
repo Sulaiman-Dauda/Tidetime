@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 
 const Sheet = DialogPrimitive.Root;
 const SheetTrigger = DialogPrimitive.Trigger;
-const SheetClose = DialogPrimitive.Close;
 const SheetPortal = DialogPrimitive.Portal;
 
 function SheetOverlay({
@@ -54,10 +53,6 @@ function SheetContent({
   );
 }
 
-function SheetHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1 px-5 pt-5", className)} {...props} />;
-}
-
 function SheetTitle({
   className,
   ...props
@@ -70,24 +65,9 @@ function SheetTitle({
   );
 }
 
-function SheetDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      className={cn("text-sm text-muted-foreground", className)}
-      {...props}
-    />
-  );
-}
-
 export {
   Sheet,
   SheetTrigger,
-  SheetClose,
   SheetContent,
-  SheetHeader,
   SheetTitle,
-  SheetDescription,
 };

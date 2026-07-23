@@ -1,12 +1,10 @@
 import { requireUser } from "@/lib/auth";
 import { listCustomersForActor } from "@/server/customers";
-import { getCustomerFieldDefs } from "@/server/customer-fields";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "../_components/page-header";
 import { Users } from "lucide-react";
-import { CustomerEditor, CustomerFieldsManager } from "./customers-client";
 
 export const metadata = { title: "Customers" };
 
@@ -22,17 +20,13 @@ export default async function CustomersPage({
 }) {
   const user = await requireUser();
   const { q } = await searchParams;
-  const [customers, fieldDefs] = await Promise.all([
-    listCustomersForActor({ userId: user.id, search: q }),
-    getCustomerFieldDefs(),
-  ]);
+  const customers = await listCustomersForActor({ userId: user.id, search: q });
 
   return (
     <div className="animate-fade-in space-y-8">
       <PageHeader
         title="Customers"
         description="Everyone who has booked with you, de-duplicated by email."
-        action={user.isAdmin ? <CustomerFieldsManager fieldDefs={fieldDefs} /> : undefined}
       />
 
       <form className="max-w-sm">
@@ -64,14 +58,8 @@ export default async function CustomersPage({
                   <th className="px-5 py-4 font-medium">Name</th>
                   <th className="px-5 py-4 font-medium">Email</th>
                   <th className="px-5 py-4 font-medium">Phone</th>
-                  {fieldDefs.map((f) => (
-                    <th key={f.id} className="px-5 py-4 font-medium">
-                      {f.label}
-                    </th>
-                  ))}
                   <th className="px-5 py-4 font-medium">Bookings</th>
                   <th className="px-5 py-4 font-medium">Last booking</th>
-                  <th className="px-5 py-4 font-medium sr-only">Edit</th>
                 </tr>
               </thead>
               <tbody>
@@ -80,24 +68,10 @@ export default async function CustomersPage({
                     <td className="px-5 py-4 font-medium">{c.name}</td>
                     <td className="px-5 py-4 text-muted-foreground">{c.email}</td>
                     <td className="px-5 py-4 text-muted-foreground">{c.phoneNumber ?? "—"}</td>
-                    {fieldDefs.map((f) => (
-                      <td key={f.id} className="px-5 py-4 text-muted-foreground">
-                        {c.customFields?.[f.id] ?? "—"}
-                      </td>
-                    ))}
                     <td className="px-5 py-4">
                       <Badge variant="secondary">{c.bookingsCount}</Badge>
-                      {c.noShowCount > 0 && (
-                        <span className="ml-2 text-xs text-destructive">{c.noShowCount} no-show</span>
-                      )}
                     </td>
                     <td className="px-5 py-4 text-muted-foreground">{formatDate(c.lastBookingAt)}</td>
-                    <td className="px-5 py-2 text-right">
-                      <CustomerEditor
-                        customer={{ id: c.id, name: c.name, notes: c.notes, customFields: c.customFields }}
-                        fieldDefs={fieldDefs}
-                      />
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -5,7 +5,7 @@ import {
   attendees,
   bookingReferences,
   bookings,
-  eventTypes,
+  services,
   users,
 } from "@/db/schema";
 import { generateIcs, bookingIcalUid } from "@/lib/ics";
@@ -19,20 +19,12 @@ import {
   type EmailBookingView,
 } from "./emails";
 import { dispatchWebhook } from "./webhooks";
-import { cancelRemindersForBooking, scheduleRemindersForBooking } from "./reminders";
 import { createCalendarEvents, deleteCalendarEvent, updateCalendarEvents } from "./calendar";
-import {
-  isStandaloneConferenceRef,
-  resolveConferencing,
-  teardownStandaloneConference,
-  type ConferencingPlan,
-} from "@/app-store/conferencing";
-import { runCrmBookingCreated } from "@/app-store/crm";
 import { buildRsvpLinks } from "./rsvp";
 
 interface LoadedBookingContext {
   booking: typeof bookings.$inferSelect;
-  eventType: typeof eventTypes.$inferSelect | null;
+  service: typeof services.$inferSelect | null;
   host:
     | {
         id: number;
@@ -50,9 +42,9 @@ async function loadBookingContext(bookingId: number): Promise<LoadedBookingConte
   const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
   if (!booking) return null;
 
-  const [eventType, host, bookingAttendees] = await Promise.all([
-    booking.eventTypeId
-      ? db.select().from(eventTypes).where(eq(eventTypes.id, booking.eventTypeId)).limit(1).then((rows) => rows[0] ?? null)
+  const [service, host, bookingAttendees] = await Promise.all([
+    booking.serviceId
+      ? db.select().from(services).where(eq(services.id, booking.serviceId)).limit(1).then((rows) => rows[0] ?? null)
       : Promise.resolve(null),
     booking.userId
       ? db
@@ -72,7 +64,7 @@ async function loadBookingContext(bookingId: number): Promise<LoadedBookingConte
     db.select().from(attendees).where(eq(attendees.bookingId, bookingId)),
   ]);
 
-  return { booking, eventType, host, attendees: bookingAttendees };
+  return { booking, service, host, attendees: bookingAttendees };
 }
 
 /**
@@ -110,29 +102,21 @@ async function silentlyCancelSupersededBooking(uid: string): Promise<void> {
     .update(bookings)
     .set({ status: "cancelled", cancellationReason: "Rescheduled", updatedAt: new Date() })
     .where(eq(bookings.id, original.id));
-  await cancelRemindersForBooking(original.id);
-
   if (!original.userId) return;
 
   const refs = await db
     .select({
-      type: bookingReferences.type,
-      uid: bookingReferences.uid,
-      externalCalendarId: bookingReferences.externalCalendarId,
+      eventId: bookingReferences.eventId,
+      calendarId: bookingReferences.calendarId,
     })
     .from(bookingReferences)
     .where(eq(bookingReferences.bookingId, original.id));
 
   for (const ref of refs) {
-    if (isStandaloneConferenceRef(ref.type)) {
-      await teardownStandaloneConference(original.userId, ref.type, ref.uid);
-      continue;
-    }
     await deleteCalendarEvent(
       original.userId,
-      ref.type,
-      ref.uid,
-      ref.externalCalendarId,
+      ref.eventId,
+      ref.calendarId,
     ).catch(() => undefined);
   }
   await db.delete(bookingReferences).where(eq(bookingReferences.bookingId, original.id));
@@ -142,7 +126,7 @@ async function buildEmailView(ctx: LoadedBookingContext): Promise<EmailBookingVi
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
   if (!primary) return null;
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
-  const title = ctx.eventType?.title ?? ctx.booking.title;
+  const title = ctx.service?.title ?? ctx.booking.title;
   const appUrl = await getAppUrl();
   return {
     title,
@@ -161,7 +145,7 @@ async function buildEmailView(ctx: LoadedBookingContext): Promise<EmailBookingVi
 
 async function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: string): Promise<EmailBookingView> {
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
-  const title = ctx.eventType?.title ?? ctx.booking.title;
+  const title = ctx.service?.title ?? ctx.booking.title;
   const appUrl = await getAppUrl();
   return {
     title,
@@ -179,7 +163,7 @@ async function buildHostEmailView(ctx: LoadedBookingContext, attendeeName: strin
 }
 
 /**
- * Side effects for an accepted booking: reminders, attendee/host emails,
+ * Side effects for an accepted booking: attendee/host emails,
  * outgoing webhook, and best-effort Google Calendar event creation.
  * Callers must only invoke this on a real transition to accepted.
  */
@@ -194,38 +178,6 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
     await silentlyCancelSupersededBooking(ctx.booking.rescheduledFromUid);
   }
 
-  const conferencing: ConferencingPlan | null = ctx.eventType
-    ? resolveConferencing(ctx.eventType.locations)
-    : null;
-
-  // Standalone providers (Zoom, Daily) mint a link up-front so it lands in the
-  // ICS + confirmation email and exists even without a connected calendar.
-  // Native providers (Meet, Teams) get their link at calendar-event time below.
-  if (ctx.host && conferencing?.standalone && !ctx.booking.meetingUrl) {
-    const meeting = await conferencing.standalone.app
-      .createMeeting({
-        userId: ctx.host.id,
-        topic: ctx.eventType?.title ?? ctx.booking.title,
-        description: ctx.booking.description ?? undefined,
-        start: ctx.booking.startTime,
-        end: ctx.booking.endTime,
-        timeZone: ctx.host.timeZone,
-      })
-      .catch(() => null);
-    if (meeting) {
-      ctx.booking.meetingUrl = meeting.url;
-      await db.update(bookings).set({ meetingUrl: meeting.url }).where(eq(bookings.id, ctx.booking.id));
-      await db.insert(bookingReferences).values({
-        bookingId: ctx.booking.id,
-        type: conferencing.standalone.slug,
-        uid: meeting.id,
-        meetingUrl: meeting.url,
-        externalCalendarId: null,
-        credentialId: null,
-      });
-    }
-  }
-
   // Build email views AFTER conferencing so the link is included.
   const attendeeView = await buildEmailView(ctx);
   if (!attendeeView) return;
@@ -234,7 +186,7 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
   attendeeView.rsvp = await buildRsvpLinks(ctx.booking.uid, primary.email);
 
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
-  const title = ctx.eventType?.title ?? ctx.booking.title;
+  const title = ctx.service?.title ?? ctx.booking.title;
   // Stable UID across the whole reschedule chain + the booking's SEQUENCE so the
   // attendee's calendar treats a reschedule as an in-place update, not a dupe.
   const icalUid = bookingIcalUid(
@@ -281,21 +233,12 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
     );
 
     tasks.push(
-      scheduleRemindersForBooking(
-        ctx.booking.id,
-        ctx.host.id,
-        ctx.booking.eventTypeId ?? 0,
-        ctx.booking.startTime,
-      ),
-    );
-
-    tasks.push(
       dispatchWebhook(
         ctx.host.id,
         ctx.booking.rescheduledFromUid ? "booking_rescheduled" : "booking_created",
         {
           uid: ctx.booking.uid,
-          eventTypeId: ctx.booking.eventTypeId,
+          serviceId: ctx.booking.serviceId,
           title,
           startTime: ctx.booking.startTime.toISOString(),
           endTime: ctx.booking.endTime.toISOString(),
@@ -309,26 +252,13 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
       ),
     );
 
-    // Best-effort CRM sync (HubSpot, …) for the primary attendee.
-    tasks.push(
-      runCrmBookingCreated(ctx.host.id, {
-        contact: { email: primary.email, name: primary.name, phone: primary.phoneNumber ?? undefined },
-        title,
-        start: ctx.booking.startTime,
-        end: ctx.booking.endTime,
-        description: ctx.booking.description ?? undefined,
-        meetingUrl: ctx.booking.meetingUrl,
-      }),
-    );
-
     tasks.push(
       (async () => {
-        // A standalone video ref may already exist; only skip if a CALENDAR ref does.
         const existing = await db
-          .select({ type: bookingReferences.type })
+          .select({ id: bookingReferences.id })
           .from(bookingReferences)
           .where(eq(bookingReferences.bookingId, ctx.booking.id));
-        if (existing.some((r) => r.type.endsWith("_calendar"))) return;
+        if (existing.length > 0) return;
 
         const refs = await createCalendarEvents(ctx.host!.id, {
           summary: title,
@@ -338,7 +268,9 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
           timeZone: ctx.host!.timeZone,
           location: ctx.booking.meetingUrl ?? ctx.booking.location ?? undefined,
           attendees: ctx.attendees.map((a) => ({ email: a.email, name: a.name })),
-          conferenceProvider: conferencing?.native,
+          conferenceProvider: ctx.service?.locations.some((location) => location.type === "google_meet")
+            ? "google_meet"
+            : undefined,
           icalUid,
           sequence: ctx.booking.sequence,
         });
@@ -347,11 +279,8 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
         await db.insert(bookingReferences).values(
           refs.map((r) => ({
             bookingId: ctx.booking.id,
-            type: r.integration,
-            uid: r.eventId,
-            meetingUrl: r.meetingUrl ?? null,
-            externalCalendarId: r.calendarId,
-            credentialId: null,
+            eventId: r.eventId,
+            calendarId: r.calendarId,
           })),
         );
 
@@ -373,7 +302,7 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
  * Side effects when a host moves an accepted booking to a new time (e.g. by
  * dragging it on the dashboard calendar). Refreshes external calendar events,
  * emails the attendee an updated invite (stable UID + bumped SEQUENCE so their
- * calendar updates in place), reschedules reminders, and fires the
+ * calendar updates in place), and fires the
  * booking_rescheduled webhook. The caller must have already persisted the new
  * times + incremented sequence.
  */
@@ -383,7 +312,7 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
   if (!primary) return;
 
-  const title = ctx.eventType?.title ?? ctx.booking.title;
+  const title = ctx.service?.title ?? ctx.booking.title;
   const hostName = ctx.host?.name ?? ctx.host?.username ?? "your host";
   const icalUid = bookingIcalUid(
     await rescheduleRootUid(ctx.booking.uid, ctx.booking.rescheduledFromUid),
@@ -427,7 +356,7 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
           .select()
           .from(bookingReferences)
           .where(eq(bookingReferences.bookingId, ctx.booking.id));
-        const calendarRefs = refs.filter((r) => !isStandaloneConferenceRef(r.type));
+        const calendarRefs = refs;
 
         const eventInput = {
           summary: title,
@@ -445,9 +374,8 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
           const updated = await updateCalendarEvents(
             ctx.host!.id,
             calendarRefs.map((r) => ({
-              integration: r.type,
-              eventId: r.uid,
-              externalCalendarId: r.externalCalendarId,
+              eventId: r.eventId,
+              calendarId: r.calendarId,
             })),
             eventInput,
           );
@@ -458,9 +386,8 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
           for (const ref of calendarRefs) {
             await deleteCalendarEvent(
               ctx.host!.id,
-              ref.type,
-              ref.uid,
-              ref.externalCalendarId,
+              ref.eventId,
+              ref.calendarId,
             ).catch(() => undefined);
           }
           await db
@@ -468,22 +395,18 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
             .where(inArray(bookingReferences.id, calendarRefs.map((r) => r.id)));
         }
 
-        const conferencing: ConferencingPlan | null = ctx.eventType
-          ? resolveConferencing(ctx.eventType.locations)
-          : null;
         const created = await createCalendarEvents(ctx.host!.id, {
           ...eventInput,
-          conferenceProvider: conferencing?.native,
+          conferenceProvider: ctx.service?.locations.some((location) => location.type === "google_meet")
+            ? "google_meet"
+            : undefined,
         });
         if (created.length > 0) {
           await db.insert(bookingReferences).values(
             created.map((r) => ({
               bookingId: ctx.booking.id,
-              type: r.integration,
-              uid: r.eventId,
-              meetingUrl: r.meetingUrl ?? null,
-              externalCalendarId: r.calendarId,
-              credentialId: null,
+              eventId: r.eventId,
+              calendarId: r.calendarId,
             })),
           );
         }
@@ -491,20 +414,9 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
     );
 
     tasks.push(
-      cancelRemindersForBooking(ctx.booking.id).then(() =>
-        scheduleRemindersForBooking(
-          ctx.booking.id,
-          ctx.host!.id,
-          ctx.booking.eventTypeId ?? 0,
-          ctx.booking.startTime,
-        ),
-      ),
-    );
-
-    tasks.push(
       dispatchWebhook(ctx.host.id, "booking_rescheduled", {
         uid: ctx.booking.uid,
-        eventTypeId: ctx.booking.eventTypeId,
+        serviceId: ctx.booking.serviceId,
         title,
         startTime: ctx.booking.startTime.toISOString(),
         endTime: ctx.booking.endTime.toISOString(),
@@ -552,8 +464,8 @@ export async function runPendingApprovalEffects(bookingId: number): Promise<void
     tasks.push(
       dispatchWebhook(ctx.host.id, "booking_requested", {
         uid: ctx.booking.uid,
-        eventTypeId: ctx.booking.eventTypeId,
-        title: ctx.eventType?.title ?? ctx.booking.title,
+        serviceId: ctx.booking.serviceId,
+        title: ctx.service?.title ?? ctx.booking.title,
         startTime: ctx.booking.startTime.toISOString(),
         endTime: ctx.booking.endTime.toISOString(),
         attendee: {

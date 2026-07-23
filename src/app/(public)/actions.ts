@@ -11,15 +11,13 @@ import {
   clientIpFromHeaders,
 } from "@/lib/rate-limit";
 import { isBookingDisabled, getCompanySettings } from "@/server/company-settings";
-import { expireStalePaymentHolds } from "@/server/payment-holds";
 import { verifyAltchaSolution } from "@/lib/altcha";
 import { verifyBotChallenge } from "@/lib/bot-challenge";
 import { env } from "@/lib/env";
 
 const bookingSchema = z.object({
-  username: z.string().min(1),
   slug: z.string().min(1),
-  teamSlug: z.string().optional(),
+  teamSlug: z.string().min(1),
   start: z.string().datetime(),
   duration: z.coerce.number().int().positive().optional(),
   timeZone: timeZoneSchema,
@@ -27,9 +25,8 @@ const bookingSchema = z.object({
   email: z.string().email("Enter a valid email"),
   responses: bookingResponsesSchema.default({}),
   guests: bookingGuestsSchema.optional(),
-  rescheduleUid: z.string().optional(),
-  idempotencyKey: z.string().optional(),
-  bookingLinkToken: z.string().optional(),
+  rescheduleUid: z.string().min(1).max(32).optional(),
+  idempotencyKey: z.string().min(16).max(64).optional(),
   /** booker picked a specific team host instead of "any available" */
   preferredHostId: z.coerce.number().int().positive().optional(),
   /** anti-spam: honeypot value (must be empty) + form render timestamp */
@@ -41,7 +38,7 @@ const bookingSchema = z.object({
   altcha: z.string().optional(),
 });
 
-export type BookActionState = { error?: string; uid?: string; requiresPayment?: boolean; paymentClientSecret?: string } | null;
+export type BookActionState = { error?: string; uid?: string } | null;
 
 export async function bookAction(_prev: BookActionState, formData: FormData): Promise<BookActionState> {
   const raw = formData.get("payload");
@@ -62,14 +59,12 @@ export async function bookAction(_prev: BookActionState, formData: FormData): Pr
   // Anti-spam: silently drop honeypot hits and implausibly fast submissions.
   // The server-signed bot challenge (when the form supplied one) makes the
   // timing tamper-proof; the client `ts` is a cheap fallback for entry points
-  // that don't issue a challenge (e.g. embeds).
+  // that don't issue a challenge.
   const challengeBad = result.data.bc !== undefined && !verifyBotChallenge(env.authSecret, result.data.bc);
   if (isHoneypotFilled(result.data.hp) || isSubmittedTooFast(result.data.ts) || challengeBad) {
     // Generic message — don't reveal the bot detection.
     return { error: "We couldn't process that request. Please try again." };
   }
-
-  await expireStalePaymentHolds();
 
   if (await isBookingDisabled()) {
     return { error: "Booking is temporarily disabled. Please try again later." };
@@ -98,15 +93,6 @@ export async function bookAction(_prev: BookActionState, formData: FormData): Pr
   const ipLimit = checkRateLimit(`book:ip:${ip}`, { limit: 10, windowMs: 60 * 1000 });
   if (!ipLimit.ok) return { error: "Too many booking attempts. Please slow down and try again." };
 
-  // Per-link throttle for one-time/limited links.
-  if (result.data.bookingLinkToken) {
-    const linkLimit = checkRateLimit(`book:link:${result.data.bookingLinkToken}`, {
-      limit: 15,
-      windowMs: 60 * 1000,
-    });
-    if (!linkLimit.ok) return { error: "Too many attempts on this link. Please try again later." };
-  }
-
   // Derive an idempotency key from the payload if not supplied.
   const idempotencyKey =
     result.data.idempotencyKey ??
@@ -115,27 +101,22 @@ export async function bookAction(_prev: BookActionState, formData: FormData): Pr
   const { hp: _hp, ts: _ts, bc: _bc, altcha: _altcha, ...bookingInput } = result.data;
   const booking = await createBooking({ ...bookingInput, idempotencyKey });
   if (!booking.ok) return { error: booking.error ?? "Could not complete booking" };
-  if (booking.requiresPayment && booking.paymentClientSecret) {
-    return { uid: booking.uid, requiresPayment: true, paymentClientSecret: booking.paymentClientSecret };
-  }
   return { uid: booking.uid };
 }
 
 const cancelSchema = z.object({
-  uid: z.string().min(1),
+  uid: z.string().min(1).max(32),
   reason: z.string().max(500).optional(),
-  series: z.coerce.boolean().optional(),
 });
 
 export async function cancelBookingAction(_prev: BookActionState, formData: FormData): Promise<BookActionState> {
   const result = cancelSchema.safeParse({
     uid: formData.get("uid"),
     reason: formData.get("reason") || undefined,
-    series: formData.get("series") === "on" || formData.get("series") === "true",
   });
   if (!result.success) return { error: "Invalid request" };
 
-  const res = await cancelBooking(result.data.uid, result.data.reason, undefined, result.data.series ?? false);
+  const res = await cancelBooking(result.data.uid, result.data.reason);
   if (!res.ok) return { error: res.error ?? "Could not cancel" };
   return { uid: res.uid };
 }

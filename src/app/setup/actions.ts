@@ -13,12 +13,11 @@ import {
   COMPANY_SETTING_KEYS,
   DEFAULT_COMPANY_PROFILE,
   normalizeBrandColor,
-  normalizeCurrency,
 } from "@/lib/company-settings";
 
 const RESERVED = new Set([
   "api", "app", "dashboard", "login", "signup", "settings", "admin", "auth", "setup",
-  "booking", "bookings", "availability", "event-types", "teams", "_next", "favicon.ico",
+  "booking", "bookings", "availability", "services", "teams", "_next", "favicon.ico",
 ]);
 const SETUP_LOCK_ID = 20_260_604;
 
@@ -27,7 +26,6 @@ const setupSchema = z
     instanceName: z.string().trim().max(128).optional(),
     companyEmail: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).optional(),
     companyWebsite: z.union([z.string().trim().url("Enter a valid URL"), z.literal("")]).optional(),
-    defaultCurrency: z.string().trim().optional(),
     name: z.string().trim().min(1, "Name is required").max(128),
     email: z.string().trim().toLowerCase().email("Enter a valid email"),
     password: z.string().min(8, "Password must be at least 8 characters").max(200),
@@ -61,7 +59,6 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     instanceName: formData.get("instanceName") || undefined,
     companyEmail: formData.get("companyEmail") || undefined,
     companyWebsite: formData.get("companyWebsite") || undefined,
-    defaultCurrency: formData.get("defaultCurrency") || undefined,
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
@@ -83,7 +80,6 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
     email: parsed.data.companyEmail || "",
     websiteUrl: parsed.data.companyWebsite || "",
     brandColor: normalizeBrandColor(DEFAULT_COMPANY_PROFILE.brandColor),
-    defaultCurrency: normalizeCurrency(parsed.data.defaultCurrency),
   };
 
   const setup = await db.transaction(async (tx) => {
@@ -133,5 +129,5 @@ export async function setupAction(_prev: SetupResult, formData: FormData): Promi
   if ("alreadySetup" in setup) redirect("/login");
 
   await createSession(setup.userId);
-  redirect("/dashboard/event-types?welcome=1");
+  redirect("/dashboard/services?welcome=1");
 }

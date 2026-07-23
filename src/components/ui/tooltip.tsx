@@ -5,9 +5,6 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 
 const TooltipProvider = TooltipPrimitive.Provider;
-const TooltipRoot = TooltipPrimitive.Root;
-const TooltipTrigger = TooltipPrimitive.Trigger;
-
 function TooltipContent({
   className,
   sideOffset = 4,
@@ -37,11 +34,11 @@ function Tooltip({
   delayDuration?: number;
 }) {
   return (
-    <TooltipRoot delayDuration={delayDuration}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+    <TooltipPrimitive.Root delayDuration={delayDuration}>
+      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
       <TooltipContent>{content}</TooltipContent>
-    </TooltipRoot>
+    </TooltipPrimitive.Root>
   );
 }
 
-export { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent, Tooltip };
+export { TooltipProvider, Tooltip };

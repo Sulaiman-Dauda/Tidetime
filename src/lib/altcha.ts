@@ -13,8 +13,8 @@ import { env } from "./env";
  * the challenge with an HMAC keyed by AUTH_SECRET so solutions can't be forged.
  */
 
-export const ALTCHA_ALGORITHM = "SHA-256";
-export const ALTCHA_MAX_NUMBER = 100_000;
+const ALTCHA_ALGORITHM = "SHA-256";
+const ALTCHA_MAX_NUMBER = 100_000;
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
 export interface AltchaChallenge {

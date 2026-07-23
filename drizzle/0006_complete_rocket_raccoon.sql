@@ -1,1 +1,0 @@
-ALTER TABLE "invites" ALTER COLUMN "created_by" SET NOT NULL;

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
-import { bookings, attendees, eventTypes } from "@/db/schema";
+import { bookings, attendees, services } from "@/db/schema";
 import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "../_components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
-import { CalendarX2, Clock, CreditCard, MapPin, User, X } from "lucide-react";
-import { expireStalePaymentHolds } from "@/server/payment-holds";
+import { CalendarX2, Clock, MapPin, User, X } from "lucide-react";
 
 type Filter = "upcoming" | "pending" | "past" | "cancelled";
 
@@ -23,14 +22,11 @@ interface BookingRow {
   location: string | null;
   meetingUrl: string | null;
   status: string;
-  paid: boolean;
-  requiresPayment: boolean;
   attendeeNames: string[];
   attendeeTz: string;
 }
 
 async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[]> {
-  await expireStalePaymentHolds();
   const now = new Date();
   const conditions = [eq(bookings.userId, userId)];
 
@@ -45,9 +41,9 @@ async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[
   }
 
   const rows = await db
-    .select({ booking: bookings, requiresPayment: eventTypes.requiresPayment })
+    .select({ booking: bookings })
     .from(bookings)
-    .leftJoin(eventTypes, eq(bookings.eventTypeId, eventTypes.id))
+    .leftJoin(services, eq(bookings.serviceId, services.id))
     .where(and(...conditions))
     .orderBy(
       filter === "past" || filter === "cancelled"
@@ -70,7 +66,7 @@ async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[
     byBooking.set(a.bookingId, list);
   }
 
-  return rows.map(({ booking, requiresPayment }) => {
+  return rows.map(({ booking }) => {
     const list = byBooking.get(booking.id) ?? [];
     const primary = list.find((a) => a.isPrimary) ?? list[0];
     return {
@@ -81,8 +77,6 @@ async function loadBookings(userId: number, filter: Filter): Promise<BookingRow[
       location: booking.location,
       meetingUrl: booking.meetingUrl,
       status: booking.status,
-      paid: booking.paid,
-      requiresPayment: requiresPayment ?? false,
       attendeeNames: list.map((a) => a.name),
       attendeeTz: primary?.timeZone ?? "UTC",
     };
@@ -136,7 +130,7 @@ export default async function BookingsPage({ searchParams }: Props) {
               action={
                 active === "upcoming" ? (
                   <Button asChild size="sm">
-                    <Link href="/dashboard/links">Create a booking link</Link>
+                    <Link href="/dashboard/services">Manage services</Link>
                   </Button>
                 ) : undefined
               }
@@ -168,7 +162,6 @@ function BookingRow({
     booking.attendeeNames.length <= 1
       ? booking.attendeeNames[0]
       : `${booking.attendeeNames[0]} + ${booking.attendeeNames.length - 1} guest${booking.attendeeNames.length - 1 === 1 ? "" : "s"}`;
-  const awaitingPayment = booking.status === "pending" && booking.requiresPayment && !booking.paid;
 
   return (
     <div className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between">
@@ -182,8 +175,7 @@ function BookingRow({
           </Link>
           {booking.status === "pending" && (
             <Badge variant="pending" className="gap-1">
-              {awaitingPayment ? <CreditCard className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
-              {awaitingPayment ? "Awaiting payment" : "Pending"}
+              <Clock className="h-2.5 w-2.5" /> Pending
             </Badge>
           )}
           {booking.status === "cancelled" && (
@@ -230,7 +222,7 @@ function BookingRow({
         </div>
       </div>
 
-      {filter === "pending" && !awaitingPayment && (
+      {filter === "pending" && (
         <div className="flex shrink-0 items-center gap-2">
           <DeclineButton uid={booking.uid} />
           <AcceptButton uid={booking.uid} />

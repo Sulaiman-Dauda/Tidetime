@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Calendar, Clock, Copy, Check, ArrowRight, User, Sparkles } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { NewEventTypeButton } from "./new-event-type-button";
-import { InstantMeetingButton } from "./instant-meeting-button";
+import { NewServiceButton } from "./new-service-button";
 
 interface OverviewEvent {
   uid: string;
@@ -17,7 +15,7 @@ interface OverviewEvent {
   attendeeName: string | null;
 }
 
-interface OverviewData {
+export interface OverviewData {
   upcoming: number;
   pending: number;
   today: OverviewEvent[];
@@ -53,24 +51,16 @@ function formatDay(iso: string): string {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
-export function DashboardOverview({ username, bookingUrl }: { username: string; bookingUrl: string }) {
-  const [data, setData] = useState<OverviewData | null>(null);
+export function DashboardOverview({
+  username,
+  bookingUrl,
+  data,
+}: {
+  username: string;
+  bookingUrl: string;
+  data: OverviewData;
+}) {
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/overview")
-      .then((r) => {
-        if (r.status === 401) {
-          window.location.href = "/login";
-          return null;
-        }
-        return r.ok ? r.json() : null;
-      })
-      .then((d) => { if (!cancelled && d) setData(d); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   async function copyLink() {
     try {
@@ -95,8 +85,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <InstantMeetingButton />
-          <NewEventTypeButton size="sm" />
+          <NewServiceButton size="sm" />
         </div>
       </div>
 
@@ -111,11 +100,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
             <Calendar className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            {data ? (
-              <p className="tabular-stat text-xl font-semibold">{data.today.length}</p>
-            ) : (
-              <Skeleton className="h-6 w-6" />
-            )}
+            <p className="tabular-stat text-xl font-semibold">{data.today.length}</p>
             <p className="text-xs text-muted-foreground">Today</p>
           </div>
         </Link>
@@ -129,11 +114,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
             <Calendar className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            {data ? (
-              <p className="tabular-stat text-xl font-semibold">{data.upcoming}</p>
-            ) : (
-              <Skeleton className="h-6 w-6" />
-            )}
+            <p className="tabular-stat text-xl font-semibold">{data.upcoming}</p>
             <p className="text-xs text-muted-foreground">Upcoming</p>
           </div>
         </Link>
@@ -147,11 +128,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
             <Clock className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            {data ? (
-              <p className="tabular-stat text-xl font-semibold">{data.pending}</p>
-            ) : (
-              <Skeleton className="h-6 w-6" />
-            )}
+            <p className="tabular-stat text-xl font-semibold">{data.pending}</p>
             <p className="text-xs text-muted-foreground">Pending</p>
           </div>
         </Link>
@@ -177,7 +154,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
       </div>
 
       {/* Today's events */}
-      {data && data.today.length > 0 && (
+      {data.today.length > 0 && (
         <div>
           <h2 className="mb-3 text-sm font-semibold text-foreground">Today</h2>
           <div className="space-y-2">
@@ -208,7 +185,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
       )}
 
       {/* This week */}
-      {data && data.thisWeek.length > 0 && (
+      {data.thisWeek.length > 0 && (
         <div>
           <h2 className="mb-3 text-sm font-semibold text-foreground">This week</h2>
           <div className="space-y-2">
@@ -241,7 +218,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
       )}
 
       {/* Empty state */}
-      {data && data.today.length === 0 && data.thisWeek.length === 0 && data.pending === 0 && (
+      {data.today.length === 0 && data.thisWeek.length === 0 && data.pending === 0 && (
         <div className="rounded-2xl border border-dashed border-border/60 py-12 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -258,7 +235,7 @@ export function DashboardOverview({ username, bookingUrl }: { username: string; 
               <Copy className="h-3 w-3" />
               {copied ? "Copied!" : "Copy link"}
             </button>
-            <NewEventTypeButton size="sm" />
+            <NewServiceButton size="sm" />
           </div>
         </div>
       )}

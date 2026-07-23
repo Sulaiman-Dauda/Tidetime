@@ -30,20 +30,17 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
   const data = await getBookingByUid(uid);
   if (!data) notFound();
 
-  const { booking, attendees, host, slug, team, eventType } = data;
+  const { booking, attendees, host, slug, team } = data;
   const primary = attendees.find((a) => a.isPrimary) ?? attendees[0];
   const tz = primary?.timeZone ?? "UTC";
   const when = formatRange(booking.startTime, booking.endTime, tz);
 
   const cancelled = booking.status === "cancelled" || booking.status === "rejected";
-  const awaitingPayment = booking.status === "pending" && Boolean(eventType?.requiresPayment) && !booking.paid;
-  const pending = booking.status === "pending" && !awaitingPayment;
+  const pending = booking.status === "pending";
 
   const status = cancelled
     ? { icon: XCircle, label: "Cancelled", cls: "text-destructive", ring: "bg-destructive/10 text-destructive" }
-    : awaitingPayment
-      ? { icon: AlertCircle, label: "Awaiting payment", cls: "text-amber-600", ring: "bg-amber-500/10 text-amber-600" }
-      : pending
+    : pending
         ? { icon: AlertCircle, label: "Awaiting confirmation", cls: "text-amber-600", ring: "bg-amber-500/10 text-amber-600" }
         : { icon: CalendarCheck, label: "Confirmed", cls: "text-emerald-600", ring: "bg-emerald-500/10 text-emerald-600" };
 
@@ -87,16 +84,12 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
           <h1 className="mt-5 text-center text-xl font-semibold tracking-tight">
             {cancelled
               ? "This booking was cancelled"
-              : awaitingPayment
-                ? "Payment still needed"
-                : pending
+              : pending
                   ? "Booking requested"
                   : "You're booked"}
           </h1>
           <p className="mt-1 text-center text-sm text-muted-foreground">
-            {awaitingPayment
-              ? "Your slot is reserved while payment is being completed. Once Stripe confirms it, we'll update the booking automatically."
-              : pending
+            {pending
                 ? "We've sent your request to the host. You'll be notified once it's confirmed."
                 : cancelled
                   ? booking.cancellationReason ?? "This event is no longer scheduled."
@@ -139,7 +132,7 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
                   </Link>
                 </Button>
               ) : null}
-              <CancelBooking uid={booking.uid} isRecurring={Boolean(booking.recurringEventId)} />
+              <CancelBooking uid={booking.uid} />
             </div>
           ) : null}
 

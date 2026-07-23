@@ -2,30 +2,24 @@
 
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, Search, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent } from "./sidebar";
 import { UserMenu } from "./user-menu";
-import { CommandPalette } from "@/components/command-palette";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
-  "/dashboard/event-types": "Services",
-  "/dashboard/categories": "Categories",
+  "/dashboard/services": "Services",
   "/dashboard/bookings": "Bookings",
   "/dashboard/customers": "Customers",
   "/dashboard/calendar": "Calendar",
   "/dashboard/availability": "Availability",
-  "/dashboard/links": "Booking Links",
-  "/dashboard/analytics": "Analytics",
-  "/dashboard/reviews": "Reviews",
-  "/dashboard/teams": "Teams",
+  "/dashboard/providers": "Providers",
   "/dashboard/integrations": "Connections",
   "/dashboard/account": "Profile settings",
   "/dashboard/settings": "Settings",
-  "/dashboard/blocked-periods": "Blocked Periods",
 };
 
 type User = {
@@ -48,7 +42,6 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [cmdOpen, setCmdOpen] = useState(false);
 
   function getBreadcrumb() {
     if (BREADCRUMB_LABELS[pathname]) return BREADCRUMB_LABELS[pathname];
@@ -58,11 +51,6 @@ export function DashboardShell({
       if (BREADCRUMB_LABELS[prefix]) return BREADCRUMB_LABELS[prefix];
     }
     return null;
-  }
-
-  function openCommand() {
-    setMobileOpen(false);
-    setCmdOpen(true);
   }
 
   const breadcrumb = getBreadcrumb();
@@ -93,11 +81,6 @@ export function DashboardShell({
           )}
           <div className="flex-1 sm:hidden" />
           <span key="copy-mobile">{copyLinkEl}</span>
-          <Tooltip content="Search (⌘K)">
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={openCommand}>
-              <Search className="h-[17px] w-[17px]" />
-            </Button>
-          </Tooltip>
         </div>
 
         {/* Main area */}
@@ -115,18 +98,6 @@ export function DashboardShell({
             )}
             <div className="flex-1" />
             <span key="copy-desktop">{copyLinkEl}</span>
-            <Tooltip content={`Search pages (⌘K)`}>
-              <button
-                onClick={openCommand}
-                className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
-              >
-                <Search className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline">Search...</span>
-                <kbd className="hidden rounded border border-border bg-secondary px-1 py-0 text-[10px] font-medium text-muted-foreground lg:inline-block">
-                  ⌘K
-                </kbd>
-              </button>
-            </Tooltip>
             <UserMenu user={user} />
           </header>
 
@@ -138,9 +109,6 @@ export function DashboardShell({
           </main>
         </div>
       </div>
-
-      {/* Command palette (⌘K) */}
-      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </TooltipProvider>
   );
 }

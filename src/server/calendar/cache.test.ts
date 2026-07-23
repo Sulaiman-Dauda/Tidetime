@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { busyWithinRange } from "./cache";
-import type { BusyInterval } from "./types";
+import type { BusyInterval } from "./cache";
 
 const iv = (start: string, end: string): BusyInterval => ({ start, end });
 

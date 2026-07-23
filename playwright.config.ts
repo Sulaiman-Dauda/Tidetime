@@ -6,12 +6,12 @@ import { defineConfig, devices } from "@playwright/test";
  * These run against a *real* running instance with a seeded database, so they
  * live separately from the fast vitest unit suite (`npm test`). In CI:
  *
- *   docker compose up -d db
+ *   docker compose up -d postgres
  *   npm run db:migrate && npm run db:seed
  *   npm run test:e2e            # builds, starts, and drives the app
  *
- * The seeded demo handle (`demo` / `intro`) is what the specs target by default;
- * override with E2E_USER / E2E_SLUG. Point at an already-running instance with
+ * The seeded company (`demo-company` / `intro`) is what the specs target by default.
+ * Point at an already-running instance with
  * E2E_BASE_URL to skip the built-in webServer.
  */
 
@@ -35,9 +35,18 @@ export default defineConfig({
   webServer: useExternal
     ? undefined
     : {
-        command: "npm run build && PORT=3100 npm run start",
+        command: "npm run start",
         url: baseURL,
         timeout: 240_000,
         reuseExistingServer: !process.env.CI,
+        env: {
+          ...process.env,
+          APP_URL: process.env.E2E_APP_URL ?? "http://127.0.0.1:3100",
+          DATABASE_URL: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/tidetime",
+          AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-auth-secret-that-is-at-least-32-characters",
+          CRON_SECRET: process.env.CRON_SECRET ?? "e2e-cron-secret",
+          PORT: "3100",
+          HOSTNAME: "127.0.0.1",
+        },
       },
 });

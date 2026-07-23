@@ -1,79 +1,9 @@
 {
-  "id": "4a9460a4-127b-4243-a4ca-f204e68e3c6f",
+  "id": "90903829-1856-465c-b775-f9d68ebbd84b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.api_keys": {
-      "name": "api_keys",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hashed_key": {
-          "name": "hashed_key",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "api_keys_user_id_users_id_fk": {
-          "name": "api_keys_user_id_users_id_fk",
-          "tableFrom": "api_keys",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.app_settings": {
       "name": "app_settings",
       "schema": "",
@@ -147,19 +77,25 @@
           "notNull": true,
           "default": "'en'"
         },
-        "no_show": {
-          "name": "no_show",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "is_primary": {
           "name": "is_primary",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "rsvp_status": {
+          "name": "rsvp_status",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'needs_action'"
+        },
+        "rsvp_responded_at": {
+          "name": "rsvp_responded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -280,8 +216,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.booking_references": {
-      "name": "booking_references",
+    "public.booking_activity": {
+      "name": "booking_activity",
       "schema": "",
       "columns": {
         "id": {
@@ -298,31 +234,105 @@
         },
         "type": {
           "name": "type",
-          "type": "varchar(64)",
+          "type": "varchar(32)",
           "primaryKey": false,
           "notNull": true
         },
-        "uid": {
-          "name": "uid",
-          "type": "text",
+        "actor": {
+          "name": "actor",
+          "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "meeting_url": {
-          "name": "meeting_url",
+        "message": {
+          "name": "message",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "external_calendar_id": {
-          "name": "external_calendar_id",
-          "type": "text",
+        "data": {
+          "name": "data",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
-        "credential_id": {
-          "name": "credential_id",
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "booking_activity_booking_idx": {
+          "name": "booking_activity_booking_idx",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "booking_activity_booking_id_bookings_id_fk": {
+          "name": "booking_activity_booking_id_bookings_id_fk",
+          "tableFrom": "booking_activity",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "booking_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.booking_references": {
+      "name": "booking_references",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calendar_id": {
+          "name": "calendar_id",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -381,8 +391,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "event_type_id": {
-          "name": "event_type_id",
+        "service_id": {
+          "name": "service_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -456,30 +466,18 @@
           "primaryKey": false,
           "notNull": false
         },
-        "cancelled_by_email": {
-          "name": "cancelled_by_email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "recurring_event_id": {
-          "name": "recurring_event_id",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "idempotency_key": {
           "name": "idempotency_key",
           "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false
         },
-        "paid": {
-          "name": "paid",
-          "type": "boolean",
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": false
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -565,12 +563,12 @@
         }
       },
       "foreignKeys": {
-        "bookings_event_type_id_event_types_id_fk": {
-          "name": "bookings_event_type_id_event_types_id_fk",
+        "bookings_service_id_services_id_fk": {
+          "name": "bookings_service_id_services_id_fk",
           "tableFrom": "bookings",
-          "tableTo": "event_types",
+          "tableTo": "services",
           "columnsFrom": [
-            "event_type_id"
+            "service_id"
           ],
           "columnsTo": [
             "id"
@@ -598,8 +596,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.credentials": {
-      "name": "credentials",
+    "public.calendar_cache": {
+      "name": "calendar_cache",
       "schema": "",
       "columns": {
         "id": {
@@ -614,9 +612,96 @@
           "primaryKey": false,
           "notNull": true
         },
-        "type": {
-          "name": "type",
-          "type": "varchar(64)",
+        "range_start": {
+          "name": "range_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "range_end": {
+          "name": "range_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "busy": {
+          "name": "busy",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "calendar_cache_user_idx": {
+          "name": "calendar_cache_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "calendar_cache_user_id_users_id_fk": {
+          "name": "calendar_cache_user_id_users_id_fk",
+          "tableFrom": "calendar_cache",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.credentials": {
+      "name": "credentials",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -652,7 +737,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -665,6 +750,126 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.customers": {
+      "name": "customers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone_number": {
+          "name": "phone_number",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bookings_count": {
+          "name": "bookings_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_booking_at": {
+          "name": "last_booking_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "customers_team_email_idx": {
+          "name": "customers_team_email_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "customers_team_idx": {
+          "name": "customers_team_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "customers_team_id_teams_id_fk": {
+          "name": "customers_team_id_teams_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
           ],
           "columnsTo": [
             "id"
@@ -693,24 +898,6 @@
           "name": "user_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
-        },
-        "event_type_id": {
-          "name": "event_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credential_id": {
-          "name": "credential_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "integration": {
-          "name": "integration",
-          "type": "varchar(64)",
-          "primaryKey": false,
           "notNull": true
         },
         "external_id": {
@@ -718,12 +905,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "primary_email": {
-          "name": "primary_email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -732,21 +913,6 @@
           "columns": [
             {
               "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "destination_calendars_event_idx": {
-          "name": "destination_calendars_event_idx",
-          "columns": [
-            {
-              "expression": "event_type_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -771,32 +937,6 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "destination_calendars_event_type_id_event_types_id_fk": {
-          "name": "destination_calendars_event_type_id_event_types_id_fk",
-          "tableFrom": "destination_calendars",
-          "tableTo": "event_types",
-          "columnsFrom": [
-            "event_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "destination_calendars_credential_id_credentials_id_fk": {
-          "name": "destination_calendars_credential_id_credentials_id_fk",
-          "tableFrom": "destination_calendars",
-          "tableTo": "credentials",
-          "columnsFrom": [
-            "credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -805,103 +945,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.event_type_hosts": {
-      "name": "event_type_hosts",
-      "schema": "",
-      "columns": {
-        "event_type_id": {
-          "name": "event_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_fixed": {
-          "name": "is_fixed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 2
-        },
-        "weight": {
-          "name": "weight",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 100
-        }
-      },
-      "indexes": {
-        "event_type_hosts_idx": {
-          "name": "event_type_hosts_idx",
-          "columns": [
-            {
-              "expression": "event_type_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "event_type_hosts_event_type_id_event_types_id_fk": {
-          "name": "event_type_hosts_event_type_id_event_types_id_fk",
-          "tableFrom": "event_type_hosts",
-          "tableTo": "event_types",
-          "columnsFrom": [
-            "event_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "event_type_hosts_user_id_users_id_fk": {
-          "name": "event_type_hosts_user_id_users_id_fk",
-          "tableFrom": "event_type_hosts",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.event_types": {
-      "name": "event_types",
+    "public.invites": {
+      "name": "invites",
       "schema": "",
       "columns": {
         "id": {
@@ -910,214 +955,37 @@
           "primaryKey": true,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
+        "token": {
+          "name": "token",
+          "type": "varchar(64)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": true
         },
         "team_id": {
           "name": "team_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
-        },
-        "schedule_id": {
-          "name": "schedule_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "title": {
-          "name": "title",
-          "type": "varchar(128)",
-          "primaryKey": false,
           "notNull": true
         },
-        "slug": {
-          "name": "slug",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "length": {
-          "name": "length",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 30
-        },
-        "durations": {
-          "name": "durations",
-          "type": "integer[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'"
-        },
-        "hidden": {
-          "name": "hidden",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "color": {
-          "name": "color",
-          "type": "varchar(9)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "locations": {
-          "name": "locations",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "booking_fields": {
-          "name": "booking_fields",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "before_event_buffer": {
-          "name": "before_event_buffer",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "after_event_buffer": {
-          "name": "after_event_buffer",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "minimum_booking_notice": {
-          "name": "minimum_booking_notice",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 120
-        },
-        "slot_interval": {
-          "name": "slot_interval",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "period_type": {
-          "name": "period_type",
-          "type": "period_type",
+        "role": {
+          "name": "role",
+          "type": "membership_role",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'unlimited'"
+          "default": "'member'"
         },
-        "period_days": {
-          "name": "period_days",
+        "created_by": {
+          "name": "created_by",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
-        },
-        "period_start_date": {
-          "name": "period_start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "period_end_date": {
-          "name": "period_end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "booking_limits": {
-          "name": "booking_limits",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "duration_limits": {
-          "name": "duration_limits",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "seats_per_time_slot": {
-          "name": "seats_per_time_slot",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "seats_show_attendees": {
-          "name": "seats_show_attendees",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "requires_confirmation": {
-          "name": "requires_confirmation",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "disable_guests": {
-          "name": "disable_guests",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "recurring_event": {
-          "name": "recurring_event",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "price": {
-          "name": "price",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "currency": {
-          "name": "currency",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'usd'"
-        },
-        "success_redirect_url": {
-          "name": "success_redirect_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scheduling_type": {
-          "name": "scheduling_type",
-          "type": "scheduling_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -1126,69 +994,24 @@
           "notNull": true,
           "default": "now()"
         },
-        "updated_at": {
-          "name": "updated_at",
+        "expires_at": {
+          "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "event_types_user_slug_idx": {
-          "name": "event_types_user_slug_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "slug",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "notNull": true
         },
-        "event_types_team_idx": {
-          "name": "event_types_team_idx",
-          "columns": [
-            {
-              "expression": "team_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
+      "indexes": {},
       "foreignKeys": {
-        "event_types_user_id_users_id_fk": {
-          "name": "event_types_user_id_users_id_fk",
-          "tableFrom": "event_types",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "event_types_team_id_teams_id_fk": {
-          "name": "event_types_team_id_teams_id_fk",
-          "tableFrom": "event_types",
+        "invites_team_id_teams_id_fk": {
+          "name": "invites_team_id_teams_id_fk",
+          "tableFrom": "invites",
           "tableTo": "teams",
           "columnsFrom": [
             "team_id"
@@ -1199,22 +1022,30 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "event_types_schedule_id_schedules_id_fk": {
-          "name": "event_types_schedule_id_schedules_id_fk",
-          "tableFrom": "event_types",
-          "tableTo": "schedules",
+        "invites_created_by_users_id_fk": {
+          "name": "invites_created_by_users_id_fk",
+          "tableFrom": "invites",
+          "tableTo": "users",
           "columnsFrom": [
-            "schedule_id"
+            "created_by"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "invites_token_unique": {
+          "name": "invites_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1321,278 +1152,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.out_of_office": {
-      "name": "out_of_office",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "start": {
-          "name": "start",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end": {
-          "name": "end",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "notes": {
-          "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "to_user_id": {
-          "name": "to_user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "out_of_office_user_id_users_id_fk": {
-          "name": "out_of_office_user_id_users_id_fk",
-          "tableFrom": "out_of_office",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "out_of_office_to_user_id_users_id_fk": {
-          "name": "out_of_office_to_user_id_users_id_fk",
-          "tableFrom": "out_of_office",
-          "tableTo": "users",
-          "columnsFrom": [
-            "to_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.payments": {
-      "name": "payments",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "uid": {
-          "name": "uid",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "booking_id": {
-          "name": "booking_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fee": {
-          "name": "fee",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "success": {
-          "name": "success",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "refunded": {
-          "name": "refunded",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "external_id": {
-          "name": "external_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "data": {
-          "name": "data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "payments_booking_id_bookings_id_fk": {
-          "name": "payments_booking_id_bookings_id_fk",
-          "tableFrom": "payments",
-          "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.scheduled_reminders": {
-      "name": "scheduled_reminders",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "booking_id": {
-          "name": "booking_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "workflow_id": {
-          "name": "workflow_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "send_at": {
-          "name": "send_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sent_at": {
-          "name": "sent_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "action": {
-          "name": "action",
-          "type": "workflow_action",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "scheduled_reminders_due_idx": {
-          "name": "scheduled_reminders_due_idx",
-          "columns": [
-            {
-              "expression": "send_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sent_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "scheduled_reminders_booking_id_bookings_id_fk": {
-          "name": "scheduled_reminders_booking_id_bookings_id_fk",
-          "tableFrom": "scheduled_reminders",
-          "tableTo": "bookings",
-          "columnsFrom": [
-            "booking_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "scheduled_reminders_workflow_id_workflows_id_fk": {
-          "name": "scheduled_reminders_workflow_id_workflows_id_fk",
-          "tableFrom": "scheduled_reminders",
-          "tableTo": "workflows",
-          "columnsFrom": [
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.schedules": {
       "name": "schedules",
       "schema": "",
@@ -1684,18 +1243,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "credential_id": {
-          "name": "credential_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "integration": {
-          "name": "integration",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
         "external_id": {
           "name": "external_id",
           "type": "text",
@@ -1709,12 +1256,6 @@
           "columns": [
             {
               "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "integration",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1745,13 +1286,272 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.service_providers": {
+      "name": "service_providers",
+      "schema": "",
+      "columns": {
+        "service_id": {
+          "name": "service_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
         },
-        "selected_calendars_credential_id_credentials_id_fk": {
-          "name": "selected_calendars_credential_id_credentials_id_fk",
-          "tableFrom": "selected_calendars",
-          "tableTo": "credentials",
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "service_providers_idx": {
+          "name": "service_providers_idx",
+          "columns": [
+            {
+              "expression": "service_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "service_providers_service_id_services_id_fk": {
+          "name": "service_providers_service_id_services_id_fk",
+          "tableFrom": "service_providers",
+          "tableTo": "services",
           "columnsFrom": [
-            "credential_id"
+            "service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "service_providers_user_id_users_id_fk": {
+          "name": "service_providers_user_id_users_id_fk",
+          "tableFrom": "service_providers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.services": {
+      "name": "services",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "length": {
+          "name": "length",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "durations": {
+          "name": "durations",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "hidden": {
+          "name": "hidden",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "draft": {
+          "name": "draft",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "locations": {
+          "name": "locations",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "booking_fields": {
+          "name": "booking_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "before_event_buffer": {
+          "name": "before_event_buffer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "after_event_buffer": {
+          "name": "after_event_buffer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "minimum_booking_notice": {
+          "name": "minimum_booking_notice",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 120
+        },
+        "slot_interval": {
+          "name": "slot_interval",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requires_confirmation": {
+          "name": "requires_confirmation",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "disable_guests": {
+          "name": "disable_guests",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "services_team_slug_idx": {
+          "name": "services_team_slug_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "services_team_idx": {
+          "name": "services_team_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "services_team_id_teams_id_fk": {
+          "name": "services_team_id_teams_id_fk",
+          "tableFrom": "services",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
           ],
           "columnsTo": [
             "id"
@@ -1862,25 +1662,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "bio": {
-          "name": "bio",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "hide_branding": {
-          "name": "hide_branding",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "brand_color": {
-          "name": "brand_color",
-          "type": "varchar(9)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1935,12 +1716,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "email_verified_at": {
-          "name": "email_verified_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "name": {
           "name": "name",
           "type": "varchar(128)",
@@ -1951,16 +1726,10 @@
           "name": "password_hash",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "avatar_url": {
           "name": "avatar_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bio": {
-          "name": "bio",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1992,25 +1761,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'en'"
-        },
-        "theme": {
-          "name": "theme",
-          "type": "varchar(16)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "brand_color": {
-          "name": "brand_color",
-          "type": "varchar(9)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "hide_branding": {
-          "name": "hide_branding",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "is_admin": {
           "name": "is_admin",
@@ -2139,8 +1889,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.webhooks": {
-      "name": "webhooks",
+    "public.webhook_deliveries": {
+      "name": "webhook_deliveries",
       "schema": "",
       "columns": {
         "id": {
@@ -2149,55 +1899,70 @@
           "primaryKey": true,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
+        "webhook_id": {
+          "name": "webhook_id",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "team_id": {
-          "name": "team_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "event_type_id": {
-          "name": "event_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "subscriber_url": {
-          "name": "subscriber_url",
-          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "triggers": {
-          "name": "triggers",
-          "type": "webhook_trigger[]",
+        "trigger": {
+          "name": "trigger",
+          "type": "webhook_trigger",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(16)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'"
+          "default": "'pending'"
         },
-        "secret": {
-          "name": "secret",
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "max_attempts": {
+          "name": "max_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_status_code": {
+          "name": "last_status_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "payload_template": {
-          "name": "payload_template",
-          "type": "text",
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "active": {
-          "name": "active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -2207,40 +1972,36 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "webhook_deliveries_due_idx": {
+          "name": "webhook_deliveries_due_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
-        "webhooks_user_id_users_id_fk": {
-          "name": "webhooks_user_id_users_id_fk",
-          "tableFrom": "webhooks",
-          "tableTo": "users",
+        "webhook_deliveries_webhook_id_webhooks_id_fk": {
+          "name": "webhook_deliveries_webhook_id_webhooks_id_fk",
+          "tableFrom": "webhook_deliveries",
+          "tableTo": "webhooks",
           "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "webhooks_team_id_teams_id_fk": {
-          "name": "webhooks_team_id_teams_id_fk",
-          "tableFrom": "webhooks",
-          "tableTo": "teams",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "webhooks_event_type_id_event_types_id_fk": {
-          "name": "webhooks_event_type_id_event_types_id_fk",
-          "tableFrom": "webhooks",
-          "tableTo": "event_types",
-          "columnsFrom": [
-            "event_type_id"
+            "webhook_id"
           ],
           "columnsTo": [
             "id"
@@ -2255,8 +2016,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.workflows": {
-      "name": "workflows",
+    "public.webhooks": {
+      "name": "webhooks",
       "schema": "",
       "columns": {
         "id": {
@@ -2265,53 +2026,22 @@
           "primaryKey": true,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(128)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "trigger": {
-          "name": "trigger",
-          "type": "workflow_trigger",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "action": {
-          "name": "action",
-          "type": "workflow_action",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "offset_minutes": {
-          "name": "offset_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "event_type_id": {
-          "name": "event_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "subject": {
-          "name": "subject",
+        "subscriber_url": {
+          "name": "subscriber_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "body": {
-          "name": "body",
+        "triggers": {
+          "name": "triggers",
+          "type": "webhook_trigger[]",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "secret": {
+          "name": "secret",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2332,34 +2062,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "workflows_user_id_users_id_fk": {
-          "name": "workflows_user_id_users_id_fk",
-          "tableFrom": "workflows",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "workflows_event_type_id_event_types_id_fk": {
-          "name": "workflows_event_type_id_event_types_id_fk",
-          "tableFrom": "workflows",
-          "tableTo": "event_types",
-          "columnsFrom": [
-            "event_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -2384,26 +2087,10 @@
       "values": [
         "owner",
         "admin",
+        "manager",
+        "provider",
+        "receptionist",
         "member"
-      ]
-    },
-    "public.period_type": {
-      "name": "period_type",
-      "schema": "public",
-      "values": [
-        "unlimited",
-        "rolling",
-        "rolling_window",
-        "range"
-      ]
-    },
-    "public.scheduling_type": {
-      "name": "scheduling_type",
-      "schema": "public",
-      "values": [
-        "round_robin",
-        "collective",
-        "managed"
       ]
     },
     "public.webhook_trigger": {
@@ -2414,29 +2101,7 @@
         "booking_rescheduled",
         "booking_cancelled",
         "booking_rejected",
-        "booking_requested",
-        "meeting_started",
-        "meeting_ended"
-      ]
-    },
-    "public.workflow_action": {
-      "name": "workflow_action",
-      "schema": "public",
-      "values": [
-        "email_attendee",
-        "email_host",
-        "sms_attendee"
-      ]
-    },
-    "public.workflow_trigger": {
-      "name": "workflow_trigger",
-      "schema": "public",
-      "values": [
-        "before_event",
-        "after_event",
-        "event_created",
-        "event_cancelled",
-        "event_rescheduled"
+        "booking_requested"
       ]
     }
   },

@@ -3,7 +3,6 @@
 import { useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import {
@@ -26,7 +25,6 @@ interface UserView {
   name: string | null;
   username: string;
   email: string;
-  bio: string | null;
   avatarUrl: string | null;
   timeZone: string;
   timeFormat: number;
@@ -80,10 +78,6 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
               <Label htmlFor="username">Username</Label>
               <Input id="username" name="username" defaultValue={user.username} required />
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea id="bio" name="bio" rows={3} defaultValue={user.bio ?? ""} placeholder="A short intro shown on your booking page." />
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">

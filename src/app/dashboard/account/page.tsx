@@ -21,7 +21,6 @@ export default async function AccountPage() {
           name: user.name,
           username: user.username,
           email: user.email,
-          bio: user.bio,
           avatarUrl: user.avatarUrl,
           timeZone: user.timeZone,
           timeFormat: user.timeFormat,

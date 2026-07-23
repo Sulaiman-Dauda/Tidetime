@@ -2,12 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { eq, or, and, isNull, gt } from "drizzle-orm";
+import { eq, or, and, isNull, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users, schedules, availabilities, invites, memberships } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/crypto";
-import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
+import { createSession, destroySession } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
 import { requestPasswordReset, resetPassword } from "@/server/password-reset";
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
@@ -20,9 +20,10 @@ async function clientIp(): Promise<string> {
 
 const RESERVED = new Set([
   "api", "app", "dashboard", "login", "signup", "settings", "admin", "auth", "setup",
-  "booking", "bookings", "availability", "event-types", "teams", "_next", "favicon.ico",
+  "booking", "bookings", "availability", "services", "teams", "_next", "favicon.ico",
   "forgot-password", "reset-password",
 ]);
+const INVITE_ACCEPT_LOCK_NS = 8176;
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(128),
@@ -87,37 +88,80 @@ export async function signupAction(_prev: ActionResult, formData: FormData): Pro
   }
 
   const passwordHash = await hashPassword(password);
-  const [user] = await db
-    .insert(users)
-    .values({ name, email, username, passwordHash, timeZone })
-    .returning({ id: users.id });
+  const created = await db.transaction(async (tx): Promise<
+    { userId: number } | { error: "invite" | "email" | "username" }
+  > => {
+    // Serialize acceptance of one invite. Re-check all mutable preconditions
+    // inside the transaction so a double-submit cannot create a partial user,
+    // membership, or schedule.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(${INVITE_ACCEPT_LOCK_NS}, hashtext(${inviteToken}))`,
+    );
+    const [lockedInvite] = await tx
+      .select({ id: invites.id, email: invites.email, teamId: invites.teamId, role: invites.role })
+      .from(invites)
+      .where(and(
+        eq(invites.id, invite.id),
+        isNull(invites.acceptedAt),
+        gt(invites.expiresAt, new Date()),
+      ))
+      .limit(1);
+    if (!lockedInvite || lockedInvite.email.toLowerCase() !== email) {
+      return { error: "invite" };
+    }
 
-  // Auto-join the team
-  await db.insert(memberships).values({ userId: user.id, teamId: invite.teamId, role: invite.role, accepted: true });
+    const [conflict] = await tx
+      .select({ email: users.email, username: users.username })
+      .from(users)
+      .where(or(eq(users.email, email), eq(users.username, username)))
+      .limit(1);
+    if (conflict) {
+      return { error: conflict.email === email ? "email" : "username" };
+    }
 
-  // Mark invite as accepted
-  await db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
+    const [user] = await tx
+      .insert(users)
+      .values({ name, email, username, passwordHash, timeZone })
+      .returning({ id: users.id });
+    await tx.insert(memberships).values({
+      userId: user.id,
+      teamId: lockedInvite.teamId,
+      role: lockedInvite.role,
+      accepted: true,
+    });
+    await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, lockedInvite.id));
 
-  // Seed default schedule
-  const [schedule] = await db
-    .insert(schedules)
-    .values({ userId: user.id, name: "Working Hours", timeZone })
-    .returning({ id: schedules.id });
-  await db.insert(availabilities).values({
-    scheduleId: schedule.id,
-    days: [1, 2, 3, 4, 5],
-    startTime: "09:00:00",
-    endTime: "17:00:00",
+    const [schedule] = await tx
+      .insert(schedules)
+      .values({ userId: user.id, name: "Working Hours", timeZone })
+      .returning({ id: schedules.id });
+    await tx.insert(availabilities).values({
+      scheduleId: schedule.id,
+      days: [1, 2, 3, 4, 5],
+      startTime: "09:00:00",
+      endTime: "17:00:00",
+    });
+    await tx.update(users).set({ defaultScheduleId: schedule.id }).where(eq(users.id, user.id));
+    return { userId: user.id };
   });
-  await db.update(users).set({ defaultScheduleId: schedule.id }).where(eq(users.id, user.id));
 
-  await createSession(user.id);
+  if ("error" in created) {
+    if (created.error === "email") {
+      return { fieldErrors: { email: "An account with this email already exists" } };
+    }
+    if (created.error === "username") {
+      return { fieldErrors: { username: "That username is taken" } };
+    }
+    return { error: "This invitation is invalid or has expired." };
+  }
+
+  await createSession(created.userId);
   redirect("/dashboard");
 }
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  password: z.string().min(1, "Password is required"),
+  password: z.string().min(1, "Password is required").max(200),
 });
 
 export async function loginAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -157,10 +201,6 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
 export async function logoutAction(): Promise<void> {
   await destroySession();
   redirect("/login");
-}
-
-export async function getSessionUser() {
-  return getCurrentUser();
 }
 
 /* ---- Password reset --------------------------------------------------- */

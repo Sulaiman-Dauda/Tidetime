@@ -9,12 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { SUPPORTED_CURRENCIES, type CompanySettings } from "@/lib/company-settings";
+import type { CompanySettings } from "@/lib/company-settings";
 import { CompanyLogoUpload } from "./company-logo-upload";
-import { ReviewSettings, type ReviewSettingsView } from "./review-settings";
-import { ApiKeys, type ApiKeyRow } from "./api-keys";
 import {
   updateCompanyLegalAction,
   updateCompanyProfileAction,
@@ -75,13 +72,9 @@ function useSavedToast(state: CompanySettingsState, area: string) {
 
 export function SettingsHub({
   settings,
-  review,
-  apiKeys,
   customDomain,
 }: {
   settings: CompanySettings;
-  review: ReviewSettingsView;
-  apiKeys: ApiKeyRow[];
   customDomain: string | null;
 }) {
   return (
@@ -90,8 +83,6 @@ export function SettingsHub({
         <TabsTrigger value="domain">Domain</TabsTrigger>
         <TabsTrigger value="general">Brand</TabsTrigger>
         <TabsTrigger value="booking">Booking</TabsTrigger>
-        <TabsTrigger value="reviews">Reviews</TabsTrigger>
-        <TabsTrigger value="api">API keys</TabsTrigger>
         <TabsTrigger value="legal">Legal</TabsTrigger>
       </TabsList>
 
@@ -103,12 +94,6 @@ export function SettingsHub({
       </TabsContent>
       <TabsContent value="booking">
         <BookingSection booking={settings.booking} />
-      </TabsContent>
-      <TabsContent value="reviews">
-        <ReviewSettings review={review} />
-      </TabsContent>
-      <TabsContent value="api">
-        <ApiKeys keys={apiKeys} />
       </TabsContent>
       <TabsContent value="legal">
         <LegalSection legal={settings.legal} />
@@ -170,24 +155,6 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
               placeholder="https://example.com/logo.png"
             />
           </div>
-        </Field>
-        <Field
-          label="Default currency"
-          htmlFor="defaultCurrency"
-          hint="Used for new paid services and price display. Match your Stripe account currency."
-        >
-          <Select name="defaultCurrency" defaultValue={profile.defaultCurrency}>
-            <SelectTrigger id="defaultCurrency">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SUPPORTED_CURRENCIES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c.toUpperCase()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </Field>
         <Field
           label="Brand colour"

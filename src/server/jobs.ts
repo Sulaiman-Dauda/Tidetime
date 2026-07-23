@@ -1,8 +1,6 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { processDueReminders } from "./reminders";
-import { sendReviewRequests } from "./reviews";
 import { processDueWebhookDeliveries } from "./webhooks";
 import { runRetentionCleanup, type RetentionSummary } from "./retention";
 
@@ -31,8 +29,6 @@ async function advisoryUnlock(): Promise<void> {
 
 export interface JobRunSummary {
   skipped: boolean;
-  reminders?: { processed: number; sent: number; failed: number };
-  reviews?: { processed: number; sent: number };
   webhooks?: { processed: number; delivered: number; failed: number };
   retention?: RetentionSummary;
 }
@@ -42,23 +38,10 @@ export async function runDueJobs(): Promise<JobRunSummary> {
   const locked = await tryAdvisoryLock();
   if (!locked) return { skipped: true };
   try {
-    const reminders = await processDueReminders();
-    const reviews = await sendReviewRequests();
     const webhooks = await processDueWebhookDeliveries();
     const retention = await runRetentionCleanup();
-    return { skipped: false, reminders, reviews, webhooks, retention };
+    return { skipped: false, webhooks, retention };
   } finally {
     await advisoryUnlock().catch(() => undefined);
   }
-}
-
-export function formatJobSummary(s: JobRunSummary): string {
-  if (s.skipped) return "[jobs] skipped (another run holds the lock)";
-  const r = s.retention;
-  return (
-    `[jobs] reminders processed=${s.reminders?.processed ?? 0} sent=${s.reminders?.sent ?? 0} failed=${s.reminders?.failed ?? 0}` +
-    ` | reviews processed=${s.reviews?.processed ?? 0} sent=${s.reviews?.sent ?? 0}` +
-    ` | webhooks processed=${s.webhooks?.processed ?? 0} delivered=${s.webhooks?.delivered ?? 0} failed=${s.webhooks?.failed ?? 0}` +
-    ` | retention sessions=${r?.sessions ?? 0} tokens=${r?.verificationTokens ?? 0} cache=${r?.calendarCache ?? 0} drafts=${r?.draftEventTypes ?? 0} bookings=${r?.bookings ?? 0}`
-  );
 }

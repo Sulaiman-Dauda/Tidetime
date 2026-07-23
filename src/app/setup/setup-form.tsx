@@ -6,28 +6,8 @@ import { setupAction, type SetupResult } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SUPPORTED_CURRENCIES } from "@/lib/company-settings";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-
-const CURRENCY_NAMES: Record<string, string> = {
-  usd: "US Dollar",
-  eur: "Euro",
-  gbp: "British Pound",
-  cad: "Canadian Dollar",
-  aud: "Australian Dollar",
-  nzd: "New Zealand Dollar",
-  ngn: "Nigerian Naira",
-  zar: "South African Rand",
-  inr: "Indian Rupee",
-  jpy: "Japanese Yen",
-  cny: "Chinese Yuan",
-  brl: "Brazilian Real",
-  mxn: "Mexican Peso",
-  chf: "Swiss Franc",
-  sek: "Swedish Krona",
-  aed: "UAE Dirham",
-};
 
 function FinishButton() {
   const { pending } = useFormStatus();
@@ -138,22 +118,6 @@ export function SetupForm() {
           <Label htmlFor="companyWebsite">Company website</Label>
           <Input id="companyWebsite" name="companyWebsite" type="url" placeholder="https://acme.com" />
           {state.fieldErrors?.companyWebsite && <FieldError msg={state.fieldErrors.companyWebsite} />}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="defaultCurrency">Default currency</Label>
-          <select
-            id="defaultCurrency"
-            name="defaultCurrency"
-            defaultValue="usd"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {SUPPORTED_CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c.toUpperCase()} — {CURRENCY_NAMES[c] ?? c.toUpperCase()}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">Used for pricing, checkout and revenue reporting.</p>
         </div>
         <div className="flex gap-2 pt-1">
           <Button type="button" variant="outline" onClick={() => setStep(1)}>

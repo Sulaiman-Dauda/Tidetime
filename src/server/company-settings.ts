@@ -13,7 +13,6 @@ import {
   normalizeBrandColor,
   type CompanyBookingDefaults,
   type CompanyLegalContents,
-  type CompanyLocalization,
   type CompanyProfile,
   type CompanySettings,
 } from "@/lib/company-settings";
@@ -70,10 +69,6 @@ export function setCompanyProfile(profile: CompanyProfile): Promise<void> {
     ...profile,
     brandColor: normalizeBrandColor(profile.brandColor),
   });
-}
-
-export function setCompanyLocalization(localization: CompanyLocalization): Promise<void> {
-  return writeSetting(COMPANY_SETTING_KEYS.localization, localization);
 }
 
 export function setCompanyBookingDefaults(booking: CompanyBookingDefaults): Promise<void> {

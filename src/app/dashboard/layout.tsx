@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { memberships } from "@/db/schema";
+import { memberships, teams } from "@/db/schema";
 import { CopyLinkButton } from "./_components/copy-link-button";
 import { getAppUrl } from "@/server/app-url";
 import { DashboardShell } from "./_components/dashboard-shell";
@@ -13,15 +13,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  // Fetch team role for single-org deployment
+  // Resolve the accepted company membership used throughout this single-org UI.
   const [membership] = await db
-    .select({ role: memberships.role })
+    .select({ role: memberships.role, companySlug: teams.slug })
     .from(memberships)
-    .where(eq(memberships.userId, user.id))
+    .innerJoin(teams, eq(teams.id, memberships.teamId))
+    .where(and(eq(memberships.userId, user.id), eq(memberships.accepted, true)))
+    .orderBy(asc(memberships.id))
     .limit(1);
 
   const appUrl = await getAppUrl();
-  const bookingUrl = `${appUrl.replace(/^https?:\/\//, "")}/${user.username}`;
+  const publicUrl = `${appUrl}/book/${membership?.companySlug ?? "company"}`;
+  const bookingUrl = publicUrl.replace(/^https?:\/\//, "");
 
   return (
     <DashboardShell
@@ -33,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         isAdmin: user.isAdmin,
         role: membership?.role ?? "member",
       }}
-      copyLinkEl={<CopyLinkButton url={`${appUrl}/${user.username}`} label={bookingUrl} />}
+      copyLinkEl={<CopyLinkButton url={publicUrl} label={bookingUrl} />}
     >
       {children}
     </DashboardShell>

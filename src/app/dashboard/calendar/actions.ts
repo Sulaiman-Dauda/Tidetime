@@ -18,6 +18,7 @@ export async function moveBookingAction(uid: string, newStartIso: string): Promi
 
 export interface ManualBookingInput {
   slug: string;
+  teamSlug: string;
   /** YYYY-MM-DD in the host's timezone */
   date: string;
   /** HH:MM (24h) in the host's timezone */
@@ -48,15 +49,16 @@ export async function createManualBookingAction(
   if (!input.name.trim() || !input.email.trim()) {
     return { error: "Add the attendee's name and email" };
   }
-  if (!input.slug) return { error: "Pick a service" };
+  if (!input.slug || !input.teamSlug) return { error: "Pick a service" };
   if (!Number.isFinite(input.durationMin) || input.durationMin <= 0) {
     return { error: "Invalid duration" };
   }
 
   const start = zonedTimeToUtc(y, mo, d, hh, mm, user.timeZone);
   const res = await createBooking({
-    username: user.username,
     slug: input.slug,
+    teamSlug: input.teamSlug,
+    preferredHostId: user.id,
     start: start.toISOString(),
     duration: input.durationMin,
     timeZone: user.timeZone,

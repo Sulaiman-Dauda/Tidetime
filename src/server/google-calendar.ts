@@ -13,11 +13,6 @@ import { getGoogleCreds } from "./integration-credentials";
 /*  OAuth2 client helpers                                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Whether Google OAuth credentials are configured (DB or env). */
-export async function isGoogleConfigured(): Promise<boolean> {
-  return (await getGoogleCreds()) !== null;
-}
-
 async function getOAuthClient() {
   const creds = await getGoogleCreds();
   if (!creds) {
@@ -76,23 +71,20 @@ export async function exchangeGoogleCode(code: string, userId: number): Promise<
   const { tokens } = await oauth.getToken(code);
   if (!tokens.access_token) throw new Error("Google returned no access token");
 
-  // Remove old credentials for this user+type, then insert new.
-  await db
-    .delete(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.type, "google_calendar")));
+  await db.delete(credentials).where(eq(credentials.userId, userId));
 
   const encrypted = encrypt(JSON.stringify(tokens));
   await db
     .insert(credentials)
-    .values({ userId, type: "google_calendar", key: encrypted });
+    .values({ userId, key: encrypted });
 }
 
 /** Retrieve and refresh the Google credential for a user. */
-export async function getGoogleCredential(userId: number): Promise<{ oauth: Awaited<ReturnType<typeof getOAuthClient>>; tokens: { access_token?: string; refresh_token?: string } } | null> {
+async function getGoogleCredential(userId: number): Promise<{ oauth: Awaited<ReturnType<typeof getOAuthClient>>; tokens: { access_token?: string; refresh_token?: string } } | null> {
   const [cred] = await db
     .select()
     .from(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.type, "google_calendar"), eq(credentials.invalid, false)))
+    .where(and(eq(credentials.userId, userId), eq(credentials.invalid, false)))
     .limit(1);
   if (!cred) return null;
 
@@ -122,15 +114,9 @@ export async function getGoogleCredential(userId: number): Promise<{ oauth: Awai
 
 /** Disconnect Google Calendar for a user. */
 export async function disconnectGoogleCalendar(userId: number): Promise<void> {
-  await db
-    .delete(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.type, "google_calendar")));
-  await db
-    .delete(selectedCalendars)
-    .where(and(eq(selectedCalendars.userId, userId), eq(selectedCalendars.integration, "google_calendar")));
-  await db
-    .delete(destinationCalendars)
-    .where(and(eq(destinationCalendars.userId, userId), eq(destinationCalendars.integration, "google_calendar")));
+  await db.delete(credentials).where(eq(credentials.userId, userId));
+  await db.delete(selectedCalendars).where(eq(selectedCalendars.userId, userId));
+  await db.delete(destinationCalendars).where(eq(destinationCalendars.userId, userId));
 }
 
 /** Check if a user has Google Calendar connected. */
@@ -139,7 +125,7 @@ export async function isGoogleConnected(userId: number): Promise<boolean> {
   const [cred] = await db
     .select({ id: credentials.id })
     .from(credentials)
-    .where(and(eq(credentials.userId, userId), eq(credentials.type, "google_calendar"), eq(credentials.invalid, false)))
+    .where(and(eq(credentials.userId, userId), eq(credentials.invalid, false)))
     .limit(1);
   return Boolean(cred);
 }
@@ -173,7 +159,7 @@ export async function getSelectedCalendars(userId: number): Promise<string[]> {
   const rows = await db
     .select({ externalId: selectedCalendars.externalId })
     .from(selectedCalendars)
-    .where(and(eq(selectedCalendars.userId, userId), eq(selectedCalendars.integration, "google_calendar")));
+    .where(eq(selectedCalendars.userId, userId));
   return rows.map((r) => r.externalId);
 }
 
@@ -182,12 +168,11 @@ export async function setSelectedCalendars(userId: number, calendarIds: string[]
   await db.transaction(async (tx) => {
     await tx
       .delete(selectedCalendars)
-      .where(and(eq(selectedCalendars.userId, userId), eq(selectedCalendars.integration, "google_calendar")));
+      .where(eq(selectedCalendars.userId, userId));
     if (calendarIds.length > 0) {
       await tx.insert(selectedCalendars).values(
         calendarIds.map((externalId) => ({
           userId,
-          integration: "google_calendar",
           externalId,
         })),
       );
@@ -200,7 +185,7 @@ export async function getGoogleDestinationCalendar(userId: number): Promise<stri
   const [row] = await db
     .select({ externalId: destinationCalendars.externalId })
     .from(destinationCalendars)
-    .where(and(eq(destinationCalendars.userId, userId), eq(destinationCalendars.integration, "google_calendar")))
+    .where(eq(destinationCalendars.userId, userId))
     .limit(1);
   return row?.externalId ?? null;
 }
@@ -212,13 +197,12 @@ export async function setGoogleDestinationCalendar(
 ): Promise<void> {
   await db
     .delete(destinationCalendars)
-    .where(and(eq(destinationCalendars.userId, userId), eq(destinationCalendars.integration, "google_calendar")));
+    .where(eq(destinationCalendars.userId, userId));
 
   if (!calendarId) return;
 
   await db.insert(destinationCalendars).values({
     userId,
-    integration: "google_calendar",
     externalId: calendarId,
   });
 }

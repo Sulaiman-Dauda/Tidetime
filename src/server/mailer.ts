@@ -1,8 +1,9 @@
 import "server-only";
 import { createTransport, type Transporter } from "nodemailer";
 import { getSmtpConfig } from "@/server/settings";
+import { sha256 } from "@/lib/crypto";
 
-export interface MailAttachment {
+interface MailAttachment {
   filename: string;
   content: string;
   contentType: string;
@@ -27,7 +28,9 @@ async function resolveSmtp() {
 async function transporter(): Promise<Transporter | null> {
   const smtp = await resolveSmtp();
   if (!smtp?.host) return null;
-  const key = `${smtp.host}:${smtp.port}:${smtp.user}`;
+  // Include a one-way password fingerprint so rotating credentials replaces
+  // the cached transporter instead of continuing to use the old secret.
+  const key = `${smtp.host}:${smtp.port}:${smtp.user}:${sha256(smtp.pass)}`;
   if (cached && cachedKey === key) return cached;
   cached = createTransport({
     host: smtp.host,

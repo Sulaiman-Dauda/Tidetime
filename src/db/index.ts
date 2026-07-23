@@ -15,5 +15,3 @@ const sql =
 if (!isProd) globalForDb.__tidetimeSql = sql;
 
 export const db = drizzle(sql, { schema, casing: "snake_case" });
-export { schema };
-export type Database = typeof db;

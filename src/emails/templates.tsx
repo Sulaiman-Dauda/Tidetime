@@ -1,19 +1,4 @@
 import * as React from "react";
-import {
-  Html,
-  Head,
-  Body,
-  Container,
-  Section,
-  Heading,
-  Text,
-  Link,
-  Button,
-  Hr,
-  Preview,
-  Row,
-  Column,
-} from "@react-email/components";
 import { env } from "@/lib/env";
 import { getAppUrl } from "@/server/app-url";
 
@@ -25,6 +10,35 @@ import { getAppUrl } from "@/server/app-url";
  */
 
 const ACCENT = "#0f172a";
+
+type ElementProps = {
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
+  href?: string;
+};
+
+const Html = ({ children }: ElementProps) => <html>{children}</html>;
+const Body = ({ children, style }: ElementProps) => <body style={style}>{children}</body>;
+const Container = ({ children, style }: ElementProps) => <div style={style}>{children}</div>;
+const Section = ({ children, style }: ElementProps) => <div style={style}>{children}</div>;
+const Heading = ({ children, style }: ElementProps) => <h1 style={style}>{children}</h1>;
+const Text = ({ children, style }: ElementProps) => <p style={style}>{children}</p>;
+const Link = ({ children, style, href }: ElementProps) => (
+  <a href={href} style={style}>{children}</a>
+);
+const Button = Link;
+const Hr = ({ style }: ElementProps) => <hr style={style} />;
+const Row = ({ children }: ElementProps) => (
+  <table role="presentation" width="100%" cellPadding="0" cellSpacing="0">
+    <tbody><tr>{children}</tr></tbody>
+  </table>
+);
+const Column = ({ children, style }: ElementProps) => <td style={style}>{children}</td>;
+const Preview = ({ children }: ElementProps) => (
+  <span style={{ display: "none", maxHeight: 0, overflow: "hidden", opacity: 0 }}>
+    {children}
+  </span>
+);
 
 const styles = {
   body: { margin: 0, backgroundColor: "#f6f7f9", padding: "24px", fontFamily: "-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif", color: "#0f172a" } as const,
@@ -39,16 +53,14 @@ const styles = {
   value: { fontSize: "14px", fontWeight: 500, padding: "6px 0", margin: 0 } as const,
   button: { backgroundColor: ACCENT, color: "#ffffff", fontSize: "14px", fontWeight: 500, padding: "10px 18px", borderRadius: "8px", textDecoration: "none" } as const,
   footer: { padding: "18px 28px", borderTop: "1px solid #eef2f6", color: "#94a3b8", fontSize: "12px" } as const,
-  list: { margin: "0 0 20px", paddingLeft: "18px", color: "#0f172a", fontSize: "14px" } as const,
 };
 
 async function Shell({ preview, children }: { preview: string; children: React.ReactNode }) {
   const appUrl = await getAppUrl();
   return (
     <Html>
-      <Head />
-      <Preview>{preview}</Preview>
       <Body style={styles.body}>
+        <Preview>{preview}</Preview>
         <Container style={styles.container}>
           <Section style={styles.header}>
             <Text style={styles.brand}>{env.appName}</Text>
@@ -141,32 +153,6 @@ export function BookingEmail(p: BookingEmailProps) {
       ) : null}
       <Button href={p.manageUrl} style={styles.button}>
         {p.manageLabel ?? "Reschedule or cancel"}
-      </Button>
-    </Shell>
-  );
-}
-
-export interface SeriesEmailProps {
-  heading: string;
-  intro: string;
-  occurrences: string[];
-  manageUrl: string;
-}
-
-export function SeriesEmail(p: SeriesEmailProps) {
-  return (
-    <Shell preview={p.heading}>
-      <Heading style={styles.heading}>{p.heading}</Heading>
-      <Text style={styles.intro}>{p.intro}</Text>
-      <ul style={styles.list}>
-        {p.occurrences.map((o, i) => (
-          <li key={i} style={{ padding: "4px 0" }}>
-            {o}
-          </li>
-        ))}
-      </ul>
-      <Button href={p.manageUrl} style={styles.button}>
-        Manage bookings
       </Button>
     </Shell>
   );

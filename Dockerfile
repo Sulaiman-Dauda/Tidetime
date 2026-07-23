@@ -22,10 +22,6 @@ RUN APP_URL=http://localhost:3100 \
     NODE_OPTIONS=--max-old-space-size=4096 \
     npm run build
 
-FROM base AS prod-deps
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -36,18 +32,16 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup -S nodejs -g 1001 \
   && adduser -S nextjs -u 1001
 
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/next.config.ts ./next.config.ts
-COPY --from=builder /app/next-env.d.ts ./next-env.d.ts
-COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-runtime.mjs ./scripts/migrate-runtime.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/jobs-worker.mjs ./scripts/jobs-worker.mjs
+# The migration entrypoint is outside Next's server trace, so copy its two
+# dependency packages explicitly instead of shipping the full node_modules tree.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
 
 USER nextjs
 EXPOSE 3100
@@ -55,4 +49,4 @@ EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

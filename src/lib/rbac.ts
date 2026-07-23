@@ -11,7 +11,7 @@ export type Permission =
   | "member.invite"
   | "member.remove"
   | "member.role.assign"
-  | "eventType.manage" // create/edit team services
+  | "service.manage" // create/edit team services
   | "availability.manage" // edit shared/provider availability
   | "booking.view" // see team bookings
   | "booking.manage" // create/reschedule/cancel on behalf of others
@@ -25,7 +25,7 @@ const ALL: Permission[] = [
   "member.invite",
   "member.remove",
   "member.role.assign",
-  "eventType.manage",
+  "service.manage",
   "availability.manage",
   "booking.view",
   "booking.manage",
@@ -49,13 +49,13 @@ const MATRIX: Record<MembershipRole, Permission[]> = {
     "team.view",
     "member.invite",
     "member.remove",
-    "eventType.manage",
+    "service.manage",
     "availability.manage",
     "booking.view",
     "booking.manage",
     "analytics.view",
   ],
-  provider: ["team.view", "eventType.manage", "availability.manage", "booking.view"],
+  provider: ["team.view", "service.manage", "availability.manage", "booking.view"],
   receptionist: ["team.view", "booking.view", "booking.manage"],
   member: ["team.view"],
 };

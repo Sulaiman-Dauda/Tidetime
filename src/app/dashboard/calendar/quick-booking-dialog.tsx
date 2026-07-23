@@ -25,6 +25,7 @@ import { createManualBookingAction } from "./actions";
 
 export interface CalendarService {
   slug: string;
+  teamSlug: string;
   title: string;
   length: number;
 }
@@ -77,6 +78,7 @@ export function QuickBookingDialog({ open, onOpenChange, date, services }: Props
     start(async () => {
       const res = await createManualBookingAction({
         slug,
+        teamSlug: services.find((service) => service.slug === slug)?.teamSlug ?? "",
         date,
         time,
         durationMin: duration,

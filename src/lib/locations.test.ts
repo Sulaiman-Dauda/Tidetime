@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import { isVideoLocationType, jitsiRoomUrl, locationLabel, resolveLocation } from "./locations";
 
 describe("isVideoLocationType", () => {
-  it("recognises every video provider including built-in Jitsi", () => {
+  it("recognises the retained video providers", () => {
     expect(isVideoLocationType("jitsi")).toBe(true);
     expect(isVideoLocationType("google_meet")).toBe(true);
-    expect(isVideoLocationType("office365_video")).toBe(true);
-    expect(isVideoLocationType("zoom")).toBe(true);
-    expect(isVideoLocationType("daily_video")).toBe(true);
   });
   it("is false for non-video types", () => {
     expect(isVideoLocationType("in_person")).toBe(false);
@@ -23,10 +20,8 @@ describe("resolveLocation", () => {
       meetingUrl: "https://x.example",
     });
   });
-  it("defers the URL for video providers (provisioned later)", () => {
-    for (const type of ["google_meet", "office365_video", "zoom", "daily_video"] as const) {
-      expect(resolveLocation({ type })).toEqual({ location: "Video call", meetingUrl: null });
-    }
+  it("defers the Google Meet URL until calendar provisioning", () => {
+    expect(resolveLocation({ type: "google_meet" })).toEqual({ location: "Video call", meetingUrl: null });
   });
   it("uses the attendee phone for attendee_phone", () => {
     expect(resolveLocation({ type: "attendee_phone" }, "+123")).toEqual({
@@ -46,9 +41,7 @@ describe("resolveLocation", () => {
 });
 
 describe("locationLabel", () => {
-  it("labels video providers by name", () => {
+  it("labels Google Meet by name", () => {
     expect(locationLabel({ type: "google_meet" })).toBe("Google Meet");
-    expect(locationLabel({ type: "office365_video" })).toBe("Microsoft Teams");
-    expect(locationLabel({ type: "zoom" })).toBe("Zoom");
   });
 });

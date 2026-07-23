@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { cancelBookingAction, type BookActionState } from "../../actions";
 import { Loader2, XCircle } from "lucide-react";
 
-export function CancelBooking({ uid, isRecurring = false }: { uid: string; isRecurring?: boolean }) {
+export function CancelBooking({ uid }: { uid: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<BookActionState, FormData>(async (prev, fd) => {
@@ -34,12 +34,6 @@ export function CancelBooking({ uid, isRecurring = false }: { uid: string; isRec
         </Label>
         <Textarea id="reason" name="reason" rows={2} placeholder="Let the host know why…" />
       </div>
-      {isRecurring ? (
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-secondary/60">
-          <input type="checkbox" name="series" className="mt-0.5 h-4 w-4 rounded border-input" />
-          <span>Cancel all upcoming occurrences in this series</span>
-        </label>
-      ) : null}
       {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
       <div className="flex gap-2">
         <Button type="button" variant="ghost" className="flex-1" onClick={() => setOpen(false)}>

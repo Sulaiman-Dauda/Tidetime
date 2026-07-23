@@ -9,13 +9,4 @@ function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
   );
 }
 
-function SkeletonCard({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("rounded-2xl border border-border/60 bg-card p-5", className)}
-      {...props}
-    />
-  );
-}
-
-export { Skeleton, SkeletonCard };
+export { Skeleton };

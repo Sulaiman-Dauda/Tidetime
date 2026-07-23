@@ -33,19 +33,6 @@ export function CardListSkeleton({ rows = 5 }: { rows?: number }) {
   );
 }
 
-export function StatGridSkeleton() {
-  return (
-    <div className="grid gap-px rounded-2xl border border-border/60 bg-border sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-3 bg-card p-5">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-8 w-20" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function FormCardSkeleton() {
   return (
     <div className="rounded-xl border bg-card p-6 space-y-4">

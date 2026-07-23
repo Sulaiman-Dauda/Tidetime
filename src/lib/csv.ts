@@ -97,7 +97,7 @@ export function toCsv(records: Record<string, unknown>[], columns: string[]): st
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export interface ProviderImportRow {
+interface ProviderImportRow {
   email: string;
   name: string;
   role: string;

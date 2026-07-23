@@ -36,8 +36,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           <ul className="space-y-2.5 text-sm text-muted-foreground">
             {[
               "Timezone-aware scheduling",
-              "Paid events with Stripe",
-              "Team round-robin & collective",
+              "Services with assigned providers",
+              "Signed Zapier webhooks",
               "Open-source, self-hostable",
             ].map((item) => (
               <li key={item} className="flex items-center gap-2.5">

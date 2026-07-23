@@ -9,7 +9,7 @@ import { getAppUrl } from "@/server/app-url";
 
 const PURPOSE = "password_reset";
 const TTL_MS = 1000 * 60 * 30; // 30 minutes
-export const RESET_TTL_MINUTES = 30;
+const RESET_TTL_MINUTES = 30;
 
 /**
  * Begin a password reset. Always resolves successfully regardless of whether the

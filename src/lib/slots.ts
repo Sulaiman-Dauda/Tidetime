@@ -19,7 +19,7 @@ export interface Interval {
 }
 
 /** Hard cap on the date span a public slots request may ask for. */
-export const MAX_PUBLIC_RANGE_DAYS = 93;
+const MAX_PUBLIC_RANGE_DAYS = 93;
 
 export type PublicSlotRange =
   | { ok: true; rangeStart: Date; rangeEnd: Date }
@@ -72,25 +72,12 @@ export interface SlotEngineInput {
   duration: number;
   /** slot granularity in minutes; defaults to duration */
   slotInterval?: number | null;
-  /** minutes to offset slot start times within each working window (e.g. 15 → :15/:45) */
-  offsetStart?: number | null;
   beforeBuffer?: number;
   afterBuffer?: number;
   /** minutes of lead time required before "now" */
   minimumNotice?: number;
   /** existing busy intervals (bookings, OOO, external calendars) */
   busy?: Interval[];
-  /** capacity per slot (>1 for group events) and existing counts keyed by ISO start */
-  seatsPerSlot?: number | null;
-  seatCounts?: Record<string, number>;
-  /** future-window restriction */
-  periodType?: "unlimited" | "rolling" | "rolling_window" | "range";
-  periodDays?: number | null;
-  periodStartDate?: string | null;
-  periodEndDate?: string | null;
-  /** frequency caps, e.g. {day:3, week:10}; counts already booked per period */
-  bookingLimits?: Record<string, number> | null;
-  bookedCounts?: { day?: number; week?: number; month?: number; year?: number };
   /** reference "now" — injectable for testing */
   now?: Date;
 }
@@ -102,10 +89,8 @@ export interface Slot {
   seatsRemaining?: number;
 }
 
-const DAY = 24 * 60 * 60 * 1000;
-
 /** Merge overlapping/adjacent intervals. */
-export function mergeIntervals(intervals: Interval[]): Interval[] {
+function mergeIntervals(intervals: Interval[]): Interval[] {
   if (intervals.length === 0) return [];
   const sorted = [...intervals].sort((a, b) => a.start - b.start);
   const out: Interval[] = [{ ...sorted[0] }];
@@ -118,29 +103,11 @@ export function mergeIntervals(intervals: Interval[]): Interval[] {
   return out;
 }
 
-/** Subtract busy intervals from a free interval, returning remaining free parts. */
-export function subtractIntervals(free: Interval, busy: Interval[]): Interval[] {
-  let parts: Interval[] = [free];
-  for (const b of busy) {
-    const next: Interval[] = [];
-    for (const p of parts) {
-      if (b.end <= p.start || b.start >= p.end) {
-        next.push(p); // no overlap
-      } else {
-        if (b.start > p.start) next.push({ start: p.start, end: b.start });
-        if (b.end < p.end) next.push({ start: b.end, end: p.end });
-      }
-    }
-    parts = next;
-  }
-  return parts;
-}
-
 /**
  * Compute the free working windows (UTC intervals) for a single calendar day
  * in the schedule's timezone, applying date overrides over weekly rules.
  */
-export function workingWindowsForDay(
+function workingWindowsForDay(
   dateKey: string,
   rules: AvailabilityRule[],
   timeZone: string,
@@ -172,46 +139,6 @@ export function workingWindowsForDay(
   return mergeIntervals(windows);
 }
 
-/** Determine the hard upper bound for bookable dates from the period config. */
-function periodBound(input: SlotEngineInput, now: Date): number {
-  switch (input.periodType) {
-    case "rolling":
-    case "rolling_window":
-      return input.periodDays != null
-        ? now.getTime() + input.periodDays * DAY
-        : Number.POSITIVE_INFINITY;
-    case "range":
-      if (input.periodEndDate) {
-        const [y, m, d] = input.periodEndDate.split("-").map(Number);
-        return zonedTimeToUtc(y, m, d, 23, 59, input.scheduleTimeZone).getTime();
-      }
-      return Number.POSITIVE_INFINITY;
-    default:
-      return Number.POSITIVE_INFINITY;
-  }
-}
-
-function periodLowerBound(input: SlotEngineInput): number {
-  if (input.periodType === "range" && input.periodStartDate) {
-    const [y, m, d] = input.periodStartDate.split("-").map(Number);
-    return zonedTimeToUtc(y, m, d, 0, 0, input.scheduleTimeZone).getTime();
-  }
-  return Number.NEGATIVE_INFINITY;
-}
-
-/** Whether frequency caps already prevent any further bookings. */
-function frequencyExhausted(input: SlotEngineInput): boolean {
-  const limits = input.bookingLimits;
-  if (!limits) return false;
-  const counts = input.bookedCounts ?? {};
-  return (
-    (limits.day != null && (counts.day ?? 0) >= limits.day) ||
-    (limits.week != null && (counts.week ?? 0) >= limits.week) ||
-    (limits.month != null && (counts.month ?? 0) >= limits.month) ||
-    (limits.year != null && (counts.year ?? 0) >= limits.year)
-  );
-}
-
 /**
  * Generate bookable slots across the requested range.
  */
@@ -219,26 +146,19 @@ export function computeSlots(input: SlotEngineInput): Slot[] {
   const now = input.now ?? new Date();
   const duration = input.duration;
   const step = input.slotInterval && input.slotInterval > 0 ? input.slotInterval : duration;
-  const offset = input.offsetStart && input.offsetStart > 0 ? input.offsetStart : 0;
   const before = (input.beforeBuffer ?? 0) * 60000;
   const after = (input.afterBuffer ?? 0) * 60000;
   const notice = (input.minimumNotice ?? 0) * 60000;
   const earliest = now.getTime() + notice;
 
-  if (frequencyExhausted(input)) return [];
-
-  const upperBound = Math.min(input.rangeEnd.getTime(), periodBound(input, now));
-  const lowerBound = Math.max(input.rangeStart.getTime(), periodLowerBound(input), earliest);
+  const upperBound = input.rangeEnd.getTime();
+  const lowerBound = Math.max(input.rangeStart.getTime(), earliest);
   if (lowerBound >= upperBound) return [];
 
   const busy = mergeIntervals(input.busy ?? []);
-  const seatsPerSlot = input.seatsPerSlot ?? 1;
-  const seatCounts = input.seatCounts ?? {};
-
   const slots: Slot[] = [];
   const slotMs = duration * 60000;
   const stepMs = step * 60000;
-  const offsetMs = offset * 60000;
 
   // Iterate day by day across the schedule timezone to apply working windows.
   let dayKey = formatDateKey(input.rangeStart, input.scheduleTimeZone);
@@ -248,26 +168,14 @@ export function computeSlots(input: SlotEngineInput): Slot[] {
   for (let guard = 0; guard < 800; guard++) {
     const windows = workingWindowsForDay(dayKey, input.rules, input.scheduleTimeZone);
     for (const w of windows) {
-      // Walk slot starts aligned to the window start, shifted by offsetStart.
-      for (let t = w.start + offsetMs; t + slotMs <= w.end; t += stepMs) {
+      for (let t = w.start; t + slotMs <= w.end; t += stepMs) {
         if (t < lowerBound || t >= upperBound) continue;
         const occupied: Interval = { start: t - before, end: t + slotMs + after };
-        // Check against busy times (skip occupancy for seated slots — handled by seatCounts).
-        const isFree =
-          seatsPerSlot > 1
-            ? true
-            : busy.every((b) => occupied.end <= b.start || occupied.start >= b.end);
+        const isFree = busy.every((b) => occupied.end <= b.start || occupied.start >= b.end);
         if (!isFree) continue;
 
         const iso = new Date(t).toISOString();
-        if (seatsPerSlot > 1) {
-          const taken = seatCounts[iso] ?? 0;
-          const remaining = seatsPerSlot - taken;
-          if (remaining <= 0) continue;
-          slots.push({ time: iso, seatsRemaining: remaining });
-        } else {
-          slots.push({ time: iso });
-        }
+        slots.push({ time: iso });
       }
     }
     if (dayKey === lastKey) break;

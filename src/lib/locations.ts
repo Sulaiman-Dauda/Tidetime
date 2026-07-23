@@ -1,29 +1,7 @@
 import type { EventLocation } from "@/db/schema";
-import { MapPin, Phone, Video, Link2, Smartphone } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-
-export const LOCATION_OPTIONS: { type: EventLocation["type"]; label: string; icon: LucideIcon }[] = [
-  { type: "in_person", label: "In person", icon: MapPin },
-  { type: "phone", label: "Phone call (you call)", icon: Phone },
-  { type: "attendee_phone", label: "Phone call (attendee provides number)", icon: Smartphone },
-  { type: "link", label: "Custom link", icon: Link2 },
-];
-
-/** Video providers backed by the App Store. Shown only when connected. */
-export const VIDEO_LOCATION_OPTIONS: {
-  type: EventLocation["type"];
-  label: string;
-  icon: LucideIcon;
-}[] = [
-  { type: "jitsi", label: "Jitsi Meet (built-in)", icon: Video },
-  { type: "google_meet", label: "Google Meet", icon: Video },
-  { type: "office365_video", label: "Microsoft Teams", icon: Video },
-  { type: "zoom", label: "Zoom", icon: Video },
-  { type: "daily_video", label: "Daily video", icon: Video },
-];
 
 /** Default Jitsi instance for the built-in, connection-free video option. */
-export const JITSI_BASE_URL = "https://meet.jit.si";
+const JITSI_BASE_URL = "https://meet.jit.si";
 
 /**
  * Build a Jitsi room URL for a booking. The room id (a booking uid) is unique
@@ -34,16 +12,10 @@ export function jitsiRoomUrl(roomId: string): string {
   return `${JITSI_BASE_URL}/Tidetime-${roomId}`;
 }
 
-const VIDEO_TYPES = new Set<EventLocation["type"]>(
-  VIDEO_LOCATION_OPTIONS.map((o) => o.type),
-);
+const VIDEO_TYPES = new Set<EventLocation["type"]>(["jitsi", "google_meet"]);
 
 export function isVideoLocationType(type: EventLocation["type"]): boolean {
   return VIDEO_TYPES.has(type);
-}
-
-export function locationOption(type: EventLocation["type"]) {
-  return [...LOCATION_OPTIONS, ...VIDEO_LOCATION_OPTIONS].find((o) => o.type === type);
 }
 
 export function locationLabel(loc: EventLocation): string {
@@ -52,12 +24,6 @@ export function locationLabel(loc: EventLocation): string {
       return "Jitsi Meet";
     case "google_meet":
       return "Google Meet";
-    case "office365_video":
-      return "Microsoft Teams";
-    case "zoom":
-      return "Zoom";
-    case "daily_video":
-      return "Video call";
     case "in_person":
       return loc.address ? `In person · ${loc.address}` : "In person";
     case "phone":
@@ -71,16 +37,10 @@ export function locationLabel(loc: EventLocation): string {
   }
 }
 
-export function locationIcon(type: EventLocation["type"]): LucideIcon {
-  return locationOption(type)?.icon ?? Video;
-}
-
 /**
  * Resolve the concrete meeting location string + URL stored on a booking at
- * creation time. For App Store video providers the join URL is provisioned
- * asynchronously by booking-effects, so we record "Video call" with no URL yet.
- * Jitsi is the exception: its room is a pure function of the booking id, so the
- * link is minted here immediately — no provider, no API, no async step.
+ * creation time. Jitsi is generated immediately; Google Meet is provisioned by
+ * the calendar integration after the booking is accepted.
  */
 export function resolveLocation(
   loc: EventLocation | undefined,
@@ -100,9 +60,6 @@ export function resolveLocation(
     case "jitsi":
       return { location: "Video call", meetingUrl: roomId ? jitsiRoomUrl(roomId) : null };
     case "google_meet":
-    case "office365_video":
-    case "zoom":
-    case "daily_video":
       return { location: "Video call", meetingUrl: null };
     default:
       return { location: "Online", meetingUrl: null };

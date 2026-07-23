@@ -25,37 +25,6 @@ export interface CompanyProfile {
   logoUrl: string;
   /** Brand colour applied across the app (hex, e.g. #4f46e5). */
   brandColor: string;
-  /** Default currency (ISO 4217, lowercase) for new services + price display. */
-  defaultCurrency: string;
-}
-
-/** Currencies offered in the settings picker. Lowercase ISO 4217 (Stripe style). */
-export const SUPPORTED_CURRENCIES = [
-  "usd",
-  "eur",
-  "gbp",
-  "cad",
-  "aud",
-  "nzd",
-  "ngn",
-  "zar",
-  "inr",
-  "jpy",
-  "cny",
-  "brl",
-  "mxn",
-  "chf",
-  "sek",
-  "aed",
-] as const;
-
-export function isSupportedCurrency(value: unknown): boolean {
-  return typeof value === "string" && (SUPPORTED_CURRENCIES as readonly string[]).includes(value.toLowerCase());
-}
-
-export function normalizeCurrency(value: string | null | undefined): string {
-  const v = (value ?? "").trim().toLowerCase();
-  return isSupportedCurrency(v) ? v : "usd";
 }
 
 export interface CompanyLocalization {
@@ -113,7 +82,6 @@ export const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   websiteUrl: "",
   logoUrl: "",
   brandColor: "#4f46e5",
-  defaultCurrency: "usd",
 };
 
 export const DEFAULT_COMPANY_LOCALIZATION: CompanyLocalization = {
@@ -143,13 +111,6 @@ export const DEFAULT_COMPANY_LEGAL: CompanyLegalContents = {
   legalNoticeUrl: "",
   imprintUrl: "",
   dataRetentionDays: 0,
-};
-
-export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
-  profile: DEFAULT_COMPANY_PROFILE,
-  localization: DEFAULT_COMPANY_LOCALIZATION,
-  booking: DEFAULT_COMPANY_BOOKING,
-  legal: DEFAULT_COMPANY_LEGAL,
 };
 
 /* -------------------------------------------------------------------------- */

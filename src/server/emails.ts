@@ -4,7 +4,6 @@ import {
   BookingEmail,
   InviteEmail,
   PasswordResetEmail,
-  SeriesEmail,
   type BookingEmailProps,
 } from "@/emails/templates";
 
@@ -121,29 +120,6 @@ export async function bookingRescheduledAttendee(v: EmailBookingView): Promise<R
         toBookingProps(v, "Booking rescheduled", "Your booking has a new time. An updated invite is attached."),
       ),
     ),
-  };
-}
-
-/** Confirmation for a recurring series — lists every occurrence. */
-export async function bookingSeriesConfirmedAttendee(
-  v: EmailBookingView,
-  dates: Date[],
-  timeZone: string,
-  hour12: boolean,
-  status: "accepted" | "pending",
-): Promise<RenderedEmail> {
-  const durationMs = v.end.getTime() - v.start.getTime();
-  const occurrences = dates.map((d) =>
-    formatRange(d, new Date(d.getTime() + durationMs), timeZone, hour12),
-  );
-  const heading = status === "pending" ? "Recurring booking requested" : "Recurring booking confirmed";
-  const intro =
-    status === "pending"
-      ? `Your recurring request with ${v.hostName} was sent. You'll be confirmed once approved. ${dates.length} occurrences:`
-      : `You're booked with ${v.hostName} for ${dates.length} occurrences:`;
-  return {
-    subject: `${status === "pending" ? "Requested" : "Confirmed"}: ${v.title} (×${dates.length})`,
-    html: await render(SeriesEmail({ heading, intro, occurrences, manageUrl: v.manageUrl })),
   };
 }
 

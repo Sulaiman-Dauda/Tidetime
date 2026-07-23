@@ -37,7 +37,6 @@ export type TranslationKey =
   | "booking.genericError"
   | "email.confirmedSubject"
   | "email.cancelledSubject"
-  | "email.reminderSubject"
   | "common.poweredBy"
   // ICU plural examples — demonstrate count-aware messages.
   | "booking.guestCount"
@@ -60,7 +59,6 @@ const en: Record<TranslationKey, string> = {
   "booking.genericError": "We couldn't process that request. Please try again.",
   "email.confirmedSubject": "Your booking is confirmed",
   "email.cancelledSubject": "Your booking was cancelled",
-  "email.reminderSubject": "Reminder: your upcoming booking",
   "common.poweredBy": "Powered by Tidetime",
   "booking.guestCount": "{count, plural, =0 {No guests} one {# guest} other {# guests}}",
   "booking.seatsRemaining": "{count, plural, =0 {Fully booked} one {# seat left} other {# seats left}}",

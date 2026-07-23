@@ -67,7 +67,7 @@ export const bookingGuestsSchema = z
   .array(z.string().email())
   .max(20, "Too many guests (maximum 20)");
 
-export const eventLocationSchema = z.discriminatedUnion("type", [
+const eventLocationSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("in_person"),
     address: z.string().trim().min(1, "Address is required").max(500),
@@ -83,14 +83,11 @@ export const eventLocationSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("jitsi") }),
   z.object({ type: z.literal("google_meet") }),
-  z.object({ type: z.literal("office365_video") }),
-  z.object({ type: z.literal("daily_video") }),
-  z.object({ type: z.literal("zoom") }),
 ]);
 
 export const eventLocationsSchema = z.array(eventLocationSchema).max(10, "Too many locations");
 
-export const bookingFieldTypeSchema = z.enum([
+const bookingFieldTypeSchema = z.enum([
   "text",
   "textarea",
   "email",
@@ -102,7 +99,7 @@ export const bookingFieldTypeSchema = z.enum([
   "multiselect",
 ]);
 
-export const bookingFieldConditionSchema = z.object({
+const bookingFieldConditionSchema = z.object({
   field: z
     .string()
     .trim()
@@ -112,7 +109,7 @@ export const bookingFieldConditionSchema = z.object({
   equals: z.array(z.string().trim().min(1).max(100)).min(1).max(50),
 });
 
-export const bookingFieldSchema = z
+const bookingFieldSchema = z
   .object({
     name: z
       .string()
@@ -168,20 +165,3 @@ export const bookingFieldsSchema = z
       }
     }
   });
-
-export const bookingLimitsSchema = z
-  .object({
-    day: z.coerce.number().int().min(0).optional(),
-    week: z.coerce.number().int().min(0).optional(),
-    month: z.coerce.number().int().min(0).optional(),
-    year: z.coerce.number().int().min(0).optional(),
-  })
-  .strict()
-  .nullable()
-  .optional();
-
-export const currencySchema = z
-  .string()
-  .trim()
-  .length(3, "Use a 3-letter ISO currency code")
-  .transform((value) => value.toLowerCase());

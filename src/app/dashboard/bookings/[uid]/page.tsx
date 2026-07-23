@@ -3,10 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/db";
-import { bookings, attendees, eventTypes } from "@/db/schema";
+import { bookings, attendees, services } from "@/db/schema";
 import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
-import { expireStalePaymentHolds } from "@/server/payment-holds";
 import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { AcceptButton, CancelBookingButton, DeclineButton } from "../_components/booking-actions";
@@ -17,13 +16,8 @@ import {
   CalendarX2,
   CheckCircle2,
   Clock,
-  CreditCard,
-  Mail,
   MapPin,
-  Repeat,
-  Star,
   User,
-  UserX,
   XCircle,
 } from "lucide-react";
 
@@ -40,10 +34,6 @@ const ACTIVITY_META: Record<
   cancelled: { label: "Cancelled", icon: CalendarX2, tone: "text-destructive" },
   confirmed: { label: "Confirmed", icon: CheckCircle2, tone: "text-emerald-500" },
   rejected: { label: "Declined", icon: XCircle, tone: "text-destructive" },
-  payment_succeeded: { label: "Payment received", icon: CreditCard, tone: "text-emerald-500" },
-  reminder_sent: { label: "Reminder sent", icon: Mail, tone: "text-sky-500" },
-  review_submitted: { label: "Review submitted", icon: Star, tone: "text-amber-500" },
-  no_show: { label: "Marked no-show", icon: UserX, tone: "text-destructive" },
   rsvp: { label: "RSVP", icon: CheckCircle2, tone: "text-sky-500" },
 };
 
@@ -58,7 +48,6 @@ export default async function BookingDetailPage({ params }: Props) {
   const user = await requireUser();
   const { uid } = await params;
 
-  await expireStalePaymentHolds();
 
   const [booking] = await db
     .select()
@@ -68,28 +57,27 @@ export default async function BookingDetailPage({ params }: Props) {
 
   if (!booking) notFound();
 
-  const [ats, activity, eventTypeRow] = await Promise.all([
+  const [ats, activity, serviceRow] = await Promise.all([
     db.select().from(attendees).where(eq(attendees.bookingId, booking.id)),
     listBookingActivity(booking.id),
-    booking.eventTypeId
+    booking.serviceId
       ? db
-          .select({ bookingFields: eventTypes.bookingFields, requiresPayment: eventTypes.requiresPayment })
-          .from(eventTypes)
-          .where(eq(eventTypes.id, booking.eventTypeId))
+          .select({ bookingFields: services.bookingFields })
+          .from(services)
+          .where(eq(services.id, booking.serviceId))
           .limit(1)
           .then((rows) => rows[0] ?? null)
       : Promise.resolve(null),
   ]);
 
   const when = formatRange(booking.startTime, booking.endTime, user.timeZone);
-  const fieldLabels = new Map((eventTypeRow?.bookingFields ?? []).map((field) => [field.name, field.label]));
+  const fieldLabels = new Map((serviceRow?.bookingFields ?? []).map((field) => [field.name, field.label]));
   const responseEntries = Object.entries(booking.responses ?? {}).filter(([, value]) => {
     if (value === null || value === undefined) return false;
     if (typeof value === "string") return value.trim().length > 0;
     if (Array.isArray(value)) return value.length > 0;
     return true;
   });
-  const awaitingPayment = booking.status === "pending" && Boolean(eventTypeRow?.requiresPayment) && !booking.paid;
   const canCancel = booking.status === "accepted" && booking.endTime.getTime() >= Date.now();
 
   return (
@@ -105,17 +93,11 @@ export default async function BookingDetailPage({ params }: Props) {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold tracking-tight">{booking.title}</h1>
           {booking.status === "pending" && (
-            <Badge variant="pending">{awaitingPayment ? "Awaiting payment" : "Pending"}</Badge>
+            <Badge variant="pending">Pending</Badge>
           )}
           {booking.status === "accepted" && <Badge>Confirmed</Badge>}
           {booking.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
           {booking.status === "rejected" && <Badge variant="destructive">Rejected</Badge>}
-          {booking.recurringEventId && (
-            <Badge variant="outline" className="gap-1">
-              <Repeat className="h-3 w-3" />
-              Recurring
-            </Badge>
-          )}
         </div>
       </div>
 
@@ -175,7 +157,7 @@ export default async function BookingDetailPage({ params }: Props) {
         </section>
 
         <section className="space-y-4 rounded-2xl border border-border/60 bg-card p-5">
-          {booking.status === "pending" && !awaitingPayment ? (
+          {booking.status === "pending" ? (
             <div className="space-y-3 border-b border-border/60 pb-4">
               <h2 className="text-sm font-medium text-foreground">Actions</h2>
               <div className="flex flex-wrap gap-2">

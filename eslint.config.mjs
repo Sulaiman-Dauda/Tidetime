@@ -1,21 +1,16 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTypeScript from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const config = [
+export default defineConfig([
+  ...nextVitals,
+  ...nextTypeScript,
   {
-    ignores: [".next/**", "coverage/**", "next-env.d.ts", "public/embed.js"],
-  },
-  ...compat.config({
-    extends: ["next/core-web-vitals", "next/typescript"],
     rules: {
+      // These compiler-oriented rules are advisory in this non-compiled React app.
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
@@ -25,14 +20,10 @@ const config = [
         },
       ],
     },
-  }),
-  {
-    // CommonJS preload helpers run outside the bundler and must use require().
-    files: ["**/*.cjs"],
-    rules: {
-      "@typescript-eslint/no-require-imports": "off",
-    },
   },
-];
-
-export default config;
+  {
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  globalIgnores([".next/**", "coverage/**", "next-env.d.ts"]),
+]);

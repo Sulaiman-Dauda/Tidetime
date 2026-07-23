@@ -68,30 +68,10 @@ const nextConfig: NextConfig = {
     // so self-hosters on 1–2GB VPSes can build without exotic swap setups.
     webpackMemoryOptimizations: true,
   },
-  // Emit a standard production build compatible with "next start".
-  // output: "standalone",
+  output: "standalone",
   async headers() {
     return [
-      // Sensitive routes are protected against clickjacking.
-      { source: "/", headers: protectedAreaHeaders },
-      { source: "/login", headers: protectedAreaHeaders },
-      { source: "/signup", headers: protectedAreaHeaders },
-      { source: "/forgot-password", headers: protectedAreaHeaders },
-      { source: "/reset-password", headers: protectedAreaHeaders },
-      { source: "/setup", headers: protectedAreaHeaders },
-      { source: "/dashboard/:path*", headers: protectedAreaHeaders },
-      { source: "/api/:path*", headers: protectedAreaHeaders },
-      { source: "/booking/:path*", headers: protectedAreaHeaders },
-      { source: "/i/:path*", headers: protectedAreaHeaders },
-      { source: "/:username", headers: protectedAreaHeaders },
-      { source: "/book/:team", headers: protectedAreaHeaders },
-
-      // Public booking pages (`/:username/:slug` and `/book/:team/:slug`) stay
-      // frameable so the embeddable widget can load cross-origin.
-      {
-        source: "/:path*",
-        headers: baseSecurityHeaders,
-      },
+      { source: "/:path*", headers: protectedAreaHeaders },
     ];
   },
 };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTeamEventType, getTeamSlots, groupTeamSlotsByDay } from "@/server/teams-public";
+import { getTeamService, getTeamSlots, groupTeamSlotsByDay } from "@/server/teams-public";
 import { parsePublicSlotRange } from "@/lib/slots";
 import { isValidTimeZone } from "@/lib/time";
 import { isBookingDisabled } from "@/server/company-settings";
@@ -22,14 +22,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Booking is temporarily disabled" }, { status: 503 });
   }
 
-  const resolved = await getTeamEventType(teamSlug, slug);
+  const resolved = await getTeamService(teamSlug, slug);
   if (!resolved) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const requestedTz = sp.get("tz");
-  const viewerTz = requestedTz && isValidTimeZone(requestedTz) ? requestedTz : resolved.eventType.scheduleTimeZone;
+  const viewerTz = requestedTz && isValidTimeZone(requestedTz) ? requestedTz : resolved.service.scheduleTimeZone;
 
   const rawDuration = sp.get("duration");
-  const duration = rawDuration ? Number(rawDuration) : resolved.eventType.length;
+  const duration = rawDuration ? Number(rawDuration) : resolved.service.length;
   if (!Number.isFinite(duration) || duration < 5 || duration > 1440) {
     return NextResponse.json({ error: "Invalid duration" }, { status: 400 });
   }
@@ -41,14 +41,19 @@ export async function GET(req: NextRequest) {
   const hostParam = sp.get("host");
   const preferredHostId = hostParam ? Number(hostParam) : undefined;
   const slots = await getTeamSlots({
-    eventType: resolved.eventType,
+    service: resolved.service,
     rangeStart,
     rangeEnd,
     duration,
     preferredHostId:
       preferredHostId && Number.isInteger(preferredHostId) ? preferredHostId : undefined,
   });
-  const byDay = groupTeamSlotsByDay(slots, viewerTz);
+  const byDay = Object.fromEntries(
+    Object.entries(groupTeamSlotsByDay(slots, viewerTz)).map(([day, daySlots]) => [
+      day,
+      daySlots.map((slot) => slot.time),
+    ]),
+  );
 
-  return NextResponse.json({ slots, byDay }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ byDay }, { headers: { "Cache-Control": "no-store" } });
 }

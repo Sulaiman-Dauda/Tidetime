@@ -4,7 +4,7 @@ import { db } from "@/db";
 import {
   bookings,
   calendarCache,
-  eventTypes,
+  services,
   sessions,
   verificationTokens,
   webhookDeliveries,
@@ -18,9 +18,9 @@ import { getCompanySettings } from "./company-settings";
  *    webhook deliveries.
  *  - Personal-data retention (opt-in via Settings → Legal "data retention days"):
  *    permanently delete bookings — and their cascading attendees, references,
- *    activity, payments and reminders — once they're older than the window.
+ *    activity and calendar references — once they're older than the window.
  *
- * Runs from the same job runner as reminders/webhooks.
+ * Runs from the same job runner as webhook delivery.
  */
 
 /** Abandoned service drafts older than this are removed. */
@@ -32,7 +32,7 @@ export interface RetentionSummary {
   sessions: number;
   verificationTokens: number;
   calendarCache: number;
-  draftEventTypes: number;
+  draftServices: number;
   webhookDeliveries: number;
   bookings: number;
 }
@@ -51,7 +51,7 @@ export async function runRetentionCleanup(now = new Date()): Promise<RetentionSu
     sessions: 0,
     verificationTokens: 0,
     calendarCache: 0,
-    draftEventTypes: 0,
+    draftServices: 0,
     webhookDeliveries: 0,
     bookings: 0,
   };
@@ -75,13 +75,13 @@ export async function runRetentionCleanup(now = new Date()): Promise<RetentionSu
       .returning({ id: calendarCache.id })
   ).length;
 
-  summary.draftEventTypes = (
+  summary.draftServices = (
     await db
-      .delete(eventTypes)
+      .delete(services)
       .where(
-        and(eq(eventTypes.draft, true), lt(eventTypes.createdAt, new Date(now.getTime() - DRAFT_TTL_MS))),
+        and(eq(services.draft, true), lt(services.createdAt, new Date(now.getTime() - DRAFT_TTL_MS))),
       )
-      .returning({ id: eventTypes.id })
+      .returning({ id: services.id })
   ).length;
 
   summary.webhookDeliveries = (
@@ -111,7 +111,7 @@ export async function runRetentionCleanup(now = new Date()): Promise<RetentionSu
 export function formatRetentionSummary(s: RetentionSummary): string {
   return (
     `[retention] sessions=${s.sessions} tokens=${s.verificationTokens}` +
-    ` cache=${s.calendarCache} drafts=${s.draftEventTypes}` +
+    ` cache=${s.calendarCache} drafts=${s.draftServices}` +
     ` webhookDeliveries=${s.webhookDeliveries} bookings=${s.bookings}`
   );
 }

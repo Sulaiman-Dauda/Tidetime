@@ -83,8 +83,8 @@ We recommend [Conventional Commits](https://www.conventionalcommits.org/):
 
 - `feat: add public health endpoint`
 - `fix: reject invalid public slot durations`
-- `docs: document reminder worker deployment`
-- `refactor: centralize event type validation`
+- `docs: document jobs worker deployment`
+- `refactor: centralize service validation`
 
 Typical branch prefixes:
 

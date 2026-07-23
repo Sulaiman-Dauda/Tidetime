@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { env } from "@/lib/env";
 import { getAppUrl } from "@/server/app-url";
 import "./globals.css";
@@ -29,17 +27,14 @@ const satoshi = localFont({
   display: "swap",
 });
 
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
-
-const description =
-  "Tidetime is a fast, elegant, open-source scheduling platform. Share your link, let people book — no back-and-forth.";
+const description = "Book company services with the right available provider.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const appUrl = await getAppUrl();
   return {
   applicationName: env.appName,
   title: {
-    default: `${env.appName} — Scheduling, perfected`,
+    default: `${env.appName} — Book a service`,
     template: `%s · ${env.appName}`,
   },
   description,
@@ -51,12 +46,12 @@ export async function generateMetadata(): Promise<Metadata> {
     type: "website",
     url: appUrl,
     siteName: env.appName,
-    title: `${env.appName} — Scheduling, perfected`,
+    title: `${env.appName} — Book a service`,
     description,
   },
   twitter: {
     card: "summary",
-    title: `${env.appName} — Scheduling, perfected`,
+    title: `${env.appName} — Book a service`,
     description,
   },
   icons: {
@@ -68,11 +63,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${clashDisplay.variable} ${satoshi.variable} ${mono.variable} font-sans`}>
+      <body className={`${clashDisplay.variable} ${satoshi.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
-          <ServiceWorkerRegister />
         </ThemeProvider>
       </body>
     </html>

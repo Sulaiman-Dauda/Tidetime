@@ -30,7 +30,7 @@ export function EmailSettings() {
             host: data.config.host || "",
             port: String(data.config.port || 587),
             user: data.config.user || "",
-            pass: data.config.pass || "",
+            pass: "",
             from: data.config.from || "",
           });
         }
@@ -96,7 +96,7 @@ export function EmailSettings() {
         <h2 className="text-base font-semibold">Email (SMTP)</h2>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Configure outgoing email for invites, booking confirmations, and reminders.
+        Configure outgoing email for invites and booking notifications.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -116,7 +116,7 @@ export function EmailSettings() {
         </div>
         <div className="space-y-1.5">
           <Label>Password</Label>
-          <Input value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} type="password" placeholder="••••••••" autoComplete="off" />
+          <Input value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} type="password" placeholder="Leave blank to keep the current password" autoComplete="new-password" />
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label>

@@ -20,27 +20,13 @@ function times(slots: { time: string }[]): string[] {
   return slots.map((s) => s.time);
 }
 
-describe("computeSlots offsetStart", () => {
-  it("aligns slots to the window start when offset is 0", () => {
+describe("computeSlots", () => {
+  it("aligns slots to the working window", () => {
     const slots = computeSlots({ ...base });
     expect(times(slots)).toEqual([
       "2025-01-06T09:00:00.000Z",
       "2025-01-06T10:00:00.000Z",
       "2025-01-06T11:00:00.000Z",
     ]);
-  });
-
-  it("shifts slot start times by the offset", () => {
-    const slots = computeSlots({ ...base, offsetStart: 15 });
-    expect(times(slots)).toEqual([
-      "2025-01-06T09:15:00.000Z",
-      "2025-01-06T10:15:00.000Z",
-    ]);
-  });
-
-  it("treats a null/zero offset the same as no offset", () => {
-    const a = times(computeSlots({ ...base, offsetStart: 0 }));
-    const b = times(computeSlots({ ...base, offsetStart: null }));
-    expect(a).toEqual(b);
   });
 });

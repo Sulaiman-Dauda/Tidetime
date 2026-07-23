@@ -9,10 +9,6 @@ export type BookingActivityType =
   | "cancelled"
   | "confirmed"
   | "rejected"
-  | "payment_succeeded"
-  | "reminder_sent"
-  | "review_submitted"
-  | "no_show"
   | "rsvp";
 
 /**

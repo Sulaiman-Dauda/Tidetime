@@ -18,7 +18,6 @@ const profileSchema = z.object({
     .min(3, "Username must be at least 3 characters")
     .max(64)
     .regex(/^[a-z0-9_-]+$/, "Use lowercase letters, numbers, - and _ only"),
-  bio: z.string().max(500).optional(),
   timeZone: z.string().min(1),
   timeFormat: z.coerce.number().int().refine((v) => v === 12 || v === 24),
   weekStart: z.coerce.number().int().min(0).max(6),
@@ -29,7 +28,6 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
   const parsed = profileSchema.safeParse({
     name: formData.get("name") || undefined,
     username: formData.get("username"),
-    bio: formData.get("bio") || undefined,
     timeZone: formData.get("timeZone"),
     timeFormat: formData.get("timeFormat"),
     weekStart: formData.get("weekStart"),
@@ -50,7 +48,6 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
     .set({
       name: parsed.data.name ?? null,
       username: parsed.data.username,
-      bio: parsed.data.bio ?? null,
       timeZone: parsed.data.timeZone,
       timeFormat: parsed.data.timeFormat,
       weekStart: parsed.data.weekStart,
@@ -64,8 +61,8 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
 
 const passwordSchema = z
   .object({
-    current: z.string().optional(),
-    next: z.string().min(8, "Password must be at least 8 characters"),
+    current: z.string().max(200).optional(),
+    next: z.string().min(8, "Password must be at least 8 characters").max(200),
   });
 
 export async function updatePasswordAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
