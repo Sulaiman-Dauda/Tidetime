@@ -1,17 +1,50 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, ChevronLeft, Clock, Loader2, MapPin, User } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Globe2,
+  Loader2,
+  MapPin,
+  RefreshCw,
+  UserRound,
+  Users,
+} from "lucide-react";
 import type { BookingField, EventLocation } from "@/db/schema";
 import { bookAction, type BookActionState } from "@/app/(public)/actions";
 import { AltchaWidget } from "@/components/altcha-widget";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { validateResponses, type FieldValues } from "@/lib/booking-fields";
+import { formatDuration, initials, WEEKDAY_SHORT } from "@/lib/format";
 import { locationLabel } from "@/lib/locations";
+import { cn } from "@/lib/utils";
+import { listTimeZones } from "@/lib/timezones";
 
 type ServiceView = {
   id: number;
@@ -26,7 +59,13 @@ type ServiceView = {
   scheduleTimeZone: string;
 };
 
-type Host = { id: number; name: string | null; username: string; avatarUrl?: string | null };
+type Host = {
+  id: number;
+  name: string | null;
+  username: string;
+  avatarUrl?: string | null;
+};
+
 type Props = {
   slug: string;
   teamSlug: string;
@@ -38,158 +77,888 @@ type Props = {
   teamHosts?: Host[];
 };
 
-function dayKey(date: Date) {
+function dayKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function addDays(date: Date, count: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + count);
-  return next;
+function monthMatrix(year: number, month: number): (Date | null)[] {
+  const cells: (Date | null)[] = [];
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for (let index = 0; index < firstWeekday; index += 1) cells.push(null);
+  for (let date = 1; date <= daysInMonth; date += 1) {
+    cells.push(new Date(year, month, date));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
 }
 
-export function BookingFlow({ slug, teamSlug, rescheduleUid, service, host, spamProtection, botChallenge, teamHosts = [] }: Props) {
+function timeZoneLabel(timeZone: string): string {
+  const city = timeZone.split("/").at(-1)?.replaceAll("_", " ") ?? timeZone;
+  try {
+    const zoneName = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "short",
+    })
+      .formatToParts(new Date())
+      .find((part) => part.type === "timeZoneName")?.value;
+    return zoneName ? `${city} (${zoneName})` : city;
+  } catch {
+    return city;
+  }
+}
+
+function parseGuestEmails(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]+/)
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function contactErrors(values: FieldValues, guests: string[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const name = typeof values.name === "string" ? values.name.trim() : "";
+  const email = typeof values.email === "string" ? values.email.trim().toLowerCase() : "";
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!name) errors.name = "Enter your name";
+  if (!email) errors.email = "Enter your email address";
+  else if (!emailPattern.test(email)) errors.email = "Enter a valid email address";
+
+  if (guests.some((guest) => !emailPattern.test(guest))) {
+    errors.guests = "Enter valid guest email addresses";
+  } else if (email && guests.includes(email)) {
+    errors.guests = "A guest email must be different from your email";
+  }
+
+  return errors;
+}
+
+export function BookingFlow({
+  slug,
+  teamSlug,
+  rescheduleUid,
+  service,
+  host,
+  spamProtection,
+  botChallenge,
+  teamHosts = [],
+}: Props) {
   const router = useRouter();
+  const hostName = host.name ?? host.username;
   const [duration, setDuration] = useState(service.length);
   const [timeZone, setTimeZone] = useState(service.scheduleTimeZone);
   const [providerId, setProviderId] = useState<number | null>(null);
+  const [viewDate, setViewDate] = useState(() => new Date());
   const [slots, setSlots] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [step, setStep] = useState<"time" | "details">("time");
+  const slotCache = useRef<Record<string, Record<string, string[]>>>({});
 
   useEffect(() => {
-    try { setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || service.scheduleTimeZone); } catch { /* use service timezone */ }
+    try {
+      setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || service.scheduleTimeZone);
+    } catch {
+      // The schedule timezone remains the safe fallback.
+    }
   }, [service.scheduleTimeZone]);
 
   useEffect(() => {
-    const start = dayKey(new Date());
-    const end = dayKey(addDays(new Date(), 30));
-    const query = new URLSearchParams({ team: teamSlug, slug, start, end, duration: String(duration), tz: timeZone });
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const start = dayKey(new Date(year, month, 1));
+    const end = dayKey(new Date(year, month + 1, 0));
+    const query = new URLSearchParams({
+      team: teamSlug,
+      slug,
+      start,
+      end,
+      duration: String(duration),
+      tz: timeZone,
+    });
     if (providerId) query.set("host", String(providerId));
+
+    const cacheKey = query.toString();
+    const cached = slotCache.current[cacheKey];
+    if (cached) {
+      setSlots(cached);
+      setSlotError(null);
+      setLoading(false);
+      return;
+    }
+
     const controller = new AbortController();
     setLoading(true);
+    setSlotError(null);
     fetch(`/api/slots/team?${query}`, { signal: controller.signal })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("slots")))
-      .then((data) => setSlots(data.byDay ?? {}))
-      .catch(() => { if (!controller.signal.aborted) setSlots({}); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load availability");
+        return (await response.json()) as { byDay?: Record<string, string[]> };
+      })
+      .then((data) => {
+        const nextSlots = data.byDay ?? {};
+        slotCache.current[cacheKey] = nextSlots;
+        setSlots(nextSlots);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setSlots({});
+        setSlotError("We couldn’t load availability for this month.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
     return () => controller.abort();
-  }, [teamSlug, slug, duration, timeZone, providerId]);
+  }, [teamSlug, slug, duration, timeZone, providerId, viewDate, reloadNonce]);
 
-  const days = useMemo(() => Object.entries(slots).filter(([, values]) => values.length > 0).slice(0, 14), [slots]);
-  const durations = [...new Set([service.length, ...service.durations])].sort((a, b) => a - b);
+  useEffect(() => {
+    if (loading || slotError || selectedDay) return;
+    const firstAvailableDay = Object.keys(slots)
+      .sort()
+      .find((key) => slots[key]?.length);
+    if (firstAvailableDay) setSelectedDay(firstAvailableDay);
+  }, [loading, selectedDay, slotError, slots]);
 
-  if (showForm && selectedSlot) {
-    return (
-      <BookingForm
-        slug={slug}
-        teamSlug={teamSlug}
-        service={service}
-        duration={duration}
-        timeZone={timeZone}
-        slot={selectedSlot}
-        preferredHostId={providerId ?? undefined}
-        rescheduleUid={rescheduleUid}
-        spamProtection={spamProtection}
-        botChallenge={botChallenge}
-        onBack={() => setShowForm(false)}
-        onBooked={(uid) => router.push(`/booking/${uid}`)}
-      />
+  const durations = useMemo(
+    () => [...new Set([service.length, ...service.durations])].sort((a, b) => a - b),
+    [service.durations, service.length],
+  );
+  const timeZones = useMemo(() => listTimeZones(), []);
+  const calendarDays = monthMatrix(viewDate.getFullYear(), viewDate.getMonth());
+  const today = dayKey(new Date());
+  const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const canGoBack =
+    new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getTime() >
+    currentMonth.getTime();
+  const daySlots = selectedDay ? slots[selectedDay] ?? [] : [];
+
+  const finishBooking = useCallback(
+    (uid: string) => router.push(`/booking/${uid}`),
+    [router],
+  );
+
+  function changeMonth(offset: number) {
+    setViewDate(
+      (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
+    setSelectedDay(null);
+    setSelectedSlot(null);
+  }
+
+  function chooseSlot(slot: string) {
+    setSelectedSlot(slot);
+    setStep("details");
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:py-16">
-      <div className="grid overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[280px_1fr]">
-        <aside className="space-y-5 border-b p-6 md:border-b-0 md:border-r">
-          <p className="text-sm text-muted-foreground">{host.name ?? host.username}</p>
-          <h1 className="text-xl font-semibold">{service.title}</h1>
-          {service.description ? <p className="text-sm text-muted-foreground">{service.description}</p> : null}
-          <p className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="h-4 w-4" /> {duration} minutes</p>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> {locationLabel(service.locations[0])}</p>
-          {service.requiresConfirmation ? <p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700">The company confirms this booking after submission.</p> : null}
-        </aside>
-        <section className="space-y-5 p-6">
-          <div className="flex flex-wrap gap-3">
-            {durations.length > 1 ? (
-              <Select value={String(duration)} onValueChange={(value) => setDuration(Number(value))}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>{durations.map((value) => <SelectItem key={value} value={String(value)}>{value} minutes</SelectItem>)}</SelectContent>
-              </Select>
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-14">
+      <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-xl shadow-black/[0.04]">
+        <div className="grid lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="border-b bg-muted/20 p-6 sm:p-8 lg:min-h-[650px] lg:border-b-0 lg:border-r">
+            {rescheduleUid ? (
+              <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                You’re rescheduling an existing booking
+              </div>
             ) : null}
-            {teamHosts.length > 1 ? (
-              <Select value={providerId ? String(providerId) : "any"} onValueChange={(value) => setProviderId(value === "any" ? null : Number(value))}>
-                <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="any">Any available provider</SelectItem>{teamHosts.map((member) => <SelectItem key={member.id} value={String(member.id)}>{member.name ?? member.username}</SelectItem>)}</SelectContent>
-              </Select>
+
+            <Avatar className="h-12 w-12 border bg-background shadow-sm">
+              {host.avatarUrl ? <AvatarImage src={host.avatarUrl} alt={hostName} /> : null}
+              <AvatarFallback>{initials(hostName)}</AvatarFallback>
+            </Avatar>
+            <p className="mt-5 text-sm font-medium text-muted-foreground">{hostName}</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{service.title}</h1>
+            {service.description ? (
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {service.description}
+              </p>
             ) : null}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="h-4 w-4" /> Times shown in {timeZone}</div>
-          {loading ? <div className="flex items-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading availability…</div> : null}
-          {!loading && days.length === 0 ? <p className="py-12 text-sm text-muted-foreground">No available times in the next 30 days.</p> : null}
-          <div className="space-y-5">
-            {days.map(([day, values]) => (
-              <div key={day}>
-                <h2 className="mb-2 text-sm font-medium">{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</h2>
-                <div className="flex flex-wrap gap-2">
-                  {values.map((value) => <Button key={value} data-testid="slot" variant="outline" size="sm" onClick={() => { setSelectedSlot(value); setShowForm(true); }}>{new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</Button>)}
+
+            <div className="mt-7 space-y-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-3">
+                <Clock className="h-4 w-4 shrink-0" />
+                <span>{formatDuration(duration)}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <MapPin className="h-4 w-4 shrink-0" />
+                <span>{locationLabel(service.locations[0])}</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <Globe2 className="mt-2 h-4 w-4 shrink-0" />
+                <Select
+                  value={timeZone}
+                  onValueChange={(value) => {
+                    setTimeZone(value);
+                    setSelectedDay(null);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Timezone"
+                    className="h-8 min-w-0 border-0 bg-transparent px-0 shadow-none focus:ring-0"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {timeZones.map((zone) => (
+                      <SelectItem key={zone} value={zone}>
+                        {timeZoneLabel(zone)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {service.requiresConfirmation ? (
+              <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
+                Your request will be confirmed by the company after submission.
+              </div>
+            ) : null}
+
+            {teamHosts.length > 1 && step === "time" ? (
+              <div className="mt-7">
+                <Label className="text-xs font-medium text-muted-foreground">Provider</Label>
+                <Select
+                  value={providerId ? String(providerId) : "any"}
+                  onValueChange={(value) => {
+                    setProviderId(value === "any" ? null : Number(value));
+                    setSelectedDay(null);
+                  }}
+                >
+                  <SelectTrigger className="mt-2 w-full bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any available provider</SelectItem>
+                    {teamHosts.map((member) => (
+                      <SelectItem key={member.id} value={String(member.id)}>
+                        {member.name ?? member.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            {durations.length > 1 && step === "time" ? (
+              <div className="mt-6">
+                <Label className="text-xs font-medium text-muted-foreground">Duration</Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {durations.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setDuration(value);
+                        setSelectedDay(null);
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                        duration === value
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border bg-background hover:border-primary/40 hover:text-primary",
+                      )}
+                    >
+                      {formatDuration(value)}
+                    </button>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
+            ) : null}
+          </aside>
+
+          <section className="min-w-0 p-6 sm:p-8">
+            <div className="mb-8 flex items-center gap-2" aria-label="Booking progress">
+              <span
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium",
+                  step === "time"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-primary/10 text-primary",
+                )}
+              >
+                {step === "details" ? <Check className="mr-1 inline h-3 w-3" /> : null}
+                1. Date &amp; time
+              </span>
+              <div className="h-px w-5 bg-border" />
+              <span
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium",
+                  step === "details"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                2. Your details
+              </span>
+            </div>
+
+            {step === "details" && selectedSlot ? (
+              <BookingForm
+                slug={slug}
+                teamSlug={teamSlug}
+                service={service}
+                duration={duration}
+                timeZone={timeZone}
+                slot={selectedSlot}
+                preferredHostId={providerId ?? undefined}
+                rescheduleUid={rescheduleUid}
+                spamProtection={spamProtection}
+                botChallenge={botChallenge}
+                onBack={() => setStep("time")}
+                onBooked={finishBooking}
+              />
+            ) : (
+              <>
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight">Choose a date and time</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Available times are shown in your selected timezone.
+                  </p>
+                </div>
+
+                <div className="mt-7 grid gap-8 md:grid-cols-[minmax(300px,1fr)_220px]">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">
+                        {viewDate.toLocaleDateString("en-US", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </h3>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 rounded-full"
+                          disabled={!canGoBack}
+                          onClick={() => changeMonth(-1)}
+                          aria-label="Previous month"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 rounded-full"
+                          onClick={() => changeMonth(1)}
+                          aria-label="Next month"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-7 gap-1 text-center">
+                      {WEEKDAY_SHORT.map((weekday) => (
+                        <div
+                          key={weekday}
+                          className="py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                        >
+                          {weekday.slice(0, 1)}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {calendarDays.map((date, index) => {
+                        if (!date) return <div key={`empty-${index}`} />;
+                        const key = dayKey(date);
+                        const available = (slots[key]?.length ?? 0) > 0;
+                        const past = key < today;
+                        const selected = key === selectedDay;
+
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            data-testid={available && !past ? "day-available" : undefined}
+                            disabled={!available || past || loading}
+                            aria-label={date.toLocaleDateString("en-US", {
+                              weekday: "long",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                            aria-pressed={selected}
+                            onClick={() => {
+                              setSelectedDay(key);
+                              setSelectedSlot(null);
+                            }}
+                            className={cn(
+                              "relative aspect-square rounded-full text-sm font-medium transition",
+                              selected &&
+                                "bg-primary text-primary-foreground shadow-md shadow-primary/20",
+                              !selected &&
+                                available &&
+                                !past &&
+                                "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground",
+                              (!available || past) && "cursor-default text-muted-foreground/35",
+                            )}
+                          >
+                            {date.getDate()}
+                            {available && !past && !selected ? (
+                              <span className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary" />
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {loading ? (
+                      <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Loading availability…
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 border-t pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                    <div className="flex min-h-9 items-center gap-2 text-sm font-semibold">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      {selectedDay
+                        ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : "Select a date"}
+                    </div>
+
+                    <div className="mt-4 max-h-[390px] space-y-2 overflow-y-auto pr-1">
+                      {loading ? (
+                        Array.from({ length: 6 }, (_, index) => (
+                          <Skeleton key={index} className="h-11 w-full rounded-xl" />
+                        ))
+                      ) : slotError ? (
+                        <div className="rounded-xl border border-dashed p-4 text-sm">
+                          <AlertTriangle className="h-5 w-5 text-amber-500" />
+                          <p className="mt-2 font-medium">Couldn’t load times</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{slotError}</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-4"
+                            onClick={() => setReloadNonce((value) => value + 1)}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Try again
+                          </Button>
+                        </div>
+                      ) : !selectedDay ? (
+                        <p className="py-10 text-center text-xs leading-5 text-muted-foreground">
+                          Choose an available date to see times.
+                        </p>
+                      ) : daySlots.length === 0 ? (
+                        <p className="py-10 text-center text-xs text-muted-foreground">
+                          No times available on this date.
+                        </p>
+                      ) : (
+                        daySlots.map((slot) => (
+                          <button
+                            key={slot}
+                            type="button"
+                            data-testid="slot"
+                            onClick={() => chooseSlot(slot)}
+                            className="w-full rounded-xl border border-primary/30 bg-background py-3 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary hover:text-primary-foreground hover:shadow-sm active:scale-[0.98]"
+                          >
+                            {new Date(slot).toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              timeZone,
+                            })}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
 }
 
-function BookingForm({ slug, teamSlug, service, duration, timeZone, slot, preferredHostId, rescheduleUid, spamProtection, botChallenge, onBack, onBooked }: {
-  slug: string; teamSlug: string; service: ServiceView; duration: number; timeZone: string; slot: string;
-  preferredHostId?: number; rescheduleUid?: string; spamProtection?: boolean; botChallenge?: string; onBack: () => void; onBooked: (uid: string) => void;
+function BookingForm({
+  slug,
+  teamSlug,
+  service,
+  duration,
+  timeZone,
+  slot,
+  preferredHostId,
+  rescheduleUid,
+  spamProtection,
+  botChallenge,
+  onBack,
+  onBooked,
+}: {
+  slug: string;
+  teamSlug: string;
+  service: ServiceView;
+  duration: number;
+  timeZone: string;
+  slot: string;
+  preferredHostId?: number;
+  rescheduleUid?: string;
+  spamProtection?: boolean;
+  botChallenge?: string;
+  onBack: () => void;
+  onBooked: (uid: string) => void;
 }) {
-  const [state, formAction, pending] = useActionState<BookActionState, FormData>(bookAction, null);
-  const [values, setValues] = useState<Record<string, string | boolean>>({ name: "", email: "" });
+  const [state, formAction, pending] = useActionState<BookActionState, FormData>(
+    bookAction,
+    null,
+  );
+  const [values, setValues] = useState<FieldValues>({ name: "", email: "" });
+  const [guestEmails, setGuestEmails] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [altcha, setAltcha] = useState<string | null>(null);
   const renderedAt = useRef(Date.now());
 
-  useEffect(() => { if (state?.uid) onBooked(state.uid); }, [state, onBooked]);
+  useEffect(() => {
+    if (state?.uid) onBooked(state.uid);
+  }, [state?.uid, onBooked]);
+
   const customFields = service.bookingFields.filter(
     (field) => !["name", "email"].includes(field.name),
   );
 
+  function setValue(name: string, value: string | boolean) {
+    setValues((current) => ({ ...current, [name]: value }));
+    setErrors((current) => {
+      if (!current[name]) return current;
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
+  }
+
   function submit(formData: FormData) {
+    const guests = service.disableGuests ? [] : parseGuestEmails(guestEmails);
+    const nextErrors = {
+      ...contactErrors(values, guests),
+      ...validateResponses(service.bookingFields, values),
+      ...(spamProtection && !altcha
+        ? { altcha: "Please wait for human verification to finish" }
+        : {}),
+    };
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setErrors({});
     const payload = {
-      slug, teamSlug, start: slot, duration, timeZone,
-      name: String(values.name ?? ""), email: String(values.email ?? ""), responses: values,
-      preferredHostId, rescheduleUid, hp: formData.get("company") ?? "", ts: renderedAt.current,
-      bc: botChallenge, altcha: altcha ?? undefined,
+      slug,
+      teamSlug,
+      start: slot,
+      duration,
+      timeZone,
+      name: String(values.name ?? "").trim(),
+      email: String(values.email ?? "").trim().toLowerCase(),
+      responses: values,
+      guests: guests.length > 0 ? guests : undefined,
+      preferredHostId,
+      rescheduleUid,
+      hp: formData.get("company") ?? "",
+      ts: renderedAt.current,
+      bc: botChallenge,
+      altcha: altcha ?? undefined,
     };
     formData.set("payload", JSON.stringify(payload));
     formAction(formData);
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-10 sm:py-16">
-      <Button variant="ghost" size="sm" onClick={onBack}><ChevronLeft className="h-4 w-4" /> Choose another time</Button>
-      <form action={submit} className="mt-4 space-y-5 rounded-2xl border bg-card p-6 shadow-sm">
-        <div><h1 className="text-lg font-semibold">Your details</h1><p className="mt-1 text-sm text-muted-foreground">{new Date(slot).toLocaleString([], { dateStyle: "full", timeStyle: "short" })}</p></div>
-        <div className="hidden"><Input name="company" tabIndex={-1} autoComplete="off" /></div>
-        <Field label="Name"><Input id="name" required value={String(values.name)} onChange={(e) => setValues((current) => ({ ...current, name: e.target.value }))} /></Field>
-        <Field label="Email"><Input id="email" required type="email" value={String(values.email)} onChange={(e) => setValues((current) => ({ ...current, email: e.target.value }))} /></Field>
+    <div className="max-w-2xl">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to date and time
+      </button>
+
+      <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/[0.06] p-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-primary/10 p-2 text-primary">
+            <Calendar className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="font-semibold">
+              {new Date(slot).toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                timeZone,
+              })}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {new Date(slot).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                timeZone,
+              })}
+              {" · "}
+              {formatDuration(duration)}
+              {" · "}
+              {timeZoneLabel(timeZone)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-7">
+        <h2 className="text-xl font-semibold tracking-tight">Enter your details</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          We’ll send the confirmation and calendar invitation to your email.
+        </p>
+      </div>
+
+      <form action={submit} className="mt-6 space-y-5" noValidate>
+        <div
+          aria-hidden="true"
+          className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden"
+        >
+          <label htmlFor="company">Company</label>
+          <input id="company" name="company" tabIndex={-1} autoComplete="off" />
+        </div>
+
+        <FormField label="Your name" htmlFor="name" required error={errors.name}>
+          <Input
+            id="name"
+            autoComplete="name"
+            autoFocus
+            aria-invalid={Boolean(errors.name)}
+            value={String(values.name ?? "")}
+            onChange={(event) => setValue("name", event.target.value)}
+          />
+        </FormField>
+
+        <FormField label="Email address" htmlFor="email" required error={errors.email}>
+          <Input
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            aria-invalid={Boolean(errors.email)}
+            value={String(values.email ?? "")}
+            onChange={(event) => setValue("email", event.target.value)}
+          />
+        </FormField>
+
+        {!service.disableGuests ? (
+          <FormField
+            label="Invite guests"
+            htmlFor="guests"
+            hint="Optional — separate multiple addresses with commas"
+            error={errors.guests}
+          >
+            <div className="relative">
+              <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Textarea
+                id="guests"
+                rows={2}
+                className="pl-9"
+                placeholder="guest@example.com"
+                value={guestEmails}
+                onChange={(event) => {
+                  setGuestEmails(event.target.value);
+                  setErrors((current) => {
+                    if (!current.guests) return current;
+                    const next = { ...current };
+                    delete next.guests;
+                    return next;
+                  });
+                }}
+              />
+            </div>
+          </FormField>
+        ) : null}
+
         {customFields.map((field) => (
-          <Field key={field.name} label={field.label}>
-            {field.type === "textarea" ? <Textarea required={field.required} value={String(values[field.name] ?? "")} onChange={(e) => setValues((current) => ({ ...current, [field.name]: e.target.value }))} /> : field.type === "checkbox" ? <input type="checkbox" checked={Boolean(values[field.name])} onChange={(e) => setValues((current) => ({ ...current, [field.name]: e.target.checked }))} /> : <Input required={field.required} type={field.type === "email" || field.type === "phone" || field.type === "number" ? field.type : "text"} value={String(values[field.name] ?? "")} onChange={(e) => setValues((current) => ({ ...current, [field.name]: e.target.value }))} />}
-          </Field>
+          <CustomField
+            key={field.name}
+            field={field}
+            value={values[field.name]}
+            error={errors[field.name]}
+            onChange={(value) => setValue(field.name, value)}
+          />
         ))}
-        {spamProtection ? <AltchaWidget onChange={setAltcha} /> : null}
-        {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-        <Button type="submit" data-testid="confirm-booking" className="w-full" disabled={pending || (spamProtection && !altcha)}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <User className="h-4 w-4" />} {pending ? "Booking…" : "Confirm booking"}</Button>
+
+        {spamProtection ? (
+          <div className="space-y-1.5">
+            <AltchaWidget onChange={setAltcha} />
+            {errors.altcha ? (
+              <p className="text-xs text-destructive">{errors.altcha}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {state?.error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            {state.error}
+          </div>
+        ) : null}
+
+        <Button
+          type="submit"
+          data-testid="confirm-booking"
+          size="lg"
+          className="w-full rounded-xl"
+          disabled={pending}
+        >
+          {pending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : service.requiresConfirmation ? (
+            <UserRound className="h-4 w-4" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+          {pending
+            ? "Scheduling…"
+            : service.requiresConfirmation
+              ? "Request booking"
+              : "Confirm booking"}
+        </Button>
+
+        <p className="text-center text-xs leading-5 text-muted-foreground">
+          By continuing, you agree to receive emails about this booking.
+        </p>
       </form>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
+function CustomField({
+  field,
+  value,
+  error,
+  onChange,
+}: {
+  field: BookingField;
+  value: FieldValues[string];
+  error?: string;
+  onChange: (value: string | boolean) => void;
+}) {
+  if (field.type === "checkbox") {
+    const checked = value === true;
+    return (
+      <div>
+        <label
+          className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition",
+            checked
+              ? "border-primary bg-primary/[0.06]"
+              : "border-border hover:border-primary/40",
+          )}
+        >
+          <input
+            type="checkbox"
+            className="sr-only"
+            checked={checked}
+            onChange={(event) => onChange(event.target.checked)}
+          />
+          <span
+            className={cn(
+              "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
+              checked
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-input bg-background",
+            )}
+          >
+            {checked ? <Check className="h-3.5 w-3.5" /> : null}
+          </span>
+          <span>
+            {field.label}
+            {field.required ? " *" : ""}
+          </span>
+        </label>
+        {error ? <p className="mt-1.5 text-xs text-destructive">{error}</p> : null}
+      </div>
+    );
+  }
+
+  const inputType =
+    field.type === "phone"
+      ? "tel"
+      : field.type === "number"
+        ? "number"
+        : field.type === "email"
+          ? "email"
+          : "text";
+
+  return (
+    <FormField
+      label={field.label}
+      htmlFor={field.name}
+      required={field.required}
+      error={error}
+    >
+      {field.type === "textarea" ? (
+        <Textarea
+          id={field.name}
+          rows={4}
+          aria-invalid={Boolean(error)}
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : (
+        <Input
+          id={field.name}
+          type={inputType}
+          aria-invalid={Boolean(error)}
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </FormField>
+  );
+}
+
+function FormField({
+  label,
+  htmlFor,
+  required,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor}>
+        {label}
+        {required ? " *" : ""}
+      </Label>
+      {children}
+      {hint && !error ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  );
 }

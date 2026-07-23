@@ -11,7 +11,13 @@ test.describe("company booking flow", () => {
 
   test("books with an available provider", async ({ page }) => {
     await page.goto(`/book/${COMPANY}/${SERVICE}`);
+    await expect(
+      page.getByRole("heading", { name: "Choose a date and time" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("day-available").first()).toBeVisible();
     await page.getByTestId("slot").first().click();
+    await expect(page.getByRole("heading", { name: "Enter your details" })).toBeVisible();
+    await expect(page.getByText("2. Your details")).toBeVisible();
     await page.locator("#name").fill("E2E Tester");
     await page.locator("#email").fill(`e2e-${Date.now()}@example.com`);
     // The public form deliberately rejects submissions within two seconds of
