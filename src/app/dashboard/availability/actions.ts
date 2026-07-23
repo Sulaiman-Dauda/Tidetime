@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { schedules, availabilities, users } from "@/db/schema";
-import { requirePermission } from "@/lib/guard";
+import { schedules, availabilities, memberships, users } from "@/db/schema";
+import { requireAnyPermission } from "@/lib/guard";
+import { can } from "@/lib/rbac";
 import { isValidTimeZone } from "@/lib/time";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -26,12 +27,41 @@ const saveSchema = z.object({
   timeZone: z.string(),
   weekly: z.array(ruleSchema),
   overrides: z.array(overrideSchema),
+  targetUserId: z.number().int().positive().optional(),
 });
 
 export type SaveScheduleInput = z.infer<typeof saveSchema>;
 export type SaveScheduleResult = { ok: true } | { ok: false; error: string };
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * Resolve whose availability is being managed. Members manage their own;
+ * owners/admins may manage any accepted member of their company.
+ */
+async function resolveTarget(targetUserId?: number) {
+  const { user, role, teamId } = await requireAnyPermission([
+    "availability.own.manage",
+    "availability.all.manage",
+  ]);
+  if (!targetUserId || targetUserId === user.id) {
+    if (!can(role, "availability.own.manage") && !can(role, "availability.all.manage")) return null;
+    return { actor: user, target: user };
+  }
+  if (!can(role, "availability.all.manage")) return null;
+  const [membership] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(and(
+      eq(memberships.userId, targetUserId),
+      eq(memberships.teamId, teamId),
+      eq(memberships.accepted, true),
+    ))
+    .limit(1);
+  if (!membership) return null;
+  const [target] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+  return target ? { actor: user, target } : null;
+}
 
 /** First problem found in a day's intervals, or null. Rejecting beats silently dropping. */
 function intervalProblem(label: string, intervals: { start: string; end: string }[]): string | null {
@@ -48,8 +78,9 @@ function intervalProblem(label: string, intervals: { start: string; end: string 
 }
 
 export async function saveScheduleAction(input: SaveScheduleInput): Promise<SaveScheduleResult> {
-  const { user } = await requirePermission("availability.own.manage");
   const data = saveSchema.parse(input);
+  const resolved = await resolveTarget(data.targetUserId);
+  if (!resolved) return { ok: false, error: "You can't manage this schedule" };
   const tz = isValidTimeZone(data.timeZone) ? data.timeZone : "UTC";
 
   for (const rule of data.weekly) {
@@ -65,7 +96,7 @@ export async function saveScheduleAction(input: SaveScheduleInput): Promise<Save
   const [owned] = await db
     .select({ id: schedules.id })
     .from(schedules)
-    .where(and(eq(schedules.id, data.scheduleId), eq(schedules.userId, user.id)))
+    .where(and(eq(schedules.id, data.scheduleId), eq(schedules.userId, resolved.target.id)))
     .limit(1);
   if (!owned) return { ok: false, error: "Schedule not found — it may have been deleted." };
 
@@ -112,52 +143,126 @@ export async function saveScheduleAction(input: SaveScheduleInput): Promise<Save
 export type DeleteScheduleResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteScheduleAction(formData: FormData): Promise<DeleteScheduleResult> {
-  const { user } = await requirePermission("availability.own.manage");
+  const targetUserId = Number(formData.get("targetUserId")) || undefined;
+  const resolved = await resolveTarget(targetUserId);
+  if (!resolved) return { ok: false, error: "You can't manage this schedule" };
   const id = Number(formData.get("scheduleId"));
 
   const all = await db
     .select({ id: schedules.id })
     .from(schedules)
-    .where(eq(schedules.userId, user.id));
+    .where(eq(schedules.userId, resolved.target.id));
   if (!all.some((s) => s.id === id)) return { ok: false, error: "Schedule not found" };
   // A provider without any schedule silently offers zero public slots — never
   // allow deleting the last one.
   if (all.length <= 1) {
-    return { ok: false, error: "You can't delete your only schedule. Create another one first." };
+    return { ok: false, error: "You can't delete the only schedule. Create another one first." };
   }
 
   const replacement = all.find((s) => s.id !== id)!;
   await db.transaction(async (tx) => {
-    await tx.delete(schedules).where(and(eq(schedules.id, id), eq(schedules.userId, user.id)));
+    await tx.delete(schedules).where(and(eq(schedules.id, id), eq(schedules.userId, resolved.target.id)));
     // Repoint the default so availability resolution never dangles.
     await tx
       .update(users)
       .set({ defaultScheduleId: replacement.id })
-      .where(and(eq(users.id, user.id), eq(users.defaultScheduleId, id)));
+      .where(and(eq(users.id, resolved.target.id), eq(users.defaultScheduleId, id)));
   });
   revalidatePath("/dashboard/availability");
   return { ok: true };
 }
 
-/** Create a schedule with sensible 9–5 weekday hours and make it the default
- *  if the user doesn't have one. Recovers the "no schedule" dead end. */
-export async function createScheduleAction(): Promise<{ ok: boolean }> {
-  const { user } = await requirePermission("availability.own.manage");
+/** Create a schedule with sensible 9–5 weekday hours; becomes the default when
+ *  the user doesn't have one. Recovers the "no schedule" dead end. */
+export async function createScheduleAction(formData?: FormData): Promise<{ ok: boolean; id?: number }> {
+  const targetUserId = formData ? Number(formData.get("targetUserId")) || undefined : undefined;
+  const resolved = await resolveTarget(targetUserId);
+  if (!resolved) return { ok: false };
+  const target = resolved.target;
+
+  const existing = await db
+    .select({ id: schedules.id })
+    .from(schedules)
+    .where(eq(schedules.userId, target.id));
+
+  let createdId = 0;
   await db.transaction(async (tx) => {
     const [schedule] = await tx
       .insert(schedules)
-      .values({ userId: user.id, name: "Working Hours", timeZone: user.timeZone })
+      .values({
+        userId: target.id,
+        name: existing.length === 0 ? "Working Hours" : `Schedule ${existing.length + 1}`,
+        timeZone: target.timeZone,
+      })
       .returning({ id: schedules.id });
+    createdId = schedule.id;
     await tx.insert(availabilities).values({
       scheduleId: schedule.id,
       days: [1, 2, 3, 4, 5],
       startTime: "09:00:00",
       endTime: "17:00:00",
     });
-    if (!user.defaultScheduleId) {
-      await tx.update(users).set({ defaultScheduleId: schedule.id }).where(eq(users.id, user.id));
+    if (!target.defaultScheduleId) {
+      await tx.update(users).set({ defaultScheduleId: schedule.id }).where(eq(users.id, target.id));
     }
   });
   revalidatePath("/dashboard/availability");
+  return { ok: true, id: createdId };
+}
+
+/** Copy a schedule with all its weekly rules and date overrides. */
+export async function duplicateScheduleAction(formData: FormData): Promise<{ ok: boolean; id?: number }> {
+  const targetUserId = Number(formData.get("targetUserId")) || undefined;
+  const resolved = await resolveTarget(targetUserId);
+  if (!resolved) return { ok: false };
+  const id = Number(formData.get("scheduleId"));
+
+  const [original] = await db
+    .select()
+    .from(schedules)
+    .where(and(eq(schedules.id, id), eq(schedules.userId, resolved.target.id)))
+    .limit(1);
+  if (!original) return { ok: false };
+  const rules = await db.select().from(availabilities).where(eq(availabilities.scheduleId, id));
+
+  let createdId = 0;
+  await db.transaction(async (tx) => {
+    const [copy] = await tx
+      .insert(schedules)
+      .values({ userId: resolved.target.id, name: `${original.name} copy`, timeZone: original.timeZone })
+      .returning({ id: schedules.id });
+    createdId = copy.id;
+    if (rules.length > 0) {
+      await tx.insert(availabilities).values(
+        rules.map((rule) => ({
+          scheduleId: copy.id,
+          days: rule.days,
+          date: rule.date,
+          startTime: rule.startTime,
+          endTime: rule.endTime,
+        })),
+      );
+    }
+  });
+  revalidatePath("/dashboard/availability");
+  return { ok: true, id: createdId };
+}
+
+/** Point public availability at a different schedule. */
+export async function setDefaultScheduleAction(formData: FormData): Promise<{ ok: boolean }> {
+  const targetUserId = Number(formData.get("targetUserId")) || undefined;
+  const resolved = await resolveTarget(targetUserId);
+  if (!resolved) return { ok: false };
+  const id = Number(formData.get("scheduleId"));
+
+  const [owned] = await db
+    .select({ id: schedules.id })
+    .from(schedules)
+    .where(and(eq(schedules.id, id), eq(schedules.userId, resolved.target.id)))
+    .limit(1);
+  if (!owned) return { ok: false };
+  await db.update(users).set({ defaultScheduleId: id }).where(eq(users.id, resolved.target.id));
+  revalidatePath("/dashboard/availability");
   return { ok: true };
 }
+

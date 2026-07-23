@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, attendees, services, serviceProviders, teams, users, bookingReferences, type BookingField } from "@/db/schema";
 import { shortId } from "@/lib/crypto";
@@ -15,7 +15,13 @@ import { validateResponses as validateFieldResponses, type FieldValues } from "@
 import { logBookingActivity } from "./activity";
 import { upsertCustomerFromBooking, decrementCustomerBookingCount } from "./customers";
 import { getAppUrl } from "@/server/app-url";
-import { isValidTimeZone } from "@/lib/time";
+import { getZonedParts, isValidTimeZone, zonedTimeToUtc } from "@/lib/time";
+
+/** Midnight of the instant's calendar day in a timezone, as a UTC instant. */
+function zonedStartOfDay(instant: Date, timeZone: string): Date {
+  const parts = getZonedParts(instant, timeZone);
+  return zonedTimeToUtc(parts.year, parts.month, parts.day, 0, 0, timeZone);
+}
 import {
   runAcceptedBookingEffects,
   runPendingApprovalEffects,
@@ -244,7 +250,26 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     }
 
     if (!input.force) {
-      if (await hostHasConflict(assignedUserId, start, end)) return { conflict: true };
+      const groupJoin =
+        (service.seatsPerSlot ?? 1) > 1
+          ? { serviceId: service.id, seats: service.seatsPerSlot }
+          : undefined;
+      if (await hostHasConflict(assignedUserId, start, end, groupJoin)) return { conflict: true };
+      // Daily cap re-checked under the lock so racing bookers can't blow past it.
+      if (service.maxBookingsPerDay) {
+        const dayStart = zonedStartOfDay(start, service.scheduleTimeZone);
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+        const [{ value: dayCount } = { value: 0 }] = await tx
+          .select({ value: count() })
+          .from(bookings)
+          .where(and(
+            eq(bookings.serviceId, service.id),
+            inArray(bookings.status, ["accepted", "pending"]),
+            gte(bookings.startTime, dayStart),
+            lt(bookings.startTime, dayEnd),
+          ));
+        if (dayCount >= service.maxBookingsPerDay) return { conflict: true };
+      }
     }
 
     const [b] = await tx

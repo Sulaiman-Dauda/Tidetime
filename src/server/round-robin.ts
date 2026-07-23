@@ -1,9 +1,10 @@
 import "server-only";
-import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { serviceProviders, bookings, users, availabilities } from "@/db/schema";
+import { serviceProviders, bookings, users, availabilities, services } from "@/db/schema";
 import { computeSlots, type AvailabilityRule } from "@/lib/slots";
 import { fetchBusyTimes } from "@/server/calendar";
+import { hostHasConflict } from "@/server/availability";
 
 interface HostRow {
   userId: number;
@@ -23,17 +24,13 @@ async function loadHosts(serviceId: number): Promise<HostRow[]> {
     .where(eq(serviceProviders.serviceId, serviceId));
 }
 
-async function isHostFree(host: HostRow, start: Date, end: Date): Promise<boolean> {
-  const [conflict] = await db
-    .select({ id: bookings.id })
-    .from(bookings)
-    .where(and(
-      eq(bookings.userId, host.userId),
-      inArray(bookings.status, ["accepted", "pending"]),
-      lt(bookings.startTime, end),
-      gt(bookings.endTime, start),
-    ))
-    .limit(1);
+async function isHostFree(
+  host: HostRow,
+  start: Date,
+  end: Date,
+  groupJoin?: { serviceId: number; seats: number },
+): Promise<boolean> {
+  const conflict = await hostHasConflict(host.userId, start, end, groupJoin);
   if (conflict || !host.defaultScheduleId) return false;
 
   const externalBusy = await fetchBusyTimes(host.userId, start, end);
@@ -90,7 +87,35 @@ export async function assignTeamHost(
 ): Promise<number | null> {
   const hosts = await loadHosts(serviceId);
   if (hosts.length === 0) return null;
-  const availability = await Promise.all(hosts.map((host) => isHostFree(host, start, end)));
+
+  const [svc] = await db
+    .select({ seatsPerSlot: services.seatsPerSlot })
+    .from(services)
+    .where(eq(services.id, serviceId))
+    .limit(1);
+  const seats = svc?.seatsPerSlot ?? 1;
+  const groupJoin = seats > 1 ? { serviceId, seats } : undefined;
+
+  // Group events must land every attendee on the SAME provider: when a group
+  // slot is already open at this exact time, join it while seats remain.
+  if (groupJoin) {
+    const existing = await db
+      .select({ userId: bookings.userId, count: sql<number>`count(*)::int` })
+      .from(bookings)
+      .where(and(
+        eq(bookings.serviceId, serviceId),
+        inArray(bookings.status, ["accepted", "pending"]),
+        eq(bookings.startTime, start),
+        eq(bookings.endTime, end),
+      ))
+      .groupBy(bookings.userId);
+    const open = existing.find((row) => row.userId !== null && row.count < seats);
+    if (open?.userId != null && (preferredHostId == null || preferredHostId === open.userId)) {
+      return open.userId;
+    }
+  }
+
+  const availability = await Promise.all(hosts.map((host) => isHostFree(host, start, end, groupJoin)));
 
   if (preferredHostId != null) {
     const index = hosts.findIndex((host) => host.userId === preferredHostId);

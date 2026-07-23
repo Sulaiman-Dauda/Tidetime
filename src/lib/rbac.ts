@@ -15,6 +15,7 @@ export type Permission =
   | "service.catalog.manage"
   | "service.assigned.view"
   | "availability.own.manage"
+  | "availability.all.manage"
   | "booking.own.view"
   | "booking.own.manage"
   | "booking.all.view"
@@ -34,6 +35,7 @@ const ALL: Permission[] = [
   "service.catalog.manage",
   "service.assigned.view",
   "availability.own.manage",
+  "availability.all.manage",
   "booking.own.view",
   "booking.own.manage",
   "booking.all.view",

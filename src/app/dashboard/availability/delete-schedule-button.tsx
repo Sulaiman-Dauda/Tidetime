@@ -18,7 +18,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { deleteScheduleAction } from "./actions";
 
-export function DeleteScheduleButton({ scheduleId, scheduleName }: { scheduleId: number; scheduleName: string }) {
+export function DeleteScheduleButton({
+  scheduleId,
+  scheduleName,
+  targetUserId,
+}: {
+  scheduleId: number;
+  scheduleName: string;
+  targetUserId?: number;
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -54,6 +62,7 @@ export function DeleteScheduleButton({ scheduleId, scheduleName }: { scheduleId:
             }}
           >
             <input type="hidden" name="scheduleId" value={scheduleId} />
+            {targetUserId ? <input type="hidden" name="targetUserId" value={targetUserId} /> : null}
             <AlertDialogAction
               type="submit"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/88"

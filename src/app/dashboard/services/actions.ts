@@ -98,6 +98,8 @@ const updateSchema = z.object({
   afterEventBuffer: z.number().int().min(0).max(720),
   minimumBookingNotice: z.number().int().min(0).max(43200),
   slotInterval: z.number().int().min(5).max(1440).nullable(),
+  seatsPerSlot: z.number().int().min(1).max(100),
+  maxBookingsPerDay: z.number().int().min(1).max(500).nullable(),
   requiresConfirmation: z.boolean(),
   disableGuests: z.boolean(),
   /** explicit status — saving no longer force-publishes */
@@ -140,6 +142,8 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
       afterEventBuffer: data.afterEventBuffer,
       minimumBookingNotice: data.minimumBookingNotice,
       slotInterval: data.slotInterval,
+      seatsPerSlot: data.seatsPerSlot,
+      maxBookingsPerDay: data.maxBookingsPerDay,
       locations: data.locations,
       bookingFields: data.bookingFields,
       requiresConfirmation: data.requiresConfirmation,

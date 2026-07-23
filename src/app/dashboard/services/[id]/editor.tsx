@@ -60,6 +60,8 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
     afterEventBuffer: service.afterEventBuffer,
     minimumBookingNotice: service.minimumBookingNotice,
     slotInterval: service.slotInterval,
+    seatsPerSlot: service.seatsPerSlot,
+    maxBookingsPerDay: service.maxBookingsPerDay,
     requiresConfirmation: service.requiresConfirmation,
     disableGuests: service.disableGuests,
   });
@@ -199,6 +201,14 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
           <Field label="Before buffer"><Input type="number" min={0} value={form.beforeEventBuffer} onChange={(e) => set("beforeEventBuffer", Number(e.target.value))} /></Field>
           <Field label="After buffer"><Input type="number" min={0} value={form.afterEventBuffer} onChange={(e) => set("afterEventBuffer", Number(e.target.value))} /></Field>
           <Field label="Slot interval"><Input type="number" min={5} placeholder={String(form.length)} value={form.slotInterval ?? ""} onChange={(e) => set("slotInterval", e.target.value ? Number(e.target.value) : null)} /></Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Seats per slot" hint="More than 1 turns this into a group event — several people can book the same time with the same provider.">
+            <Input type="number" min={1} max={100} value={form.seatsPerSlot} onChange={(e) => set("seatsPerSlot", Math.max(1, Number(e.target.value) || 1))} />
+          </Field>
+          <Field label="Max bookings per day" hint="Leave empty for no daily cap.">
+            <Input type="number" min={1} placeholder="Unlimited" value={form.maxBookingsPerDay ?? ""} onChange={(e) => set("maxBookingsPerDay", e.target.value ? Math.max(1, Number(e.target.value)) : null)} />
+          </Field>
         </div>
         <Toggle label="Require manual confirmation" checked={form.requiresConfirmation} onChange={(value) => set("requiresConfirmation", value)} />
         <Toggle label="Do not allow additional guests" checked={form.disableGuests} onChange={(value) => set("disableGuests", value)} />

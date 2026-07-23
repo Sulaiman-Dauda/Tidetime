@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createScheduleAction } from "./actions";
 
-export function CreateScheduleButton() {
+export function CreateScheduleButton({ targetUserId }: { targetUserId?: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
@@ -14,7 +14,9 @@ export function CreateScheduleButton() {
       loading={pending}
       onClick={() =>
         start(async () => {
-          await createScheduleAction();
+          const data = new FormData();
+          if (targetUserId) data.set("targetUserId", String(targetUserId));
+          await createScheduleAction(data);
           router.refresh();
         })
       }

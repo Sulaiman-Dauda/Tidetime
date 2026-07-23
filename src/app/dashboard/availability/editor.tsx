@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Plus, Trash2, X } from "lucide-react";
+import { Check, Copy, Plus, Star, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,11 +21,44 @@ import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { DeleteScheduleButton } from "./delete-schedule-button";
 import { weekdayLabel } from "@/lib/format";
 import { listTimeZones } from "@/lib/timezones";
-import { saveScheduleAction } from "./actions";
+import {
+  saveScheduleAction,
+  createScheduleAction,
+  duplicateScheduleAction,
+  setDefaultScheduleAction,
+} from "./actions";
 
 export type Interval = { start: string; end: string };
 export type WeeklyRule = { day: number; intervals: Interval[] };
 export type DateOverride = { date: string; intervals: Interval[] };
+
+/** "+ New" pill at the end of the schedule switcher. */
+function NewScheduleInlineButton({ targetUserId }: { targetUserId?: number }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const data = new FormData();
+          if (targetUserId) data.set("targetUserId", String(targetUserId));
+          const res = await createScheduleAction(data);
+          if (res.ok && res.id) {
+            const params = new URLSearchParams();
+            if (targetUserId) params.set("user", String(targetUserId));
+            params.set("schedule", String(res.id));
+            router.push(`/dashboard/availability?${params.toString()}` as never);
+          }
+        })
+      }
+      className="rounded-full border border-dashed border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50"
+    >
+      + New
+    </button>
+  );
+}
 
 function formatOverrideDate(key: string): string {
   return new Date(`${key}T12:00:00`).toLocaleDateString("en-US", {
@@ -38,17 +71,49 @@ function formatOverrideDate(key: string): string {
 
 type Props = {
   schedule: { id: number; name: string; timeZone: string };
+  /** every schedule the target user has, for the switcher */
+  schedules?: { id: number; name: string; isDefault: boolean }[];
   initialWeekly: WeeklyRule[];
   initialOverrides: DateOverride[];
   /** 0=Sunday .. 6=Saturday, from the viewer's profile */
   weekStart?: number;
+  /** set when an owner/admin is editing someone else's hours */
+  targetUserId?: number;
+  targetName?: string;
+  /** team roster for the admin member selector */
+  members?: { id: number; name: string }[];
+  viewerId?: number;
 };
 
-export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides, weekStart = 0 }: Props) {
+export function AvailabilityEditor({
+  schedule,
+  schedules = [],
+  initialWeekly,
+  initialOverrides,
+  weekStart = 0,
+  targetUserId,
+  targetName,
+  members = [],
+  viewerId,
+}: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
   const timezones = useMemo(() => listTimeZones(), []);
+
+  function scheduleHref(overrides: { schedule?: number; user?: number | null }) {
+    const params = new URLSearchParams();
+    const userParam = overrides.user === undefined ? targetUserId : overrides.user ?? undefined;
+    if (userParam) params.set("user", String(userParam));
+    if (overrides.schedule) params.set("schedule", String(overrides.schedule));
+    const qs = params.toString();
+    return `/dashboard/availability${qs ? `?${qs}` : ""}`;
+  }
+
+  function withTarget(data: FormData): FormData {
+    if (targetUserId) data.set("targetUserId", String(targetUserId));
+    return data;
+  }
 
   const [name, setName] = useState(schedule.name);
   const [timeZone, setTimeZone] = useState(schedule.timeZone);
@@ -102,7 +167,7 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides, 
   function save() {
     start(async () => {
       try {
-        const res = await saveScheduleAction({ scheduleId: schedule.id, name, timeZone, weekly, overrides });
+        const res = await saveScheduleAction({ scheduleId: schedule.id, name, timeZone, weekly, overrides, targetUserId });
         if (res.ok) {
           toast({ title: "Changes saved", description: "Your availability has been updated." });
           router.refresh();
@@ -119,17 +184,63 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides, 
     });
   }
 
+  const active = schedules.find((s) => s.id === schedule.id);
+
   return (
     <div className="animate-fade-in space-y-8">
       <PageHeader
         title="Availability"
-        description="Set the hours people can book you."
+        description={
+          targetName
+            ? `Editing ${targetName}'s bookable hours.`
+            : "Set the hours people can book you."
+        }
         action={
           <Button onClick={save} loading={pending}>
             <Check className="h-4 w-4" /> Save
           </Button>
         }
       />
+
+      {(members.length > 1 || schedules.length > 0) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {members.length > 1 ? (
+            <select
+              aria-label="Whose availability"
+              value={targetUserId ?? viewerId ?? ""}
+              onChange={(ev) => {
+                const id = Number(ev.target.value);
+                router.push(scheduleHref({ user: id === viewerId ? null : id, schedule: undefined }) as Parameters<typeof router.push>[0]);
+              }}
+              className="h-8 rounded-lg border bg-card px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.id === viewerId ? `${member.name} (you)` : member.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {schedules.map((s) => (
+              <Link
+                key={s.id}
+                href={scheduleHref({ schedule: s.id }) as never}
+                className={
+                  s.id === schedule.id
+                    ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow-sm"
+                    : "rounded-full border border-border bg-card px-3 py-1 text-xs font-medium transition-colors hover:border-primary/40 hover:text-primary"
+                }
+              >
+                {s.name}
+                {s.isDefault ? " ★" : ""}
+              </Link>
+            ))}
+            <NewScheduleInlineButton targetUserId={targetUserId} />
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="rounded-2xl border border-border/60 bg-card p-5">
@@ -225,8 +336,46 @@ export function AvailabilityEditor({ schedule, initialWeekly, initialOverrides, 
               </Link>
               ; these hours are the outer bounds.
             </div>
-            <div className="mt-4 border-t border-border/40 pt-3">
-              <DeleteScheduleButton scheduleId={schedule.id} scheduleName={name} />
+            <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-border/40 pt-3">
+              {active && !active.isDefault ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  disabled={pending}
+                  onClick={() =>
+                    start(async () => {
+                      const data = withTarget(new FormData());
+                      data.set("scheduleId", String(schedule.id));
+                      await setDefaultScheduleAction(data);
+                      toast({ title: "Default schedule updated", description: "Public bookings now use this schedule." });
+                      router.refresh();
+                    })
+                  }
+                >
+                  <Star className="h-3.5 w-3.5" /> Make default
+                </Button>
+              ) : null}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    const data = withTarget(new FormData());
+                    data.set("scheduleId", String(schedule.id));
+                    const res = await duplicateScheduleAction(data);
+                    if (res.ok && res.id) {
+                      toast({ title: "Schedule duplicated" });
+                      router.push(scheduleHref({ schedule: res.id }) as never);
+                    }
+                  })
+                }
+              >
+                <Copy className="h-3.5 w-3.5" /> Duplicate
+              </Button>
+              <DeleteScheduleButton scheduleId={schedule.id} scheduleName={name} targetUserId={targetUserId} />
             </div>
           </div>
 
