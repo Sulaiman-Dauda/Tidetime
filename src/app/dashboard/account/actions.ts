@@ -90,3 +90,13 @@ export async function updatePasswordAction(_prev: SettingsState, formData: FormD
   await revokeOtherSessions(user.id);
   return { ok: true };
 }
+
+/** "Sign out other devices" — revokes every session except the current one. */
+export async function signOutOtherSessionsAction(
+  _prev: SettingsState,
+  _formData: FormData,
+): Promise<SettingsState> {
+  const user = await requireUser();
+  await revokeOtherSessions(user.id);
+  return { ok: true };
+}

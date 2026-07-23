@@ -78,7 +78,7 @@ export function SettingsHub({
   customDomain: string | null;
 }) {
   return (
-    <Tabs defaultValue="domain" className="space-y-6">
+    <Tabs defaultValue="brand" className="space-y-6">
       <TabsList className="flex-wrap">
         <TabsTrigger value="domain">Domain</TabsTrigger>
         <TabsTrigger value="general">Brand</TabsTrigger>
@@ -150,8 +150,7 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
           <div className="flex items-center gap-2">
             <input
               type="color"
-              aria-hidden
-              tabIndex={-1}
+              aria-label="Pick brand colour"
               defaultValue={profile.brandColor}
               onChange={(e) => {
                 const t = document.getElementById("brandColor") as HTMLInputElement | null;
@@ -203,7 +202,7 @@ function DomainSection({ customDomain }: { customDomain: string | null }) {
           result?.live
             ? {
                 title: "Your domain is live",
-                description: `https://${result.domain} is serving Tidetime with a valid certificate.`,
+                description: `https://${result.domain} is serving your booking pages with a valid certificate.`,
               }
             : {
                 title: "Not reachable yet",
@@ -226,7 +225,7 @@ function DomainSection({ customDomain }: { customDomain: string | null }) {
         <div>
           <h2 className="text-sm font-semibold">Custom domain</h2>
           <p className="text-xs text-muted-foreground">
-            Serve Tidetime from your own domain over HTTPS. The certificate is obtained and renewed
+            Serve your booking pages from your own domain over HTTPS. The certificate is obtained and renewed
             automatically — no certificate files or server changes needed.
           </p>
         </div>

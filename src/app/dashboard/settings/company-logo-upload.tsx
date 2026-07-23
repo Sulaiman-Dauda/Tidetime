@@ -39,7 +39,7 @@ export function CompanyLogoUpload({
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         onChange(data.url);
-        toast({ title: "Logo uploaded", description: "Remember to save your changes." });
+        toast({ title: "Logo uploaded", description: "Now press Save changes to make it live." });
       } catch (err) {
         toast({
           title: "Couldn't upload logo",

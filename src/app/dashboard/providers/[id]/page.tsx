@@ -47,6 +47,8 @@ export default async function ProviderDetailPage({ params }: Props) {
       userId: users.id,
       name: users.name,
       email: users.email,
+      position: users.position,
+      avatarUrl: users.avatarUrl,
     })
     .from(memberships)
     .innerJoin(users, eq(memberships.userId, users.id))
@@ -98,6 +100,8 @@ export default async function ProviderDetailPage({ params }: Props) {
           accepted: m.accepted,
           name: m.name,
           email: m.email,
+          position: m.position,
+          avatarUrl: m.avatarUrl,
         }))}
         pendingInvites={pendingInvites}
       />

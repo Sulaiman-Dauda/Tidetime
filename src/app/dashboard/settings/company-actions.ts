@@ -58,6 +58,8 @@ export async function updateCompanyBookingAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   await setCompanyBookingDefaults(parsed.data);
   revalidatePath("/dashboard/settings");
+  // Booking toggles change what the public pages render — bust them too.
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

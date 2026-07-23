@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { initials } from "@/lib/format";
 import { can, canAssignRole } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
 import {
@@ -45,6 +47,8 @@ interface Member {
   accepted: boolean;
   name: string | null;
   email: string;
+  position: string | null;
+  avatarUrl: string | null;
 }
 
 interface PendingInvite {
@@ -146,9 +150,20 @@ export function TeamMembers({
         <div className="mt-4 space-y-2">
           {members.map((m) => (
             <div key={m.membershipId} className="flex items-center justify-between gap-3 rounded-md border p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{m.name ?? m.email}</p>
-                <p className="truncate text-xs text-muted-foreground">{m.email}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar className="h-9 w-9 shrink-0">
+                  {m.avatarUrl ? <AvatarImage src={m.avatarUrl} alt="" /> : null}
+                  <AvatarFallback className="text-xs">{initials(m.name ?? m.email)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {m.name ?? m.email}
+                    {m.position ? (
+                      <span className="font-normal text-muted-foreground"> · {m.position}</span>
+                    ) : null}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{m.email}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {!m.accepted ? <Badge variant="secondary">Pending</Badge> : null}

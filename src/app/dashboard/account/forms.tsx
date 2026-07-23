@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,7 @@ import { AvatarUpload } from "./avatar-upload";
 import {
   updateProfileAction,
   updatePasswordAction,
+  signOutOtherSessionsAction,
   type SettingsState,
 } from "./actions";
 import { WEEKDAY_SHORT } from "@/lib/format";
@@ -35,12 +37,23 @@ interface UserView {
 
 export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: string[] }) {
   const { toast } = useToast();
+  const router = useRouter();
+  const [pwMismatch, setPwMismatch] = useState(false);
 
   const [profileState, profileAction, profilePending] = useActionState<SettingsState, FormData>(
     updateProfileAction,
     null,
   );
   const [pwState, pwAction, pwPending] = useActionState<SettingsState, FormData>(updatePasswordAction, null);
+  const [sessionsState, sessionsAction, sessionsPending] = useActionState<SettingsState, FormData>(
+    signOutOtherSessionsAction,
+    null,
+  );
+
+  useEffect(() => {
+    if (sessionsState?.ok) toast({ title: "Signed out everywhere else", description: "Only this device stays signed in." });
+    if (sessionsState?.error) toast({ title: "Couldn't sign out other sessions", variant: "destructive" });
+  }, [sessionsState, toast]);
 
   useEffect(() => {
     if (profileState?.ok) toast({ title: "Changes saved", description: "Your profile has been updated." });
@@ -67,7 +80,12 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
       <Card className="p-6">
         <h2 className="text-base font-semibold">Profile</h2>
         <div className="mt-5">
-          <AvatarUpload currentUrl={user.avatarUrl} name={user.name ?? user.username} />
+          {/* refresh server-rendered avatars (sidebar/topbar) after an upload */}
+          <AvatarUpload
+            currentUrl={user.avatarUrl}
+            name={user.name ?? user.username}
+            onUploaded={() => router.refresh()}
+          />
         </div>
         <form action={profileAction} className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -131,7 +149,17 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
 
       <Card className="p-6">
         <h2 className="text-base font-semibold">{user.hasPassword ? "Change password" : "Set password"}</h2>
-        <form action={pwAction} className="mt-5 max-w-sm space-y-4">
+        <form
+          action={(formData) => {
+            if (formData.get("next") !== formData.get("confirm")) {
+              setPwMismatch(true);
+              return;
+            }
+            setPwMismatch(false);
+            pwAction(formData);
+          }}
+          className="mt-5 max-w-sm space-y-4"
+        >
           {user.hasPassword ? (
             <div className="space-y-1.5">
               <Label htmlFor="current">Current password</Label>
@@ -142,8 +170,26 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
             <Label htmlFor="next">New password</Label>
             <Input id="next" name="next" type="password" autoComplete="new-password" required minLength={8} />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm">Confirm new password</Label>
+            <Input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} />
+            {pwMismatch ? <p className="text-xs text-destructive">Passwords don&apos;t match.</p> : null}
+          </div>
           <Button type="submit" variant="outline" loading={pwPending}>
             Update password
+          </Button>
+        </form>
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="text-base font-semibold">Sessions</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          If you signed in on a shared or lost device, sign out everywhere else. This device stays
+          signed in.
+        </p>
+        <form action={sessionsAction} className="mt-4">
+          <Button type="submit" variant="outline" loading={sessionsPending}>
+            Sign out other devices
           </Button>
         </form>
       </Card>

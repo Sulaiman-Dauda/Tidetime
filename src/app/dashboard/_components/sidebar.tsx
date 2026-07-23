@@ -45,7 +45,7 @@ const NAV_GROUPS = [
     label: "Company",
     items: [
       { href: "/dashboard/team", label: "Team", icon: Users },
-      { href: "/dashboard/providers", label: "Manage providers", icon: Building2 },
+      { href: "/dashboard/providers", label: "Members", icon: Building2 },
     ],
   },
 ] as const;
