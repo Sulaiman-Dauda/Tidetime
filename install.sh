@@ -19,7 +19,11 @@ set -euo pipefail
 
 REPO_URL="https://github.com/Sulaiman-Dauda/Tidetime.git"
 REF="${TIDETIME_REF:-main}"
-IMAGE="ghcr.io/sulaiman-dauda/tidetime:${REF}"
+# The prebuilt image is tagged "latest" on the main branch; a version ref (e.g.
+# v1.2.0) maps to its own image tag.
+IMAGE_TAG="latest"
+[ "${REF}" != "main" ] && IMAGE_TAG="${REF}"
+IMAGE="ghcr.io/sulaiman-dauda/tidetime:${IMAGE_TAG}"
 INSTALL_DIR="${INSTALL_DIR:-tidetime}"
 
 info()  { printf '\033[0;36m•\033[0m %s\n' "$1"; }
