@@ -50,25 +50,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
-      # Building is required: a broken Dockerfile fails the workflow.
-      - name: Build image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64
-          push: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Publishing is best-effort. The first push to a new GHCR package name can
-      # be denied until the package is created and its "Actions access" grants
-      # this repository write permission (GitHub Packages settings). Until then,
-      # install.sh builds from source, so a denied push does not break installs.
-      - name: Publish image to GHCR
-        id: publish
-        continue-on-error: true
+      - name: Build and push
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -77,10 +59,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-
-      - name: Note if publish was skipped
-        if: steps.publish.outcome != 'success'
-        run: |
-          echo "::warning::Image build succeeded but the GHCR push was denied."
-          echo "Grant this repository write access to the ghcr.io/${{ github.repository_owner }}/tidetime package,"
-          echo "or delete a stale package of that name, then re-run. install.sh builds from source meanwhile."
+          cache-to: type=gha,mode=max
