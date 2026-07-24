@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpCircle, Check, Loader2 } from "lucide-react";
+import { ArrowUpCircle, Check, Loader2, Download } from "lucide-react";
 
 interface UpdateStatus {
   current: string | null;
@@ -126,14 +126,18 @@ export function SidebarUpdate() {
           type="button"
           onClick={onUpdate}
           disabled={phase === "updating"}
-          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1 text-[11.5px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+          className={`mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 ${
+            phase === "updating" ? "" : "tt-attn"
+          }`}
         >
           {phase === "updating" ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" /> Updating…
             </>
           ) : (
-            "Update now"
+            <>
+              <Download className="h-3.5 w-3.5" /> Update now
+            </>
           )}
         </button>
       )}

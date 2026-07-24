@@ -131,6 +131,19 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
   }
+
+  /* Gentle attention pulse for a can't-miss action (e.g. the update button). */
+  .tt-attn {
+    animation: tt-attn-pulse 2.2s ease-in-out infinite;
+  }
+}
+
+@keyframes tt-attn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--brand) / 0); }
+  50%      { box-shadow: 0 0 0 3px hsl(var(--brand) / 0.35), 0 0 16px 2px hsl(var(--brand) / 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tt-attn { animation: none; box-shadow: 0 0 0 2px hsl(var(--brand) / 0.4); }
 }
 
 /* ── Motion primitives (pure CSS, no animation library) ──────────────────── */
