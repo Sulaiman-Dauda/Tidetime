@@ -8,6 +8,10 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-25
+
+Maintenance release; no functional changes.
+
 ## [0.1.1] - 2026-07-25
 
 ### Changed
@@ -53,6 +57,7 @@ company with multiple services and multiple providers.
   and are alerted when a newer release is available, with an optional one-click
   updater.
 
-[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.0
