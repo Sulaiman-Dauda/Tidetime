@@ -165,7 +165,7 @@ async function Shell({ preview, children }: { preview: string; children: React.R
                     <tr>
                       <td className="tt-pad" style={styles.footer}>
                         Powered by{" "}
-                        <Link href={appUrl} style={styles.footerLink}>
+                        <Link href="https://tidetime.app" style={styles.footerLink}>
                           Tidetime
                         </Link>
                         {" · "}

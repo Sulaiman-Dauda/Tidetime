@@ -252,9 +252,14 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
           Powered by{" "}
-          <Link href="/" className="font-medium text-foreground hover:underline">
+          <a
+            href="https://tidetime.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-foreground hover:underline"
+          >
             Tidetime
-          </Link>
+          </a>
         </p>
       </div>
       <PublicLegal />
