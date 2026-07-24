@@ -8,6 +8,8 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-25
+
 First public release of Tidetime: self-hosted appointment scheduling for a single
 company with multiple services and multiple providers.
 
@@ -35,7 +37,12 @@ company with multiple services and multiple providers.
   protection.
 - Company settings for legal pages, a data-retention window, and locale and time
   zone handling.
-- Production Docker Compose stack, an install script, and a background jobs worker
-  for webhook retries and data retention.
+- Production Docker Compose stack, a one-command install script that installs
+  Docker and its prerequisites, and a background jobs worker for webhook retries
+  and data retention.
+- In-app update notifications: admins see the running version in the dashboard
+  and are alerted when a newer release is available, with an optional one-click
+  updater.
 
-[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/commits/main
+[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.0
