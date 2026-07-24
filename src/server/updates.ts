@@ -4,17 +4,18 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
-import { RUNNING_COMMIT, SOURCE_REPO, shortCommit } from "@/lib/version";
+import { RUNNING_VERSION, SOURCE_REPO, normalizeVersion, compareVersions } from "@/lib/version";
 
 /**
  * Self-update support for Docker deployments.
  *
- * The running image carries the commit it was built from (RUNNING_COMMIT). We
- * compare it against the tip of `main` on GitHub and surface an admin banner
- * when the instance is behind. Performing the update needs Docker access, which
- * the app deliberately does not have, so it hands off to an optional `updater`
- * sidecar (docker-compose.updater.yml) through a shared volume. When that
- * sidecar is not running, the dashboard shows the manual command instead.
+ * We compare the running version (RUNNING_VERSION, from package.json, baked into
+ * the image) against the latest published GitHub release. When a newer release
+ * exists, admins see an update prompt. Performing the update needs Docker
+ * access, which the app deliberately does not have, so it hands off to an
+ * optional `updater` sidecar (docker-compose.updater.yml) through a shared
+ * volume. When that sidecar is not running, the dashboard shows the manual
+ * command instead.
  */
 
 const CACHE_KEY = "system:update_check";
@@ -30,17 +31,14 @@ const F_REQUEST = join(UPDATE_DIR, "update.request");
 const F_STATUS = join(UPDATE_DIR, "update.status");
 
 export interface UpdateStatus {
-  /** Commit the running image was built from, or null if unknown (dev/old image). */
-  current: string | null;
-  currentShort: string | null;
-  /** Latest commit on the source repo's main branch. */
-  latest: string | null;
-  latestShort: string | null;
-  /** How many commits behind main, or null when it cannot be determined. */
-  behind: number | null;
+  /** Running app version, e.g. "0.1.0". */
+  version: string;
+  /** Latest released version, e.g. "0.1.1", or null when unknown. */
+  latestVersion: string | null;
   updateAvailable: boolean;
   checkedAt: string | null;
-  compareUrl: string | null;
+  /** Link to the latest release's notes. */
+  releaseUrl: string | null;
   /** Whether the optional updater sidecar is running (one-click possible). */
   updaterAvailable: boolean;
   /** "running" | "done" | "failed" while/after an update, else null. */
@@ -48,10 +46,9 @@ export interface UpdateStatus {
 }
 
 interface CacheValue {
-  current: string | null;
-  latest: string | null;
-  behind: number | null;
-  compareUrl: string | null;
+  version: string;
+  latestVersion: string | null;
+  releaseUrl: string | null;
   checkedAt: string;
 }
 
@@ -68,54 +65,30 @@ async function writeCache(value: CacheValue): Promise<void> {
   await db
     .insert(appSettings)
     .values({ name: CACHE_KEY, value: value as unknown as Record<string, unknown> })
-    .onConflictDoUpdate({ target: appSettings.name, set: { value: value as unknown as Record<string, unknown> } });
+    .onConflictDoUpdate({
+      target: appSettings.name,
+      set: { value: value as unknown as Record<string, unknown> },
+    });
 }
 
-async function fetchFromGitHub(current: string | null): Promise<Omit<CacheValue, "checkedAt">> {
-  const headers = {
-    "User-Agent": "Tidetime-Update-Check",
-    Accept: "application/vnd.github+json",
-  };
-  const signal = AbortSignal.timeout(GITHUB_TIMEOUT_MS);
-
-  if (current) {
-    const res = await fetch(
-      `https://api.github.com/repos/${SOURCE_REPO}/compare/${current}...main`,
-      { headers, signal, cache: "no-store" },
-    );
-    if (!res.ok) throw new Error(`GitHub compare returned ${res.status}`);
-    const d = (await res.json()) as {
-      status?: string;
-      ahead_by?: number;
-      html_url?: string;
-      commits?: { sha: string }[];
-    };
-    const behind = d.status === "identical" ? 0 : d.ahead_by ?? 0;
-    const latest = behind > 0 ? d.commits?.[d.commits.length - 1]?.sha ?? null : current;
-    return {
-      current,
-      latest,
-      behind,
-      compareUrl: d.html_url ?? `https://github.com/${SOURCE_REPO}/compare/${current}...main`,
-    };
-  }
-
-  const res = await fetch(`https://api.github.com/repos/${SOURCE_REPO}/commits/main`, {
-    headers,
-    signal,
+async function fetchLatestRelease(): Promise<{ latestVersion: string | null; releaseUrl: string | null }> {
+  const res = await fetch(`https://api.github.com/repos/${SOURCE_REPO}/releases/latest`, {
+    headers: { "User-Agent": "Tidetime-Update-Check", Accept: "application/vnd.github+json" },
+    signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`GitHub commits returned ${res.status}`);
-  const d = (await res.json()) as { sha?: string };
+  if (res.status === 404) {
+    // No releases published yet.
+    return { latestVersion: null, releaseUrl: `https://github.com/${SOURCE_REPO}/releases` };
+  }
+  if (!res.ok) throw new Error(`GitHub releases returned ${res.status}`);
+  const d = (await res.json()) as { tag_name?: string; html_url?: string };
   return {
-    current: null,
-    latest: d.sha ?? null,
-    behind: null,
-    compareUrl: `https://github.com/${SOURCE_REPO}/commits/main`,
+    latestVersion: d.tag_name ? normalizeVersion(d.tag_name) : null,
+    releaseUrl: d.html_url ?? `https://github.com/${SOURCE_REPO}/releases`,
   };
 }
 
-/** Whether the updater sidecar is alive (fresh heartbeat on the shared volume). */
 export async function isUpdaterAvailable(): Promise<boolean> {
   try {
     const s = await stat(F_HEARTBEAT);
@@ -136,39 +109,39 @@ async function readProgress(): Promise<string | null> {
 
 /**
  * Current update status. Uses a 30-minute cache so GitHub is queried at most
- * twice an hour (well under the unauthenticated rate limit). Never throws; a
- * failed check falls back to the last cached result.
+ * twice an hour. Never throws; a failed check falls back to the last cached
+ * result.
  */
 export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
-  const current = RUNNING_COMMIT;
   let cache = await readCache();
 
   const stale =
     !cache ||
-    cache.current !== current ||
+    cache.version !== RUNNING_VERSION ||
     Date.now() - new Date(cache.checkedAt).getTime() > CACHE_TTL_MS;
 
   if (force || stale) {
     try {
-      const fresh = await fetchFromGitHub(current);
-      cache = { ...fresh, checkedAt: new Date().toISOString() };
+      const fresh = await fetchLatestRelease();
+      cache = { version: RUNNING_VERSION, ...fresh, checkedAt: new Date().toISOString() };
       await writeCache(cache);
     } catch {
-      // Keep whatever we had; if we had nothing, report unknown.
+      // Keep whatever we had.
     }
   }
+
+  const latestVersion = cache?.latestVersion ?? null;
+  const updateAvailable =
+    latestVersion != null && compareVersions(latestVersion, RUNNING_VERSION) > 0;
 
   const [updaterAvailable, progress] = await Promise.all([isUpdaterAvailable(), readProgress()]);
 
   return {
-    current,
-    currentShort: shortCommit(current),
-    latest: cache?.latest ?? null,
-    latestShort: shortCommit(cache?.latest ?? null),
-    behind: cache?.behind ?? null,
-    updateAvailable: (cache?.behind ?? 0) > 0,
+    version: RUNNING_VERSION,
+    latestVersion,
+    updateAvailable,
     checkedAt: cache?.checkedAt ?? null,
-    compareUrl: cache?.compareUrl ?? null,
+    releaseUrl: cache?.releaseUrl ?? null,
     updaterAvailable,
     progress,
   };
@@ -186,7 +159,6 @@ export async function requestUpdate(): Promise<{ triggered: boolean }> {
     await writeFile(F_REQUEST, new Date().toISOString());
     return { triggered: true };
   } catch {
-    // The shared volume is not writable — fall back to the manual command.
     return { triggered: false };
   }
 }

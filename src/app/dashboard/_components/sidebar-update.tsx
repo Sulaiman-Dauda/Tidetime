@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpCircle, Check, Loader2, Download } from "lucide-react";
 
 interface UpdateStatus {
-  current: string | null;
-  currentShort: string | null;
+  version: string;
+  latestVersion: string | null;
   updateAvailable: boolean;
+  releaseUrl: string | null;
   updaterAvailable: boolean;
   progress: string | null;
 }
@@ -18,7 +19,7 @@ const MANUAL_COMMAND =
 
 /**
  * Compact version + update control for the sidebar footer (admins only). Shows
- * the running version; when the instance is behind, offers a one-click update
+ * the running version; when a newer release exists, offers a one-click update
  * (or copies the manual command when the updater sidecar is not enabled).
  */
 export function SidebarUpdate() {
@@ -53,7 +54,7 @@ export function SidebarUpdate() {
       const data = await load();
       if (!data) return;
       const from = startedFrom.current;
-      const moved = from && data.current && data.current !== from;
+      const moved = from && data.version && data.version !== from;
       if (moved || data.progress === "done" || !data.updateAvailable) setPhase("done");
       else if (data.progress === "failed") setPhase("idle");
     }, 5000);
@@ -63,7 +64,7 @@ export function SidebarUpdate() {
   }, [phase, load]);
 
   async function onUpdate() {
-    startedFrom.current = status?.current ?? null;
+    startedFrom.current = status?.version ?? null;
     setPhase("updating");
     try {
       const res = await fetch("/api/updates", {
@@ -89,8 +90,6 @@ export function SidebarUpdate() {
   // Non-admins get 403 (status stays null) — render nothing.
   if (!status) return null;
 
-  const version = status.currentShort ?? "unknown";
-
   if (phase === "done") {
     return (
       <div className="mx-2 mb-1 flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11.5px] text-emerald-700 dark:text-emerald-400">
@@ -102,7 +101,7 @@ export function SidebarUpdate() {
   if (!status.updateAvailable) {
     return (
       <div className="px-3 pb-1 pt-0.5 text-[10.5px] text-muted-foreground/60">
-        Tidetime <span className="font-mono">{version}</span>
+        Tidetime <span className="font-medium">v{status.version}</span>
       </div>
     );
   }
@@ -113,7 +112,11 @@ export function SidebarUpdate() {
         <ArrowUpCircle className="h-3.5 w-3.5 shrink-0 text-brand" />
         Update available
       </div>
-      <div className="mt-0.5 pl-[19px] font-mono text-[10.5px] text-muted-foreground">{version}</div>
+      {status.latestVersion ? (
+        <div className="mt-0.5 pl-[19px] text-[10.5px] font-medium text-muted-foreground">
+          v{status.latestVersion}
+        </div>
+      ) : null}
 
       {phase === "manual" ? (
         <p className="mt-1.5 text-[10.5px] leading-snug text-muted-foreground">

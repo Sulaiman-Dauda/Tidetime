@@ -8,6 +8,15 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-25
+
+### Changed
+
+- The in-app update check now compares the app's semantic version against the
+  latest published GitHub release, and the dashboard shows the version number
+  (e.g. `v0.1.1`) instead of a git commit. Updates are surfaced only for tagged
+  releases, not every commit to `main`.
+
 ## [0.1.0] - 2026-07-25
 
 First public release of Tidetime: self-hosted appointment scheduling for a single
@@ -44,5 +53,6 @@ company with multiple services and multiple providers.
   and are alerted when a newer release is available, with an optional one-click
   updater.
 
-[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.0
