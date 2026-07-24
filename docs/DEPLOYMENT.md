@@ -1,5 +1,17 @@
 # Deployment
 
+Tidetime is deployed with Docker. The fastest path is the install script; the manual Compose steps below give you full control.
+
+## Install script
+
+On a server with Docker and the Docker Compose plugin installed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/Tidetime/main/install.sh | bash
+```
+
+The script downloads the project, generates the required secrets, writes a `.env` file, and starts the stack. It prefers a prebuilt image published to the GitHub Container Registry (`ghcr.io/sulaiman-dauda/tidetime`) and falls back to building from source when a pull is not possible. Review the script before running it if you prefer.
+
 ## Required configuration
 
 Set `APP_URL`, `DATABASE_URL`, a URL-safe random `POSTGRES_PASSWORD`, a random `AUTH_SECRET`

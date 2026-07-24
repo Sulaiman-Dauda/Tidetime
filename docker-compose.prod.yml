@@ -26,7 +26,7 @@ services:
       start_period: 15s
 
   app:
-    image: ${TIDETIME_IMAGE:-tide-time-lite:local}
+    image: ${TIDETIME_IMAGE:-tidetime:local}
     build:
       context: .
       dockerfile: Dockerfile
@@ -62,7 +62,7 @@ services:
       - "127.0.0.1:${APP_PORT:-3000}:3100"
 
   jobs:
-    image: ${TIDETIME_IMAGE:-tide-time-lite:local}
+    image: ${TIDETIME_IMAGE:-tidetime:local}
     build:
       context: .
       dockerfile: Dockerfile

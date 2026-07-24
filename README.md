@@ -32,6 +32,8 @@ Tidetime is open source and runs on your own server. There is no hosted plan, no
 You need Node.js 20 or newer and a PostgreSQL database.
 
 ```bash
+git clone https://github.com/Sulaiman-Dauda/Tidetime.git tidetime
+cd tidetime
 cp .env.example .env
 npm ci
 npm run db:migrate

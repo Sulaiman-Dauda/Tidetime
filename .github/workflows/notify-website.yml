@@ -1,0 +1,31 @@
+# Tells the tidetime-website repo to rebuild whenever the docs or README change,
+# so the published documentation stays in sync with this repository.
+#
+# Requires a repository secret WEBSITE_DISPATCH_TOKEN: a fine-grained personal
+# access token with permission to dispatch workflows on the tidetime-website
+# repo. Without it, the website still rebuilds on its own pushes and on a manual
+# run; this workflow only makes the sync immediate.
+name: Notify website of docs changes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger website rebuild
+        run: |
+          curl -fsSL -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.WEBSITE_DISPATCH_TOKEN }}" \
+            https://api.github.com/repos/Sulaiman-Dauda/tidetime-website/dispatches \
+            -d '{"event_type":"docs-updated"}'

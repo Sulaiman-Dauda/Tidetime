@@ -23,10 +23,10 @@ Please:
 
 Useful links:
 
-- Issues: https://github.com/Sulaiman-Dauda/tidetime-lite/issues
-- New bug report: https://github.com/Sulaiman-Dauda/tidetime-lite/issues/new?template=bug_report.yml
-- New feature request: https://github.com/Sulaiman-Dauda/tidetime-lite/issues/new?template=feature_request.yml
-- Pull requests: https://github.com/Sulaiman-Dauda/tidetime-lite/pulls
+- Issues: https://github.com/Sulaiman-Dauda/Tidetime/issues
+- New bug report: https://github.com/Sulaiman-Dauda/Tidetime/issues/new?template=bug_report.yml
+- New feature request: https://github.com/Sulaiman-Dauda/Tidetime/issues/new?template=feature_request.yml
+- Pull requests: https://github.com/Sulaiman-Dauda/Tidetime/pulls
 
 ## Development setup
 
