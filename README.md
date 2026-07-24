@@ -40,7 +40,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Open `http://localhost:3100/setup` to create the company and its owner account. From there, add providers under **Providers** and assign them to services under **Services**.
+Open `http://localhost:3100/setup` to create the company and its owner account. From there, invite teammates under **Members** and assign them to services as providers under **Services**.
 
 To load a demo company with a sample service and provider:
 
@@ -88,10 +88,14 @@ For domain setup, backups, Microsoft 365 email, and upgrade notes, see [docs/DEP
 
 ## Access model
 
-- **Owners and managers** control the service catalog, provider assignments, company settings, and integrations.
-- **Providers** manage only their own availability, bookings, and calendar connection. They can see assigned services and accepted teammates but cannot change them.
+Team members are managed under **Members**, each with one of four roles:
 
-These boundaries are enforced in the server queries and mutations, not only in the interface.
+- **Owner** — full control, including settings, integrations, and transferring or deleting the instance.
+- **Admin** — everything except deleting the instance: the service catalog, members, availability, all bookings, and settings.
+- **Scheduler** — a front-desk role for managing all bookings and customers; not bookable, and no access to the catalog, members, or settings.
+- **Member** — a bookable provider who manages their own availability, bookings, and calendar connection.
+
+A provider is a member assigned to a service. These boundaries are enforced in the server queries and mutations, not only in the interface.
 
 ## Integrations
 

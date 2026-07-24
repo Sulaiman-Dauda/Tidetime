@@ -6,13 +6,15 @@ Terms used across the Tidetime documentation.
 
 **Company.** The single organization that owns the instance. Its name, logo, and settings appear on the booking pages and emails.
 
-**Owner.** The account with full control of the instance, including settings, the team, and ownership transfer.
+**Owner.** The account with full control of the instance, including settings, integrations, and transferring or deleting the instance.
 
-**Admin.** A role that manages the service catalog, provider assignments, availability, and integrations.
+**Admin.** A role that can do everything except delete the instance: the service catalog, members, everyone's availability, all bookings, and settings.
 
-**Scheduler.** A role that works with bookings and its own availability.
+**Scheduler.** A front-desk role that manages all bookings and customers and books on behalf of customers, but is not bookable and cannot change the catalog, members, or settings.
 
-**Provider.** A team member who can be assigned to services and take bookings. Providers manage their own hours and calendar connection.
+**Member.** A regular team member and bookable provider, managing their own availability, bookings, and calendar connection. The default role for invited teammates.
+
+**Provider.** A member assigned to a service to take its bookings. Managed under Members; assigned to services in the service editor.
 
 **Service.** Something a customer can book, with a duration, a location, assigned providers, and scheduling rules.
 

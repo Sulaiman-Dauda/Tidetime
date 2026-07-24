@@ -16,7 +16,7 @@ Tidetime is self-hosted appointment scheduling for a single company with multipl
 
 ## What Tidetime is, in one paragraph
 
-One company runs the instance. Customers open a public booking page, choose a service, pick a provider or let Tidetime assign the least-busy available one, and book an open slot. Providers set their own hours, connect a calendar for conflict checks, and manage their bookings from a dashboard. Owners and managers control the service catalog, the team, branding, email, and integrations. Everything runs on your own server and your own PostgreSQL database.
+One company runs the instance. Customers open a public booking page, choose a service, pick a provider or let Tidetime assign the least-busy available one, and book an open slot. Providers set their own hours, connect a calendar for conflict checks, and manage their bookings from a dashboard. Owners and admins control the service catalog, the team, branding, email, and integrations. Everything runs on your own server and your own PostgreSQL database.
 
 ## Project links
 

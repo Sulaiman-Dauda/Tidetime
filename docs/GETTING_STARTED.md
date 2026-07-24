@@ -52,14 +52,14 @@ The app applies database migrations on startup. For domains, backups, and upgrad
 
 ## First run
 
-1. Open your `APP_URL` (or `http://localhost:3000` if you have not set a domain) and go to `/setup`.
+1. Open your instance in a browser at `http://<your-server-ip>` and go to `/setup`. (During the manual Compose setup the app is also reachable on the server itself at `http://localhost:3000`, its localhost-bound port.)
 2. Create the company and the owner account. This is a one-time step and is only available while the instance has no users.
 3. You land in the dashboard.
 
 ## Create your first bookable service
 
-1. Go to **Providers** and confirm your owner account is listed. Add more providers here and send them an invite by email.
-2. Go to **Services** and create a service. Give it a name, a duration, and a location such as a Jitsi meeting or a phone call. Assign at least one provider.
+1. Go to **Members** and confirm your owner account is listed. Invite teammates here by email; each gets a role (Admin, Scheduler, or Member).
+2. Go to **Services** and create a service. Give it a name, a duration, and a location such as a Jitsi meeting or a phone call. Assign at least one provider (a member who will take its bookings).
 3. Go to **Availability** and set the working hours for each provider.
 
 ## Take a test booking

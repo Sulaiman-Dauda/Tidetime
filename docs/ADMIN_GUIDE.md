@@ -1,24 +1,25 @@
 # Admin guide
 
-This guide covers the company-wide settings that owners and managers control: the team, email, branding, legal pages, the custom domain, and data retention. For provider tasks, see the [user guide](./USER_GUIDE.md).
+This guide covers the company-wide settings that owners and admins control: the team, email, branding, legal pages, the custom domain, and data retention. For provider tasks, see the [user guide](./USER_GUIDE.md).
 
 ## Roles and access
 
-Tidetime runs one company per instance. Within that company there are three roles:
+Tidetime runs one company per instance. Team members are managed under **Members**, and each has one of four roles:
 
-- **Owner** has full control, including company settings, the team, and ownership transfer.
-- **Admin** manages the service catalog, provider assignments, availability, and integrations.
-- **Scheduler** works with bookings and their own availability.
+- **Owner** has full control, including company settings, integrations, and transferring or deleting the instance.
+- **Admin** can do everything except delete the instance: manage the service catalog, members, everyone's availability, all bookings, and company settings.
+- **Scheduler** is a front-desk role. They view and manage every booking and customer and can book on behalf of customers, but they are not bookable themselves and cannot change the service catalog, members, or settings.
+- **Member** is a regular team member and bookable provider. They take appointments and manage their own availability, bookings, and calendar connection.
 
-Providers manage only their own availability, bookings, and calendar connection. They can see assigned services and accepted teammates but cannot change them. These limits are enforced in the server, not only hidden in the interface.
+A **provider** is a member assigned to a service to take its bookings; owners and admins can be assigned as providers too. These limits are enforced in the server, not only hidden in the interface.
 
 ### Inviting the team
 
-Add people under **Providers** and send an invite by email. The invite is a one-time link tied to their address. When they accept and set a password, they join the company with the role you chose.
+Add people under **Members** and send an invite by email. The invite is a one-time link tied to their address. When they accept and set a password, they join the company with the role you chose.
 
 ### Transferring ownership
 
-An owner can transfer ownership to another accepted member from the provider settings. Use this before handing the instance to someone else.
+An owner can transfer ownership to another accepted member from the **Members** page. Use this before handing the instance to someone else.
 
 ## Email delivery
 
