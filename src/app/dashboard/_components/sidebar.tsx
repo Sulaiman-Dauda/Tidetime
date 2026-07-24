@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { can, canAny } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
 import { UserMenu } from "./user-menu";
+import { SidebarUpdate } from "./sidebar-update";
 
 /**
  * Focused navigation for company services, providers and bookings.
@@ -178,6 +179,13 @@ export function SidebarContent({ user, onNavigate }: SidebarProps) {
           </div>
         ) : null}
       </nav>
+
+      {/* Version + update (admins only), sitting above the user section. */}
+      {user.isAdmin ? (
+        <div className="pt-1">
+          <SidebarUpdate />
+        </div>
+      ) : null}
 
       {/* User section */}
       <div className="border-t border-sidebar-border/60 p-2">

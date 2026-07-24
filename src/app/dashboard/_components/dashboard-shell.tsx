@@ -9,7 +9,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar, SidebarContent } from "./sidebar";
 import { UserMenu } from "./user-menu";
 import { RouteProgress } from "./route-progress";
-import { UpdateBanner } from "./update-banner";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
@@ -108,7 +107,6 @@ export function DashboardShell({
           {/* Content */}
           <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
             <div className="max-w-7xl mx-auto">
-              {user.isAdmin && <UpdateBanner />}
               {children}
             </div>
           </main>
