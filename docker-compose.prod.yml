@@ -42,6 +42,11 @@ services:
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-tidetime}
       PORT: 3100
+    volumes:
+      # Channel to the optional updater sidecar (docker-compose.updater.yml).
+      # The app only writes an update request and reads a heartbeat here; it
+      # never gets Docker access itself.
+      - tidetime_update:/var/run/tidetime
     # Migrations run on boot. Safe at the supported single app replica; running
     # multiple app replicas would race the migrator and needs a separate
     # migrate step instead.
@@ -115,3 +120,4 @@ volumes:
   tidetime_pgdata:
   tidetime_caddy_data:
   tidetime_caddy_config:
+  tidetime_update:

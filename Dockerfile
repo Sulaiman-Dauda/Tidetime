@@ -29,6 +29,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3100
 ENV HOSTNAME=0.0.0.0
 
+# The git commit this image was built from, so the running app can compare
+# itself against the latest on GitHub and offer updates. Passed by CI.
+ARG TIDETIME_COMMIT=""
+ENV TIDETIME_COMMIT=$TIDETIME_COMMIT
+
 RUN addgroup -S nodejs -g 1001 \
   && adduser -S nextjs -u 1001
 

@@ -1,0 +1,58 @@
+# Optional one-click updater.
+#
+# Enable it ALONGSIDE the production stack, from the install directory:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.updater.yml up -d
+#
+# This runs a small helper container with access to the Docker socket so the
+# dashboard "Update now" button can pull the new image and restart the stack.
+# The Docker socket is host-root-equivalent, so only enable this if you accept
+# that trade-off. Without it, the dashboard shows the manual update command.
+#
+# To turn it off again:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.updater.yml stop updater
+#   docker compose -f docker-compose.prod.yml up -d   # back to the plain stack
+
+services:
+  updater:
+    image: docker:27-cli
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - tidetime_update:/var/run/tidetime
+      # Mount the project at the SAME path it lives on the host, so relative
+      # paths in the compose file (deploy/Caddyfile, .env) resolve to real host
+      # paths when the socket-driven compose recreates the stack.
+      - ${PWD}:${PWD}:ro
+    working_dir: ${PWD}
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /var/run/tidetime && chmod 777 /var/run/tidetime
+        echo "[updater] watching for update requests"
+        while true; do
+          touch /var/run/tidetime/heartbeat
+          if [ -f /var/run/tidetime/update.request ]; then
+            rm -f /var/run/tidetime/update.request
+            printf running > /var/run/tidetime/update.status
+            echo "[updater] pulling and restarting…"
+            if docker compose -f docker-compose.prod.yml pull && \
+               docker compose -f docker-compose.prod.yml up -d; then
+              printf done > /var/run/tidetime/update.status
+              echo "[updater] update complete"
+            else
+              printf failed > /var/run/tidetime/update.status
+              echo "[updater] update failed"
+            fi
+          fi
+          sleep 5
+        done
+
+volumes:
+  tidetime_update:

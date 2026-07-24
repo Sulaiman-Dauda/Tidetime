@@ -69,3 +69,14 @@ You can disable public bookings from **Settings**. While disabled, the booking p
 ## Background jobs
 
 Two housekeeping jobs run on a schedule: retrying failed webhook deliveries and applying data retention. In the production Docker setup a small worker triggers these automatically. See the [deployment guide](./DEPLOYMENT.md) for how it is wired.
+
+## Updates
+
+Tidetime checks GitHub for newer versions and shows admins a banner in the dashboard when the instance is behind, with a link to exactly what changed. The check is cached, so it only queries GitHub occasionally.
+
+How you apply an update depends on whether the optional updater is enabled:
+
+- **Default (recommended for most):** the banner's **Update now** button reveals the one command to run on your server. You stay in full control and nothing on the server has extra privileges.
+- **One-click:** enable the updater service and the button pulls the new image and restarts the stack for you. This requires giving a small helper container access to the Docker socket (host-root-equivalent), so it is off by default. See [enabling one-click updates](./DEPLOYMENT.md) in the deployment guide.
+
+Either way, updates preserve your data — the database and uploaded files live in Docker volumes that survive the restart. As always, back up before upgrading.

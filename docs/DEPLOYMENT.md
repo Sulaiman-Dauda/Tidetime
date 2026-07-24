@@ -69,6 +69,35 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f app jobs
 ```
 
+## Updates
+
+Tidetime shows admins a dashboard banner when a newer version is available. To update manually, pull the new image and restart:
+
+```bash
+cd /path/to/tidetime          # the install directory
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Your data is safe: PostgreSQL and uploads live in named volumes that survive the restart. Back up first anyway (see below).
+
+### Enabling one-click updates (optional)
+
+To make the dashboard's **Update now** button perform the update for you, enable the updater service. It runs a small helper container with access to the Docker socket, which is **host-root-equivalent** — only enable it if you accept that trade-off.
+
+Run it alongside the production stack, from the install directory:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.updater.yml up -d
+```
+
+The app talks to the updater over a private volume; it never gets Docker access itself. To disable it again:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.updater.yml stop updater
+docker compose -f docker-compose.prod.yml up -d
+```
+
 ## Backups and restore
 
 Create a compressed logical backup before every upgrade and copy it off the application host:
