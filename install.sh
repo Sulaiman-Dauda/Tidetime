@@ -27,9 +27,24 @@ IMAGE_TAG="latest"
 IMAGE="ghcr.io/sulaiman-dauda/tidetime:${IMAGE_TAG}"
 INSTALL_DIR="${INSTALL_DIR:-tidetime}"
 
-info()  { printf '\033[0;36m•\033[0m %s\n' "$1"; }
-ok()    { printf '\033[0;32m✓\033[0m %s\n' "$1"; }
-die()   { printf '\033[0;31m✗\033[0m %s\n' "$1" >&2; exit 1; }
+# Colours only when stdout is a real terminal, so piped/CI logs stay clean.
+if [ -t 1 ]; then
+  C_CYAN=$'\033[0;36m'; C_GREEN=$'\033[0;32m'; C_RED=$'\033[0;31m'
+  C_DIM=$'\033[0;90m'; C_BOLD=$'\033[1m'; C_RESET=$'\033[0m'; TTY=1
+else
+  C_CYAN=""; C_GREEN=""; C_RED=""; C_DIM=""; C_BOLD=""; C_RESET=""; TTY=0
+fi
+
+info()  { printf '%s•%s %s\n' "$C_CYAN" "$C_RESET" "$1"; }
+ok()    { printf '%s✓%s %s\n' "$C_GREEN" "$C_RESET" "$1"; }
+die()   { printf '%s✗%s %s\n' "$C_RED" "$C_RESET" "$1" >&2; exit 1; }
+
+banner() {
+  printf '\n'
+  printf '  %s≈≈≈%s  %sTidetime%s\n' "$C_CYAN" "$C_RESET" "$C_BOLD" "$C_RESET"
+  printf '  %sself-hosted appointment scheduling · one-command install%s\n\n' "$C_DIM" "$C_RESET"
+}
+banner
 
 # ---- Privilege -------------------------------------------------------------
 # Installing packages, Docker, swap and firewall rules needs root. Use sudo
@@ -173,15 +188,21 @@ compose up -d
 
 # ---- Wait until healthy ----------------------------------------------------
 app_url="$(grep '^APP_URL=' .env | cut -d= -f2-)"
-info "Waiting for Tidetime to become healthy…"
 healthy=0
-for _ in $(seq 1 40); do
+frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+[ "$TTY" -eq 0 ] && info "Waiting for Tidetime to become healthy…"
+for n in $(seq 1 40); do
   if curl -fsS --max-time 3 http://localhost/api/health 2>/dev/null | grep -q '"status":"ok"'; then
     healthy=1
     break
   fi
+  if [ "$TTY" -eq 1 ]; then
+    printf '\r%s%s%s Waiting for Tidetime to become healthy… %s(%ss)%s' \
+      "$C_CYAN" "${frames[$(( (n - 1) % 10 ))]}" "$C_RESET" "$C_DIM" "$(( (n - 1) * 3 ))" "$C_RESET"
+  fi
   sleep 3
 done
+[ "$TTY" -eq 1 ] && printf '\r\033[K'
 
 echo
 if [ "${healthy}" -eq 1 ]; then
