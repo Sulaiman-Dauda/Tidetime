@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { env } from "./env";
+import { deriveKey } from "./crypto";
 
 /**
  * Self-hosted ALTCHA proof-of-work challenge/response — a privacy-friendly,
@@ -10,7 +10,8 @@ import { env } from "./env";
  *
  * The client must find the integer `number` in [0, maxnumber] such that
  * SHA-256(salt + number) === challenge. We bind the salt to an expiry and sign
- * the challenge with an HMAC keyed by AUTH_SECRET so solutions can't be forged.
+ * the challenge with an HMAC keyed by a derived app subkey so solutions can't
+ * be forged.
  */
 
 const ALTCHA_ALGORITHM = "SHA-256";
@@ -38,7 +39,7 @@ function sha256Hex(input: string): string {
 }
 
 function hmacHex(input: string): string {
-  return createHmac("sha256", env.authSecret).update(input).digest("hex");
+  return createHmac("sha256", deriveKey("altcha-challenge")).update(input).digest("hex");
 }
 
 function safeEqualHex(a: string, b: string): boolean {

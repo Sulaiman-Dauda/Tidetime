@@ -87,6 +87,7 @@ email, and a Zapier catch hook against a staging database.
 
 ## Pre-release database policy
 
-This pre-release build has one clean baseline migration and intentionally provides no upgrade
-path from earlier prototypes. Use a new empty PostgreSQL database. This policy can change once
-the first production release creates a compatibility commitment.
+This pre-release build ships its migrations in `drizzle/` (applied in order on boot) and
+intentionally provides no upgrade path from earlier prototypes. Use a new empty PostgreSQL
+database. This policy can change once the first production release creates a compatibility
+commitment.

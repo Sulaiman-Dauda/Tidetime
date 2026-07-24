@@ -1,0 +1,1 @@
+CREATE INDEX "bookings_service_time_idx" ON "bookings" USING btree ("service_id","start_time");

@@ -4,10 +4,10 @@ import { google } from "googleapis";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { credentials, selectedCalendars, destinationCalendars } from "@/db/schema";
-import { encrypt, decrypt, hmacSign } from "@/lib/crypto";
-import { env } from "@/lib/env";
+import { encrypt, decrypt, hmacSign, deriveKey } from "@/lib/crypto";
 import { getAppUrl } from "@/server/app-url";
 import { getGoogleCreds } from "./integration-credentials";
+import { IntegrationError } from "./integration-error";
 
 /* -------------------------------------------------------------------------- */
 /*  OAuth2 client helpers                                                      */
@@ -16,7 +16,7 @@ import { getGoogleCreds } from "./integration-credentials";
 async function getOAuthClient() {
   const creds = await getGoogleCreds();
   if (!creds) {
-    throw new Error(
+    throw new IntegrationError(
       "Google OAuth is not configured — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
     );
   }
@@ -29,7 +29,7 @@ async function getOAuthClient() {
 
 function googleState(userId: number, issuedAt = Date.now()): string {
   const payload = `${userId}:${issuedAt}`;
-  const sig = hmacSign(payload, env.authSecret);
+  const sig = hmacSign(payload, deriveKey("google-oauth-state"));
   return `${payload}:${sig}`;
 }
 
@@ -39,7 +39,7 @@ export function parseGoogleOAuthState(state: string): number | null {
   if (!userIdRaw || !issuedAtRaw || !sig) return null;
 
   const payload = `${userIdRaw}:${issuedAtRaw}`;
-  const expected = hmacSign(payload, env.authSecret);
+  const expected = hmacSign(payload, deriveKey("google-oauth-state"));
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
@@ -69,7 +69,7 @@ export async function getGoogleAuthUrl(userId: number): Promise<string> {
 export async function exchangeGoogleCode(code: string, userId: number): Promise<void> {
   const oauth = await getOAuthClient();
   const { tokens } = await oauth.getToken(code);
-  if (!tokens.access_token) throw new Error("Google returned no access token");
+  if (!tokens.access_token) throw new IntegrationError("Google returned no access token");
 
   await db.delete(credentials).where(and(eq(credentials.userId, userId), eq(credentials.provider, "google")));
 

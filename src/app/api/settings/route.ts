@@ -1,3 +1,4 @@
+import { integrationErrorMessage } from "@/server/integration-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getMicrosoftCallbackUrl } from "@/server/microsoft-email";
@@ -117,7 +118,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     } catch (error) {
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Could not save Microsoft settings" },
+        { error: integrationErrorMessage(error, "Could not save Microsoft settings") },
         { status: 400 },
       );
     }

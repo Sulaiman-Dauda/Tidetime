@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: tidetime
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Localhost-only: dev credentials are weak, keep them off the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       # PostgreSQL 18+ images require the mount at /var/lib/postgresql (data is
       # stored in a version-specific subdirectory). Mounting /var/lib/postgresql/data

@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { createTransport } from "nodemailer";
 import { getSmtpConfig, smtpConfigSchema } from "@/server/settings";
 import { sendMicrosoftMail } from "@/server/microsoft-email";
+import { integrationErrorMessage } from "@/server/integration-error";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +12,16 @@ export async function POST(req: NextRequest) {
   const currentUser = await getCurrentUser();
   if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!currentUser.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // The SMTP check connects to an admin-supplied host/port, so throttle it to
+  // keep the endpoint useless as a connection/port-scan primitive.
+  const limit = checkRateLimit(`test-email:${currentUser.id}`, { limit: 10, windowMs: 60 * 60 * 1000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, message: "Too many test attempts — try again later." },
+      { status: 429 },
+    );
+  }
 
   let body: unknown;
   try {
@@ -43,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          message: error instanceof Error ? error.message : "Microsoft 365 test failed",
+          message: integrationErrorMessage(error, "Microsoft 365 test failed"),
         },
         { status: 502 },
       );

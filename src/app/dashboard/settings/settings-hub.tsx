@@ -78,7 +78,7 @@ export function SettingsHub({
   customDomain: string | null;
 }) {
   return (
-    <Tabs defaultValue="brand" className="space-y-6">
+    <Tabs defaultValue="domain" className="space-y-6">
       <TabsList className="flex-wrap">
         <TabsTrigger value="domain">Domain</TabsTrigger>
         <TabsTrigger value="general">Brand</TabsTrigger>

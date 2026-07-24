@@ -259,13 +259,25 @@ function EmailCard({ currentEmail }: { currentEmail: string }) {
       <h2 className="text-base font-semibold">Email</h2>
       <p className="mt-1 text-sm text-muted-foreground">{currentEmail}</p>
       {editing ? (
-        <form action={action} className="mt-4 flex max-w-sm items-end gap-2">
-          <div className="flex-1 space-y-1.5">
+        <form action={action} className="mt-4 max-w-sm space-y-3">
+          <div className="space-y-1.5">
             <Label htmlFor="new-email">New email address</Label>
             <Input id="new-email" name="email" type="email" required placeholder="new@company.com" autoFocus />
           </div>
-          <Button type="submit" loading={pending}>Send link</Button>
-          <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+          <div className="space-y-1.5">
+            <Label htmlFor="email-password">Current password</Label>
+            <Input
+              id="email-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="submit" loading={pending}>Send link</Button>
+            <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
         </form>
       ) : (
         <Button variant="outline" size="sm" className="mt-4" onClick={() => setEditing(true)}>
@@ -332,11 +344,21 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
               Choose “enter a setup key”, account name “{setup.uri.match(/totp\/([^?]+)/)?.[1] ? decodeURIComponent(setup.uri.match(/totp\/([^?]+)/)![1]) : "Tidetime"}”, time-based.
             </p>
           </div>
-          <form action={enableAction} className="flex items-end gap-2">
+          <form action={enableAction} className="space-y-3">
             <input type="hidden" name="secret" value={setup.secret} />
-            <div className="flex-1 space-y-1.5">
+            <div className="space-y-1.5">
               <Label htmlFor="totp-enable">2. Enter the 6-digit code it shows</Label>
               <Input id="totp-enable" name="code" inputMode="numeric" maxLength={8} placeholder="123456" required autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="totp-password">3. Confirm your password</Label>
+              <Input
+                id="totp-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
             </div>
             <Button type="submit" loading={enabling}>Verify &amp; enable</Button>
           </form>

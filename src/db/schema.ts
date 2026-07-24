@@ -287,6 +287,9 @@ export const bookings = pgTable(
     uniqueIndex("bookings_uid_idx").on(t.uid),
     uniqueIndex("bookings_idempotency_idx").on(t.idempotencyKey),
     index("bookings_user_time_idx").on(t.userId, t.startTime),
+    // Booking hot path: daily-cap counts and group-seat checks filter on
+    // (serviceId, startTime) inside the booking transaction.
+    index("bookings_service_time_idx").on(t.serviceId, t.startTime),
     index("bookings_status_idx").on(t.status),
   ],
 );
@@ -596,17 +599,12 @@ export type BookingField = {
 /* -------------------------------------------------------------------------- */
 
 export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
 export type Service = typeof services.$inferSelect;
-export type NewService = typeof services.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
-export type NewBooking = typeof bookings.$inferInsert;
 export type Attendee = typeof attendees.$inferSelect;
 export type Schedule = typeof schedules.$inferSelect;
 export type Availability = typeof availabilities.$inferSelect;
 export type Team = typeof teams.$inferSelect;
-export type Membership = typeof memberships.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
-export type NewCustomer = typeof customers.$inferInsert;
 export type BookingActivity = typeof bookingActivity.$inferSelect;
 export type MembershipRole = (typeof membershipRole.enumValues)[number];

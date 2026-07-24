@@ -96,9 +96,18 @@ export function isSubmittedTooFast(
   return now - renderedAt < minMs;
 }
 
-/** Derive a best-effort client IP from forwarding headers. */
+/**
+ * Derive a best-effort client IP from forwarding headers.
+ *
+ * X-Real-IP is preferred: the bundled Caddy sets it from the TCP socket, so it
+ * cannot be spoofed by the client. X-Forwarded-For is only a fallback — many
+ * proxies (e.g. nginx's $proxy_add_x_forwarded_for) append to a
+ * client-supplied list, which would let attackers rotate rate-limit keys.
+ */
 export function clientIpFromHeaders(headers: Headers): string {
+  const realIp = headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
   const xff = headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]!.trim();
-  return headers.get("x-real-ip")?.trim() || "unknown";
+  return "unknown";
 }

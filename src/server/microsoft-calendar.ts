@@ -7,6 +7,7 @@ import { encrypt, decrypt, randomToken } from "@/lib/crypto";
 import { getAppUrl } from "@/server/app-url";
 import { getMicrosoftEmailConfig } from "@/server/settings";
 import type { BusyInterval } from "@/server/google-calendar";
+import { IntegrationError } from "@/server/integration-error";
 
 /**
  * Per-user Microsoft 365 calendar connection for busy-time conflict checking.
@@ -51,7 +52,7 @@ export async function createMicrosoftCalendarOAuthRequest(): Promise<{
 }> {
   const config = await getMicrosoftEmailConfig();
   if (!config) {
-    throw new Error("Connect Microsoft 365 in company Settings first — the calendar uses the same app registration");
+    throw new IntegrationError("Connect Microsoft 365 in company Settings first — the calendar uses the same app registration");
   }
   const state = randomToken(24);
   const codeVerifier = randomToken(48);
@@ -80,7 +81,7 @@ async function tokenRequest(tenantId: string, params: URLSearchParams): Promise<
   });
   const body = (await response.json()) as TokenResponse;
   if (!response.ok || body.error || !body.access_token) {
-    throw new Error(
+    throw new IntegrationError(
       body.error_description?.replace(/\s*Trace ID:.*$/s, "").trim() ||
         body.error ||
         "Microsoft rejected the OAuth request",
@@ -96,7 +97,7 @@ async function tokenRequest(tenantId: string, params: URLSearchParams): Promise<
 /** Exchange the callback code and persist the encrypted per-user credential. */
 export async function exchangeMicrosoftCalendarCode(userId: number, code: string, codeVerifier: string): Promise<void> {
   const config = await getMicrosoftEmailConfig();
-  if (!config) throw new Error("Microsoft application settings are missing");
+  if (!config) throw new IntegrationError("Microsoft application settings are missing");
   const tokens = await tokenRequest(config.tenantId, new URLSearchParams({
     client_id: config.clientId,
     client_secret: config.clientSecret,

@@ -4,6 +4,7 @@ import { appSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { z } from "zod";
+import { IntegrationError } from "@/server/integration-error";
 
 export const emailProviderSchema = z.enum(["smtp", "microsoft365"]);
 export type EmailProvider = z.infer<typeof emailProviderSchema>;
@@ -125,7 +126,7 @@ export async function getMicrosoftEmailConfig(): Promise<MicrosoftEmailConfig | 
 export async function setMicrosoftEmailConfig(config: MicrosoftEmailConfig): Promise<void> {
   const existing = await getMicrosoftEmailConfig();
   const clientSecret = config.clientSecret || existing?.clientSecret || "";
-  if (!clientSecret) throw new Error("Application Client Secret is required");
+  if (!clientSecret) throw new IntegrationError("Application Client Secret is required");
 
   // Tokens belong to the app registration that issued them. Changing the
   // client id therefore disconnects the old account instead of leaving a

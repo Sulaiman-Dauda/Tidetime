@@ -12,8 +12,7 @@ import {
 } from "@/lib/rate-limit";
 import { isBookingDisabled, getCompanySettings } from "@/server/company-settings";
 import { verifyAltchaSolution } from "@/lib/altcha";
-import { verifyBotChallenge } from "@/lib/bot-challenge";
-import { env } from "@/lib/env";
+import { verifyBotChallenge, botChallengeSecret } from "@/lib/bot-challenge";
 
 const bookingSchema = z.object({
   slug: z.string().min(1),
@@ -65,7 +64,7 @@ export async function bookAction(_prev: BookActionState, formData: FormData): Pr
   // The server-signed bot challenge (when the form supplied one) makes the
   // timing tamper-proof; the client `ts` is a cheap fallback for entry points
   // that don't issue a challenge.
-  const challengeBad = result.data.bc !== undefined && !verifyBotChallenge(env.authSecret, result.data.bc);
+  const challengeBad = result.data.bc !== undefined && !verifyBotChallenge(botChallengeSecret(), result.data.bc);
   if (isHoneypotFilled(result.data.hp) || isSubmittedTooFast(result.data.ts) || challengeBad) {
     // Generic message — don't reveal the bot detection.
     return { error: "We couldn't process that request. Please try again." };

@@ -1,3 +1,4 @@
+import { integrationErrorMessage } from "@/server/integration-error";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
     return redirectWith(
       req,
       "microsoft_error",
-      error instanceof Error ? error.message : "Microsoft connection failed",
+      integrationErrorMessage(error, "Microsoft connection failed"),
     );
   }
 }

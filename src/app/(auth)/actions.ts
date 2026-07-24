@@ -6,7 +6,7 @@ import { eq, or, and, isNull, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users, schedules, availabilities, invites, memberships } from "@/db/schema";
-import { hashPassword, verifyPassword } from "@/lib/crypto";
+import { hashPassword, verifyPassword, decrypt } from "@/lib/crypto";
 import { createSession, destroySession } from "@/lib/auth";
 import { isValidTimeZone } from "@/lib/time";
 import { requestPasswordReset, resetPassword } from "@/server/password-reset";
@@ -205,7 +205,7 @@ export async function loginAction(_prev: LoginResult, formData: FormData): Promi
   // Second factor, only after the password checks out.
   if (user.totpSecret) {
     if (!parsed.data.totp) return { needsTotp: true };
-    if (!verifyTotp(user.totpSecret, parsed.data.totp)) {
+    if (!verifyTotp(decrypt(user.totpSecret), parsed.data.totp)) {
       return { needsTotp: true, error: "That code didn't match. Try again." };
     }
   }

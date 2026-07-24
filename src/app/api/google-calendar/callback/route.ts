@@ -1,3 +1,4 @@
+import { integrationErrorMessage } from "@/server/integration-error";
 import { NextRequest, NextResponse } from "next/server";
 import { userHasPermission } from "@/lib/guard";
 import { exchangeGoogleCode, parseGoogleOAuthState } from "@/server/google-calendar";
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(
         "/dashboard/integrations?google_error=" +
-          encodeURIComponent(err instanceof Error ? err.message : "Exchange failed"),
+          encodeURIComponent(integrationErrorMessage(err, "Exchange failed")),
         req.url,
       ),
     );

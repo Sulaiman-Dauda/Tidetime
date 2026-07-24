@@ -1,3 +1,4 @@
+import { integrationErrorMessage } from "@/server/integration-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAuthorization } from "@/lib/guard";
 import { can } from "@/lib/rbac";
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
     await exchangeMicrosoftCalendarCode(authorization.user.id, code, codeVerifier);
     return clearCookies(NextResponse.redirect(settingsUrl(req, { ms_calendar_connected: "1" })));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Connection failed";
+    const message = integrationErrorMessage(error, "Connection failed");
     return clearCookies(NextResponse.redirect(settingsUrl(req, { ms_calendar_error: message })));
   }
 }

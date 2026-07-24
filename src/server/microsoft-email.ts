@@ -1,8 +1,7 @@
 import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createTransport } from "nodemailer";
-import { hmacSign, randomToken } from "@/lib/crypto";
-import { env } from "@/lib/env";
+import { hmacSign, randomToken, deriveKey } from "@/lib/crypto";
 import { getAppUrl } from "@/server/app-url";
 import {
   deleteMicrosoftEmailConnection,
@@ -14,6 +13,7 @@ import {
   type MicrosoftEmailConnection,
 } from "@/server/settings";
 import type { SendMailArgs } from "@/server/mailer";
+import { IntegrationError } from "@/server/integration-error";
 
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 const SCOPES = "openid profile email offline_access User.Read Mail.Send";
@@ -52,7 +52,7 @@ export async function getMicrosoftCallbackUrl(): Promise<string> {
 }
 
 function stateSignature(payload: string): string {
-  return hmacSign(`microsoft-email:${payload}`, env.authSecret);
+  return hmacSign(`microsoft-email:${payload}`, deriveKey("microsoft-email-state"));
 }
 
 export function createMicrosoftOAuthState(
@@ -90,7 +90,7 @@ export async function createMicrosoftOAuthRequest(
 ): Promise<MicrosoftOAuthRequest> {
   const config = await getMicrosoftEmailConfig();
   if (!config?.clientId || !config.clientSecret) {
-    throw new Error("Save the Microsoft Application Client ID and Client Secret first");
+    throw new IntegrationError("Save the Microsoft Application Client ID and Client Secret first");
   }
 
   const state = createMicrosoftOAuthState(adminUserId);
@@ -128,7 +128,7 @@ async function tokenRequest(
   });
   const body = await response.json() as MicrosoftTokenResponse;
   if (!response.ok || body.error) {
-    throw new Error(
+    throw new IntegrationError(
       body.error_description?.replace(/\s*Trace ID:.*$/s, "").trim() ||
         body.error ||
         "Microsoft rejected the OAuth request",
@@ -159,7 +159,7 @@ async function fetchProfile(accessToken: string): Promise<MicrosoftProfile> {
       signal: AbortSignal.timeout(15_000),
     },
   );
-  if (!response.ok) throw new Error("Microsoft connected, but the mailbox profile could not be read");
+  if (!response.ok) throw new IntegrationError("Microsoft connected, but the mailbox profile could not be read");
   return response.json() as Promise<MicrosoftProfile>;
 }
 
@@ -169,7 +169,7 @@ export async function exchangeMicrosoftCode(
   codeVerifier: string,
 ): Promise<MicrosoftEmailConnection> {
   const config = await getMicrosoftEmailConfig();
-  if (!config) throw new Error("Microsoft email application settings are missing");
+  if (!config) throw new IntegrationError("Microsoft email application settings are missing");
 
   const tokens = await tokenRequest(config.tenantId, new URLSearchParams({
     client_id: config.clientId,
@@ -181,15 +181,15 @@ export async function exchangeMicrosoftCode(
     scope: SCOPES,
   }));
   if (!tokens.access_token || !tokens.refresh_token) {
-    throw new Error("Microsoft did not return the offline access required for email sending");
+    throw new IntegrationError("Microsoft did not return the offline access required for email sending");
   }
 
   const profile = await fetchProfile(tokens.access_token);
   const email = profile.mail || profile.userPrincipalName;
-  if (!profile.id || !email) throw new Error("The connected Microsoft account has no mailbox address");
+  if (!profile.id || !email) throw new IntegrationError("The connected Microsoft account has no mailbox address");
   const tokenTenantId = tenantIdFromIdToken(tokens.id_token);
   if (tokenTenantId && tokenTenantId.toLowerCase() !== config.tenantId.toLowerCase()) {
-    throw new Error("Microsoft returned an account from a different directory");
+    throw new IntegrationError("Microsoft returned an account from a different directory");
   }
 
   const connection: MicrosoftEmailConnection = {
@@ -212,7 +212,7 @@ async function refreshMicrosoftConnection(
   connection: MicrosoftEmailConnection,
 ): Promise<MicrosoftEmailConnection> {
   const config = await getMicrosoftEmailConfig();
-  if (!config) throw new Error("Microsoft email application settings are missing");
+  if (!config) throw new IntegrationError("Microsoft email application settings are missing");
 
   try {
     const tokens = await tokenRequest(config.tenantId, new URLSearchParams({
@@ -222,7 +222,7 @@ async function refreshMicrosoftConnection(
       refresh_token: connection.refreshToken,
       scope: SCOPES,
     }));
-    if (!tokens.access_token) throw new Error("Microsoft returned no access token");
+    if (!tokens.access_token) throw new IntegrationError("Microsoft returned no access token");
 
     const next: MicrosoftEmailConnection = {
       ...connection,
@@ -246,7 +246,7 @@ async function refreshMicrosoftConnection(
 
 export async function getValidMicrosoftConnection(): Promise<MicrosoftEmailConnection> {
   const connection = await getMicrosoftEmailConnection();
-  if (!connection) throw new Error("Microsoft 365 email is not connected");
+  if (!connection) throw new IntegrationError("Microsoft 365 email is not connected");
   if (connection.expiresAt - Date.now() <= REFRESH_SKEW_MS) {
     return refreshMicrosoftConnection(connection);
   }
@@ -272,7 +272,7 @@ export async function renderMicrosoftMime(
     attachments: args.attachments,
   });
   const message = (info as { message?: unknown }).message;
-  if (!Buffer.isBuffer(message)) throw new Error("Unable to generate the Microsoft email message");
+  if (!Buffer.isBuffer(message)) throw new IntegrationError("Unable to generate the Microsoft email message");
   return message;
 }
 
@@ -294,7 +294,7 @@ async function graphSend(
 
 export async function sendMicrosoftMail(args: SendMailArgs): Promise<void> {
   const config = await getMicrosoftEmailConfig();
-  if (!config) throw new Error("Microsoft 365 email application settings are missing");
+  if (!config) throw new IntegrationError("Microsoft 365 email application settings are missing");
 
   let connection = await getValidMicrosoftConnection();
   const safeName = config.fromName.replace(/[\r\n"]/g, "").trim();
@@ -310,7 +310,7 @@ export async function sendMicrosoftMail(args: SendMailArgs): Promise<void> {
   }
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 500);
-    throw new Error(`Microsoft Graph rejected the email (${response.status})${detail ? `: ${detail}` : ""}`);
+    throw new IntegrationError(`Microsoft Graph rejected the email (${response.status})${detail ? `: ${detail}` : ""}`);
   }
 }
 

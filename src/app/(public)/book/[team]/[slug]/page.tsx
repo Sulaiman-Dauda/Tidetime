@@ -4,8 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { getTeamService, getTeamHosts } from "@/server/teams-public";
 import { getBookingByUid } from "@/server/bookings";
 import { getCompanySettings } from "@/server/company-settings";
-import { issueBotChallenge } from "@/lib/bot-challenge";
-import { env } from "@/lib/env";
+import { issueBotChallenge, botChallengeSecret } from "@/lib/bot-challenge";
 import type { FieldValues } from "@/lib/booking-fields";
 import { formatDuration } from "@/lib/format";
 import { BookingFlow, type BookingPrefill, type LegalLink } from "../../../_components/booking-flow";
@@ -136,7 +135,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
         }}
         company={{ name: teamRow.name, logoUrl: teamRow.logoUrl }}
         spamProtection={settings.booking.spamProtectionEnabled}
-        botChallenge={issueBotChallenge(env.authSecret)}
+        botChallenge={issueBotChallenge(botChallengeSecret())}
         teamHosts={teamHosts}
         prefill={prefill}
         legalLinks={legalLinks}

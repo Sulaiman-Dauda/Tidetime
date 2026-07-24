@@ -1,3 +1,4 @@
+import { integrationErrorMessage } from "@/server/integration-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAuthorization } from "@/lib/guard";
 import { can } from "@/lib/rbac";
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(
         "/dashboard/integrations?app_error=" +
-          encodeURIComponent(err instanceof Error ? err.message : "Google is not configured"),
+          encodeURIComponent(integrationErrorMessage(err, "Google is not configured")),
         req.url,
       ),
     );

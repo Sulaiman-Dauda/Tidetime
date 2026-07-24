@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { deriveKey } from "./crypto";
 
 /**
  * Server-signed bot challenge for public forms (the idea borrowed from
@@ -12,6 +13,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  */
 
 const SEP = ".";
+
+/**
+ * The production signing secret — a purpose-specific subkey of AUTH_SECRET.
+ * Tests inject their own fixed secret via the function parameters instead.
+ */
+export function botChallengeSecret(): string {
+  return deriveKey("bot-challenge").toString("hex");
+}
 
 function sign(secret: string, payload: string): string {
   return createHmac("sha256", secret).update(payload).digest("hex");

@@ -6,7 +6,7 @@ import { eq, and, ne } from "drizzle-orm";
 import { requireUser, revokeOtherSessions } from "@/lib/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { hashPassword, verifyPassword } from "@/lib/crypto";
+import { hashPassword, verifyPassword, encrypt, decrypt } from "@/lib/crypto";
 import { isValidTimeZone } from "@/lib/time";
 import { generateTotpSecret, totpUri, verifyTotp } from "@/lib/totp";
 import { env } from "@/lib/env";
@@ -14,6 +14,24 @@ import { requestEmailChange } from "@/server/email-change";
 import { resolveLocale } from "@/lib/format";
 
 export type SettingsState = { ok?: boolean; error?: string } | null;
+
+/**
+ * Re-authenticate a sensitive change with the account password so a hijacked
+ * session alone can't take over the account (change email, enroll 2FA).
+ * Accounts without a password (none to verify) pass through.
+ */
+async function verifyCurrentPassword(userId: number, password: unknown): Promise<string | null> {
+  const [row] = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!row?.passwordHash) return null;
+  if (typeof password !== "string" || !password || !(await verifyPassword(password, row.passwordHash))) {
+    return "Current password is incorrect";
+  }
+  return null;
+}
 
 const profileSchema = z.object({
   name: z.string().max(128).optional(),
@@ -114,6 +132,8 @@ export async function requestEmailChangeAction(
   if (parsed.data.email === user.email.toLowerCase()) {
     return { error: "That's already your email address" };
   }
+  const passwordError = await verifyCurrentPassword(user.id, formData.get("password"));
+  if (passwordError) return { error: passwordError };
   const result = await requestEmailChange(user.id, parsed.data.email);
   if (!result.ok) return { error: result.error };
   return { ok: true };
@@ -143,10 +163,16 @@ export async function enableTotpAction(_prev: SettingsState, formData: FormData)
     code: formData.get("code"),
   });
   if (!parsed.success) return { error: "Invalid code" };
+  const passwordError = await verifyCurrentPassword(user.id, formData.get("password"));
+  if (passwordError) return { error: passwordError };
   if (!verifyTotp(parsed.data.secret, parsed.data.code)) {
     return { error: "That code didn't match. Check your authenticator app and try again." };
   }
-  await db.update(users).set({ totpSecret: parsed.data.secret, updatedAt: new Date() }).where(eq(users.id, user.id));
+  // Encrypted at rest, like every other credential this app stores.
+  await db
+    .update(users)
+    .set({ totpSecret: encrypt(parsed.data.secret), updatedAt: new Date() })
+    .where(eq(users.id, user.id));
   revalidatePath("/dashboard/account");
   return { ok: true };
 }
@@ -156,7 +182,7 @@ export async function disableTotpAction(_prev: SettingsState, formData: FormData
   const code = formData.get("code");
   const [row] = await db.select({ totpSecret: users.totpSecret }).from(users).where(eq(users.id, user.id)).limit(1);
   if (!row?.totpSecret) return { ok: true };
-  if (typeof code !== "string" || !verifyTotp(row.totpSecret, code)) {
+  if (typeof code !== "string" || !verifyTotp(decrypt(row.totpSecret), code)) {
     return { error: "Enter the current code from your authenticator app to turn 2FA off." };
   }
   await db.update(users).set({ totpSecret: null, updatedAt: new Date() }).where(eq(users.id, user.id));

@@ -1,3 +1,4 @@
+import { integrationErrorMessage } from "@/server/integration-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createMicrosoftOAuthRequest } from "@/server/microsoft-email";
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     response.cookies.set("tidetime_ms_oauth_verifier", oauth.codeVerifier, cookieOptions);
     return response;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Microsoft email is not configured";
+    const message = integrationErrorMessage(error, "Microsoft email is not configured");
     return NextResponse.redirect(
       new URL(`/dashboard/integrations?microsoft_error=${encodeURIComponent(message)}`, req.url),
     );

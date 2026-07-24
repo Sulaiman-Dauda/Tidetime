@@ -2,14 +2,14 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { attendees, bookings } from "@/db/schema";
-import { env } from "@/lib/env";
+import { deriveKey } from "@/lib/crypto";
 import { getAppUrl } from "@/server/app-url";
 import { isRsvpStatus, rsvpToken, verifyRsvpToken, type RsvpStatus } from "@/lib/rsvp";
 import { logBookingActivity } from "./activity";
 
 /** Signed Accept / Decline / Tentative links for a booking's attendee email. */
 export async function buildRsvpLinks(uid: string, email: string) {
-  const token = rsvpToken(uid, email, env.authSecret);
+  const token = rsvpToken(uid, email, deriveKey("rsvp-token").toString("hex"));
   const base = `${await getAppUrl()}/booking/${uid}/rsvp`;
   const mk = (status: RsvpStatus) =>
     `${base}?status=${status}&email=${encodeURIComponent(email)}&t=${token}`;
@@ -29,7 +29,7 @@ export async function respondToRsvp(
 ): Promise<{ ok: boolean; status?: RsvpStatus; error?: string }> {
   if (!isRsvpStatus(status)) return { ok: false, error: "Invalid response." };
   const normalized = email.trim().toLowerCase();
-  if (!normalized || !verifyRsvpToken(uid, normalized, token, env.authSecret)) {
+  if (!normalized || !verifyRsvpToken(uid, normalized, token, deriveKey("rsvp-token").toString("hex"))) {
     return { ok: false, error: "This response link is no longer valid." };
   }
 
