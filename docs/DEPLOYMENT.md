@@ -4,13 +4,15 @@ Tidetime is deployed with Docker. The fastest path is the install script; the ma
 
 ## Install script
 
-On a server with Docker and the Docker Compose plugin installed:
+On a fresh Linux server (as root, or a user with sudo):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/Tidetime/main/install.sh | bash
 ```
 
-The script downloads the project, generates the required secrets, writes a `.env` file, and starts the stack. It prefers a prebuilt image published to the GitHub Container Registry (`ghcr.io/sulaiman-dauda/tidetime`) and falls back to building from source when a pull is not possible. Review the script before running it if you prefer.
+The script installs everything it needs — Docker, git, and openssl if missing — adds a swap file on low-memory hosts, opens firewall ports 80 and 443, then downloads the project, generates the required secrets, writes a `.env` file, starts the stack, and waits until it is healthy. It uses a prebuilt image published to the GitHub Container Registry (`ghcr.io/sulaiman-dauda/tidetime`) and only builds from source when a pull is not possible. It prints the address to open when done, for example `http://<your-server-ip>`. Review the script before running it if you prefer.
+
+The instance is reachable on port 80 through Caddy (`http://<your-server-ip>`, no port suffix); the application's own port stays bound to localhost. Attach a domain for HTTPS (see below) — a bare IP cannot be issued a certificate.
 
 ## Required configuration
 

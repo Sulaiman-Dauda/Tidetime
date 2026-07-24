@@ -4,20 +4,22 @@ This guide takes you from an empty server to a working booking page. It covers t
 
 ## What you need
 
-- A server or machine with [Docker](https://docs.docker.com/get-docker/) and the Docker Compose plugin.
+- A Linux server with root or sudo access. That is all — the install script installs Docker and everything else for you.
 - A domain name if you want public HTTPS booking pages. You can start without one and add it later.
 
 Tidetime runs one company per instance. If you need to schedule for several unrelated organizations, run a separate instance for each.
 
 ## Option 1: install script
 
-On a fresh server with Docker installed, run:
+On a fresh server, run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/Tidetime/main/install.sh | bash
 ```
 
-The script checks for Docker, downloads the project, generates the required secrets, writes a `.env` file, and starts the containers. When it finishes it prints the address to open. Read the script first if you prefer; piping to a shell always deserves a look.
+The script does the whole setup end to end: it installs Docker, git, and openssl if they are missing, adds a swap file on low-memory hosts, opens firewall ports 80 and 443, downloads Tidetime, generates the required secrets, starts the stack, and waits until it is healthy. When it finishes it prints the address to open, for example `http://<your-server-ip>`. Read the script first if you prefer; piping to a shell always deserves a look.
+
+Access is on port 80 through the bundled Caddy proxy, so the URL is `http://<your-server-ip>` with no port. HTTPS is only available once you attach a domain (a bare IP address cannot get a certificate) — see [Custom domain and HTTPS](./ADMIN_GUIDE.md).
 
 ## Option 2: Docker Compose by hand
 

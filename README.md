@@ -68,7 +68,13 @@ In production the app validates its configuration on boot and refuses to start w
 
 ## Production
 
-The production Compose file runs PostgreSQL, the standalone Next.js server, a background jobs worker, and Caddy for HTTPS.
+On a fresh Linux server (root or sudo), one command installs everything — Docker, secrets, firewall, the stack — and prints the address when it is live:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/Tidetime/main/install.sh | bash
+```
+
+Prefer to do it by hand? The production Compose file runs PostgreSQL, the standalone Next.js server, a background jobs worker, and Caddy:
 
 ```bash
 cp .env.example .env
@@ -76,7 +82,7 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-The app container applies database migrations before it starts. The jobs worker calls the protected cron endpoint on an interval to handle webhook retries and data retention. The application port stays bound to localhost so all remote traffic passes through Caddy.
+The app container applies database migrations before it starts. The jobs worker calls the protected cron endpoint on an interval to handle webhook retries and data retention. The application port stays bound to localhost so all remote traffic passes through Caddy — the instance is reached at `http://<your-server-ip>` (or `https://<your-domain>` once a domain is attached).
 
 For domain setup, backups, Microsoft 365 email, and upgrade notes, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
