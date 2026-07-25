@@ -31,14 +31,31 @@ npm run jobs:worker       # background jobs, separate process
 Useful: `npm run db:studio` (Drizzle Studio), `npm run db:generate` after schema edits.
 `docker-compose.prod.yml` and `docker-compose.updater.yml` are deployment concerns, not local ones.
 
-## Tests
+## Verifying a change
 
 ```sh
-npm run check          # lint + typecheck + test — run this before handing back
-npm test
+npm run check          # lint + typecheck + test + build — the floor, run before handing back
+npm test               # vitest only, fast loop while working
 npm run test:coverage
-npm run test:e2e       # Playwright
+npm run test:e2e       # builds, starts the app, drives real Chromium against seeded demo data
 ```
+
+`npm run check` passing means the change **compiles and doesn't regress**. It does not mean the
+change works. For anything on the list below, exercise the real thing and say in the handback
+what you actually observed — not "the code looks right".
+
+| Touching | What "verified" means |
+|---|---|
+| Booking flow, availability, public pages | Place a real booking in the browser, then query the DB for the row. `npm run test:e2e` covers the seeded path; a new path needs a spec or a manual run. |
+| Reminders, webhooks, anything queued | `npm run jobs:worker` must be running in a second process. Without it bookings look fine and nothing fires. Confirm the job actually ran. |
+| Email | Render and read the real email. A template that compiles is not a template that looks right. |
+| Zapier payloads | Payload shape is a public contract — a change is breaking. Capture the actual JSON sent. |
+| Auth, sessions, TOTP | Load the page in a real browser with a real cookie. `curl` doesn't carry the session. |
+| Services / event types | Check the public slug too: drafts must 404, published must resolve. |
+| Schema | `npm run db:generate`, apply with `db:migrate`, then confirm against a **freshly migrated** DB — not one that happens to already have the column. |
+
+If a surface couldn't be verified, say so plainly in the handback and name what's unproven.
+Unverified is a normal outcome; unverified reported as done is not.
 
 ## Hard rules
 
