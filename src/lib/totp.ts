@@ -60,10 +60,22 @@ export function totpCode(secret: string, step: number): string {
   return String(code % 1_000_000).padStart(6, "0");
 }
 
-/** Verify a user-supplied code, allowing one step of clock drift either way. */
-export function verifyTotp(secret: string, code: string, now: Date = new Date()): boolean {
+/**
+ * Verify a user-supplied code, allowing one step of clock drift either way, and
+ * return the 30-second step it matched — or null if it matched none.
+ *
+ * Callers guarding a login or a sensitive action must persist the returned step
+ * and reject any later code whose step is not strictly greater. RFC 6238 §5.2:
+ * a verifier must not accept a second use of the same OTP. Without that check a
+ * single code stays usable for its whole ~90-second acceptance window.
+ */
+export function verifyTotpStep(
+  secret: string,
+  code: string,
+  now: Date = new Date(),
+): number | null {
   const normalized = code.replace(/\s/g, "");
-  if (!/^\d{6}$/.test(normalized)) return false;
+  if (!/^\d{6}$/.test(normalized)) return null;
   const step = Math.floor(now.getTime() / 30_000);
   for (const candidate of [step, step - 1, step + 1]) {
     const expected = totpCode(secret, candidate);
@@ -71,10 +83,15 @@ export function verifyTotp(secret: string, code: string, now: Date = new Date())
       expected.length === normalized.length &&
       timingSafeEqual(Buffer.from(expected), Buffer.from(normalized))
     ) {
-      return true;
+      return candidate;
     }
   }
-  return false;
+  return null;
+}
+
+/** Boolean form of {@link verifyTotpStep}, for callers with no replay window to guard. */
+export function verifyTotp(secret: string, code: string, now: Date = new Date()): boolean {
+  return verifyTotpStep(secret, code, now) !== null;
 }
 
 /** otpauth:// URI for QR/manual entry in authenticator apps. */

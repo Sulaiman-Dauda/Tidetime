@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { base32Decode, base32Encode, generateTotpSecret, totpCode, totpUri, verifyTotp } from "./totp";
+import {
+  base32Decode,
+  base32Encode,
+  generateTotpSecret,
+  totpCode,
+  totpUri,
+  verifyTotp,
+  verifyTotpStep,
+} from "./totp";
 
 describe("totp", () => {
   it("round-trips base32", () => {
@@ -26,6 +34,35 @@ describe("totp", () => {
     expect(verifyTotp(secret, totpCode(secret, step + 2), now)).toBe(false);
     expect(verifyTotp(secret, "12345", now)).toBe(false);
     expect(verifyTotp(secret, "abcdef", now)).toBe(false);
+  });
+
+  it("reports which step a code matched, so callers can enforce single use", () => {
+    const secret = generateTotpSecret();
+    const now = new Date("2026-07-24T12:00:00Z");
+    const step = Math.floor(now.getTime() / 30_000);
+    expect(verifyTotpStep(secret, totpCode(secret, step), now)).toBe(step);
+    expect(verifyTotpStep(secret, totpCode(secret, step - 1), now)).toBe(step - 1);
+    expect(verifyTotpStep(secret, totpCode(secret, step + 1), now)).toBe(step + 1);
+    expect(verifyTotpStep(secret, totpCode(secret, step + 2), now)).toBeNull();
+    expect(verifyTotpStep(secret, "abcdef", now)).toBeNull();
+  });
+
+  it("gives callers what they need to reject a replayed code", () => {
+    // The guard callers implement: accept only a step strictly greater than the
+    // last one consumed. Without it a single code stays good for ~90 seconds.
+    const secret = generateTotpSecret();
+    const now = new Date("2026-07-24T12:00:00Z");
+    const step = Math.floor(now.getTime() / 30_000);
+    const code = totpCode(secret, step);
+
+    const first = verifyTotpStep(secret, code, now);
+    expect(first).toBe(step);
+
+    // Same code, same window — still cryptographically valid...
+    const second = verifyTotpStep(secret, code, now);
+    expect(second).toBe(step);
+    // ...but not strictly greater than what was consumed, so callers reject it.
+    expect(second !== null && first !== null && second <= first).toBe(true);
   });
 
   it("builds an otpauth URI", () => {

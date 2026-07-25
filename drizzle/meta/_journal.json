@@ -36,6 +36,13 @@
       "when": 1784880731090,
       "tag": "0004_first_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784994004024,
+      "tag": "0005_nasty_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }

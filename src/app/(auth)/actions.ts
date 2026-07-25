@@ -13,7 +13,7 @@ import { requestPasswordReset, resetPassword } from "@/server/password-reset";
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
 import { fieldErrorsFromIssues } from "@/lib/schemas";
 import { isAdminRole } from "@/lib/rbac";
-import { verifyTotp } from "@/lib/totp";
+import { verifyTotpStep } from "@/lib/totp";
 
 /** Best-effort client IP for rate-limit keys, from forwarding headers. */
 async function clientIp(): Promise<string> {
@@ -192,7 +192,12 @@ export async function loginAction(_prev: LoginResult, formData: FormData): Promi
   }
 
   const [user] = await db
-    .select({ id: users.id, passwordHash: users.passwordHash, totpSecret: users.totpSecret })
+    .select({
+      id: users.id,
+      passwordHash: users.passwordHash,
+      totpSecret: users.totpSecret,
+      totpLastStep: users.totpLastStep,
+    })
     .from(users)
     .where(eq(users.email, parsed.data.email))
     .limit(1);
@@ -205,9 +210,19 @@ export async function loginAction(_prev: LoginResult, formData: FormData): Promi
   // Second factor, only after the password checks out.
   if (user.totpSecret) {
     if (!parsed.data.totp) return { needsTotp: true };
-    if (!verifyTotp(decrypt(user.totpSecret), parsed.data.totp)) {
+    const step = verifyTotpStep(decrypt(user.totpSecret), parsed.data.totp);
+    if (step === null) {
       return { needsTotp: true, error: "That code didn't match. Try again." };
     }
+    // Single-use: a code is only good for a step we haven't already consumed,
+    // otherwise it stays replayable for its whole ~90-second window.
+    if (user.totpLastStep !== null && step <= user.totpLastStep) {
+      return {
+        needsTotp: true,
+        error: "That code has already been used. Wait for your authenticator to show a new one.",
+      };
+    }
+    await db.update(users).set({ totpLastStep: step }).where(eq(users.id, user.id));
   }
 
   await createSession(user.id);

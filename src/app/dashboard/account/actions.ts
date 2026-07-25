@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword, verifyPassword, encrypt, decrypt } from "@/lib/crypto";
 import { isValidTimeZone } from "@/lib/time";
-import { generateTotpSecret, totpUri, verifyTotp } from "@/lib/totp";
+import { generateTotpSecret, totpUri, verifyTotpStep } from "@/lib/totp";
 import { env } from "@/lib/env";
 import { requestEmailChange } from "@/server/email-change";
 import { resolveLocale } from "@/lib/format";
@@ -165,13 +165,16 @@ export async function enableTotpAction(_prev: SettingsState, formData: FormData)
   if (!parsed.success) return { error: "Invalid code" };
   const passwordError = await verifyCurrentPassword(user.id, formData.get("password"));
   if (passwordError) return { error: passwordError };
-  if (!verifyTotp(parsed.data.secret, parsed.data.code)) {
+  const step = verifyTotpStep(parsed.data.secret, parsed.data.code);
+  if (step === null) {
     return { error: "That code didn't match. Check your authenticator app and try again." };
   }
-  // Encrypted at rest, like every other credential this app stores.
+  // Encrypted at rest, like every other credential this app stores. Seed
+  // totpLastStep with the enrolment code's step so that same code cannot be
+  // turned straight around against a login or to switch 2FA back off.
   await db
     .update(users)
-    .set({ totpSecret: encrypt(parsed.data.secret), updatedAt: new Date() })
+    .set({ totpSecret: encrypt(parsed.data.secret), totpLastStep: step, updatedAt: new Date() })
     .where(eq(users.id, user.id));
   revalidatePath("/dashboard/account");
   return { ok: true };
@@ -180,12 +183,22 @@ export async function enableTotpAction(_prev: SettingsState, formData: FormData)
 export async function disableTotpAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   const user = await requireUser();
   const code = formData.get("code");
-  const [row] = await db.select({ totpSecret: users.totpSecret }).from(users).where(eq(users.id, user.id)).limit(1);
+  const [row] = await db
+    .select({ totpSecret: users.totpSecret, totpLastStep: users.totpLastStep })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
   if (!row?.totpSecret) return { ok: true };
-  if (typeof code !== "string" || !verifyTotp(decrypt(row.totpSecret), code)) {
+  const step = typeof code === "string" ? verifyTotpStep(decrypt(row.totpSecret), code) : null;
+  // Same single-use rule as login: turning 2FA off is exactly the sort of
+  // sensitive action a replayed code should not be able to reach.
+  if (step === null || (row.totpLastStep !== null && step <= row.totpLastStep)) {
     return { error: "Enter the current code from your authenticator app to turn 2FA off." };
   }
-  await db.update(users).set({ totpSecret: null, updatedAt: new Date() }).where(eq(users.id, user.id));
+  await db
+    .update(users)
+    .set({ totpSecret: null, totpLastStep: null, updatedAt: new Date() })
+    .where(eq(users.id, user.id));
   revalidatePath("/dashboard/account");
   return { ok: true };
 }

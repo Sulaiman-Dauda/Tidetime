@@ -65,6 +65,12 @@ export const users = pgTable(
     isAdmin: boolean("is_admin").notNull().default(false),
     /** TOTP secret (base32) — non-null means two-factor auth is enabled. */
     totpSecret: varchar("totp_secret", { length: 64 }),
+    /**
+     * Highest 30-second TOTP step already consumed. A code is only accepted if
+     * its step is strictly greater, so the same code cannot be replayed inside
+     * its ~90-second acceptance window (RFC 6238 §5.2).
+     */
+    totpLastStep: integer("totp_last_step"),
     defaultScheduleId: integer("default_schedule_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

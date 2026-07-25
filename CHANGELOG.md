@@ -8,6 +8,19 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+### Security
+
+- Two-factor codes are now single-use. `verifyTotp` only reported whether a code
+  was valid, so a code stayed usable for the whole ±1-step acceptance window —
+  roughly 90 seconds — and could be replayed to sign in again or to switch 2FA
+  back off. RFC 6238 §5.2 requires a verifier to reject the second use of an OTP.
+  A new `verifyTotpStep` returns the 30-second step a code matched, the step is
+  recorded on the user as `totp_last_step`, and a code is only accepted when its
+  step is strictly greater than the one already consumed. Enrolment seeds the
+  value so the setup code cannot be turned straight around against a login.
+  Requires the `0005` migration; the column is nullable, so existing installs
+  keep working and simply have no consumed step recorded until the next sign-in.
+
 ### Fixed
 
 - The dashboard was unusable on screens narrower than 768px. The mobile header
