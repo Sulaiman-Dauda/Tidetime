@@ -205,21 +205,24 @@ export function AvailabilityEditor({
       {(members.length > 1 || schedules.length > 0) && (
         <div className="flex flex-wrap items-center gap-3">
           {members.length > 1 ? (
-            <select
-              aria-label="Whose availability"
-              value={targetUserId ?? viewerId ?? ""}
-              onChange={(ev) => {
-                const id = Number(ev.target.value);
+            <Select
+              value={String(targetUserId ?? viewerId ?? "")}
+              onValueChange={(value) => {
+                const id = Number(value);
                 router.push(scheduleHref({ user: id === viewerId ? null : id, schedule: undefined }) as Parameters<typeof router.push>[0]);
               }}
-              className="h-8 rounded-lg border bg-card px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.id === viewerId ? `${member.name} (you)` : member.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger aria-label="Whose availability" className="h-8 w-auto min-w-[10rem] gap-2 rounded-lg text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((member) => (
+                  <SelectItem key={member.id} value={String(member.id)}>
+                    {member.id === viewerId ? `${member.name} (you)` : member.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
 
           <div className="flex flex-wrap items-center gap-1.5">

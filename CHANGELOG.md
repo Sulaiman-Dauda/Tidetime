@@ -8,6 +8,38 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard was unusable on screens narrower than 768px. The mobile header
+  was a sibling of the sidebar inside a row-direction flex container, so it took
+  a column of its own and pushed the content area off-screen — every dashboard
+  page rendered as a blank screen below the header. The header now sits inside
+  the content column.
+- Booking times like `10:00 AM` wrapped onto a second line in the overview's
+  agenda rows, giving rows in the same list different heights.
+- The date label in the booking page's slot column wrapped after the weekday
+  when the rail was narrow.
+- The calendar's month toolbar overflowed the viewport on phones.
+
+### Changed
+
+- Filters on Bookings, Customers, Calendar and Availability now use the app's
+  own select control instead of the unstyled browser dropdown.
+- Service rows have a labelled `Preview` and `Edit` action plus an overflow menu
+  (move, duplicate, hide, delete) in place of five unlabelled icon buttons with
+  an unguarded delete first in the row.
+- Settings opens on the Brand tab; Domain, a one-time DNS step, moved last. The
+  domain setup steps are a numbered list rather than one run-on line.
+- Dark theme: cards and list rows sat too close to the page background to read
+  as separate surfaces, and secondary text fell below AA contrast. Card, border
+  and muted-foreground tokens were lifted.
+- Native date and time fields keep their platform pickers but the indicator
+  glyph now matches the surrounding controls.
+- Month-grid event chips use compact times (`9am`, `9:45am`) so the meeting
+  title has room.
+- The calendar's timezone footnote names it as the viewer's own zone and links
+  to the profile setting.
+
 ## [0.1.2] - 2026-07-25
 
 Maintenance release; no functional changes.

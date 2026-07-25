@@ -7,6 +7,13 @@ import type { Route } from "next";
 import { ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarX2, ExternalLink, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { WEEKDAY_SHORT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getZonedParts, zonedTimeToUtc } from "@/lib/time";
@@ -109,6 +116,18 @@ export function CalendarView({
       hour12,
     }).format(new Date(iso));
   }
+
+  /**
+   * Month cells are ~110px wide, and a full "10:00 AM" left almost nothing for
+   * the title. Drop a zero minute and the space before the meridiem, the way
+   * every other month grid does: "9am", "9:45am".
+   */
+  function compactTimeInTz(iso: string): string {
+    return timeInTz(iso)
+      .replace(/:00(?=\s*[AaPp][Mm]|$)/, "")
+      .replace(/\s+([AaPp][Mm])/, "$1")
+      .toLowerCase();
+  }
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startMove] = useTransition();
@@ -210,19 +229,24 @@ export function CalendarView({
             add one.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {teamMembers.length > 1 ? (
-            <select
-              aria-label="Filter by provider"
+            <Select
               value={filterHostId === null ? "all" : String(filterHostId)}
-              onChange={(ev) => setFilterHostId(ev.target.value === "all" ? null : Number(ev.target.value))}
-              className="h-8 rounded-xl border bg-card px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onValueChange={(value) => setFilterHostId(value === "all" ? null : Number(value))}
             >
-              <option value="all">All providers</option>
-              {teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
-            </select>
+              <SelectTrigger aria-label="Filter by provider" className="h-8 w-auto min-w-[8.5rem] gap-2 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All providers</SelectItem>
+                {teamMembers.map((member) => (
+                  <SelectItem key={member.id} value={String(member.id)}>
+                    {member.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
           <Button asChild variant="outline" size="sm">
             <Link href={`/dashboard/calendar?month=${thisMonth}` as Route}>Today</Link>
@@ -233,7 +257,7 @@ export function CalendarView({
                 <ChevronLeft className="h-4 w-4" />
               </Link>
             </Button>
-            <span className="w-36 text-center text-sm font-medium tabular-nums">{monthLabel}</span>
+            <span className="w-28 text-center text-sm font-medium tabular-nums sm:w-36">{monthLabel}</span>
             <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-l-none">
               <Link href={`/dashboard/calendar?month=${next}` as Route} aria-label="Next month">
                 <ChevronRight className="h-4 w-4" />
@@ -356,9 +380,9 @@ export function CalendarView({
                             ? "bg-amber-500/20 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200"
                             : "bg-primary/20 text-foreground dark:bg-primary/25 dark:text-foreground",
                         )}
-                        title={`${e.title} — drag to another day to reschedule`}
+                        title={`${timeInTz(e.start)} ${e.title}${e.hostName ? ` · ${e.hostName}` : ""} — drag to another day to reschedule`}
                       >
-                        <span className="tabular-nums opacity-70">{timeInTz(e.start)}</span>{" "}
+                        <span className="tabular-nums opacity-70">{compactTimeInTz(e.start)}</span>{" "}
                         {e.title}
                         {e.hostName ? <span className="opacity-60"> · {e.hostName}</span> : null}
                       </div>
@@ -389,7 +413,16 @@ export function CalendarView({
               <span className="h-2 w-2 rounded-full bg-amber-500/70" aria-hidden />
               Awaiting approval
             </span>
-            <span className="ml-auto hidden sm:block">Times in {timeZone.replace(/_/g, " ")}</span>
+            {/* This is the viewer's display zone, not a schedule's zone — the
+                bare "Times in UTC" read as a contradiction next to a schedule
+                set in Europe/London. Say whose it is, and where to change it. */}
+            <Link
+              href={"/dashboard/account" as Route}
+              className="ml-auto hidden transition-colors hover:text-foreground sm:block"
+              title="Shown in your profile time zone. Click to change it."
+            >
+              Your time zone · {timeZone.replace(/_/g, " ")}
+            </Link>
           </div>
         </div>
 

@@ -78,17 +78,16 @@ export function SettingsHub({
   customDomain: string | null;
 }) {
   return (
-    <Tabs defaultValue="domain" className="space-y-6">
+    /* Ordered by how often they are touched. Domain is a one-time DNS chore,
+       so it goes last; Brand is what an owner opens Settings to change. */
+    <Tabs defaultValue="general" className="space-y-6">
       <TabsList className="flex-wrap">
-        <TabsTrigger value="domain">Domain</TabsTrigger>
         <TabsTrigger value="general">Brand</TabsTrigger>
         <TabsTrigger value="booking">Booking</TabsTrigger>
         <TabsTrigger value="legal">Legal</TabsTrigger>
+        <TabsTrigger value="domain">Domain</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="domain">
-        <DomainSection customDomain={customDomain} />
-      </TabsContent>
       <TabsContent value="general">
         <GeneralSection profile={settings.profile} />
       </TabsContent>
@@ -97,6 +96,9 @@ export function SettingsHub({
       </TabsContent>
       <TabsContent value="legal">
         <LegalSection legal={settings.legal} />
+      </TabsContent>
+      <TabsContent value="domain">
+        <DomainSection customDomain={customDomain} />
       </TabsContent>
     </Tabs>
   );
@@ -234,9 +236,17 @@ function DomainSection({ customDomain }: { customDomain: string | null }) {
           htmlFor="domain"
           hint={
             <>
-              1. Create a DNS A record for the domain pointing at this server&apos;s IP.&nbsp;
-              2. Save, then use &quot;Check status&quot;. Booking links, emails, and calendar
-              redirects switch to the domain automatically. Leave empty to remove it.
+              {/* Two steps set on one line read as a wall of text. */}
+              <ol className="ml-4 list-decimal space-y-1">
+                <li>Create a DNS A record for the domain pointing at this server&apos;s IP.</li>
+                <li>
+                  Save, then use <span className="font-medium text-foreground">Check status</span>.
+                </li>
+              </ol>
+              <p className="mt-2">
+                Booking links, emails, and calendar redirects switch to the domain automatically.
+                Leave the field empty to remove it.
+              </p>
             </>
           }
         >

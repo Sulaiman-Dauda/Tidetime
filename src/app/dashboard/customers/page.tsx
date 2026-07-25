@@ -6,6 +6,7 @@ import { resolveLocale } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "../_components/page-header";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
@@ -82,18 +83,15 @@ export default async function CustomersPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Search name, email or phone…"
-          className="flex h-9 w-full max-w-sm rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-9 w-full max-w-sm rounded-xl border border-input bg-card px-3 py-1 text-sm transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
         />
-        <select
+        <FilterSelect
           name="sort"
+          ariaLabel="Sort customers"
           defaultValue={sort}
-          aria-label="Sort customers"
-          className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {SORTS.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
+          className="h-9 rounded-xl text-sm"
+          options={SORTS.map((s) => ({ value: s.value, label: s.label }))}
+        />
         <Button type="submit" size="sm" variant="outline" className="h-9">
           Apply
         </Button>

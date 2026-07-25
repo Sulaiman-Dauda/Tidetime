@@ -10,6 +10,7 @@ import { formatRange } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { PageHeader } from "../_components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
@@ -234,30 +235,26 @@ export default async function BookingsPage({ searchParams }: Props) {
               className="h-8 w-52 rounded-lg border border-input bg-card px-2.5 text-[13px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             {serviceOptions.length > 1 ? (
-              <select
+              <FilterSelect
                 name="service"
-                defaultValue={params.service ?? ""}
-                className="h-8 rounded-lg border border-input bg-card px-2 text-[13px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Filter by service"
-              >
-                <option value="">All services</option>
-                {serviceOptions.map((s) => (
-                  <option key={s.id} value={s.id}>{s.title}</option>
-                ))}
-              </select>
+                ariaLabel="Filter by service"
+                defaultValue={params.service || "all"}
+                options={[
+                  { value: "all", label: "All services" },
+                  ...serviceOptions.map((s) => ({ value: String(s.id), label: s.title })),
+                ]}
+              />
             ) : null}
             {providerOptions.length > 1 ? (
-              <select
+              <FilterSelect
                 name="host"
-                defaultValue={params.host ?? ""}
-                className="h-8 rounded-lg border border-input bg-card px-2 text-[13px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Filter by provider"
-              >
-                <option value="">All providers</option>
-                {providerOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                ariaLabel="Filter by provider"
+                defaultValue={params.host || "all"}
+                options={[
+                  { value: "all", label: "All providers" },
+                  ...providerOptions.map((p) => ({ value: String(p.id), label: p.name })),
+                ]}
+              />
             ) : null}
             <Button type="submit" size="sm" variant="outline" className="h-8">
               Apply

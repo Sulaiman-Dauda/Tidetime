@@ -1,19 +1,15 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Clock, Copy, ExternalLink, EyeOff, Settings2, Zap, ChevronUp, ChevronDown } from "lucide-react";
+import { Clock, ExternalLink, EyeOff, Zap } from "lucide-react";
 import { db } from "@/db";
 import { teams } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import {
-  listServices,
-  duplicateServiceAction,
-  reorderServicesAction,
-} from "./actions";
+import { listServices } from "./actions";
 import { NewServiceButton } from "../_components/new-service-button";
-import { HideServiceButton } from "../_components/hide-service-button";
-import { DeleteServiceButton } from "../_components/delete-service-button";
+import { ServiceRowActions } from "../_components/service-row-actions";
 import { PageHeader } from "../_components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/format";
 import { getAppUrl } from "@/server/app-url";
 import { locationLabel } from "@/lib/locations";
@@ -58,7 +54,7 @@ export default async function ServicesPage({ searchParams }: Props) {
         <EmptyState firstRun={welcome === "1"} canManage={canManage} />
       ) : (
         <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
-          {items.map((et) => {
+          {items.map((et, index) => {
             const publicUrl = `${appUrl}/book/${company?.slug ?? "company"}/${et.slug}`;
             return (
               <div
@@ -104,62 +100,29 @@ export default async function ServicesPage({ searchParams }: Props) {
                   </div>
                 </Link>
 
-                <div className="flex shrink-0 items-center gap-0.5">
+                {/* One named primary action, one preview, everything else
+                    behind a labelled overflow menu. */}
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
+                    <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Preview</span>
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="h-8">
+                    <Link href={`/dashboard/services/${et.id}` as Route}>
+                      {canManage ? "Edit" : "View"}
+                    </Link>
+                  </Button>
                   {canManage ? (
-                    <>
-                  {/* Move up / down controls */}
-                  <form action={reorderServicesAction} className="flex">
-                    <input type="hidden" name="id" value={et.id} />
-                    <button
-                      type="submit"
-                      name="direction"
-                      value="up"
-                      title="Move up"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground opacity-0 group-hover:opacity-100"
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="submit"
-                      name="direction"
-                      value="down"
-                      title="Move down"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground opacity-0 group-hover:opacity-100"
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
-                  </form>
-
-                  <DeleteServiceButton id={et.id} label={et.title} />
-                    </>
+                    <ServiceRowActions
+                      id={et.id}
+                      title={et.title}
+                      hidden={et.hidden}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < items.length - 1}
+                    />
                   ) : null}
-                  <a
-                    href={publicUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Preview"
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                  {canManage ? <form action={duplicateServiceAction}>
-                    <input type="hidden" name="id" value={et.id} />
-                    <button
-                      type="submit"
-                      title="Duplicate"
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                  </form> : null}
-                  {canManage ? <HideServiceButton id={et.id} hidden={et.hidden} title={et.title} /> : null}
-                  <Link
-                    href={`/dashboard/services/${et.id}` as Route}
-                    title={canManage ? "Edit" : "View"}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  >
-                    <Settings2 className="h-3.5 w-3.5" />
-                  </Link>
                 </div>
               </div>
             );

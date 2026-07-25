@@ -48,9 +48,9 @@
     /* ── Deep charcoal + luminous indigo dark ── */
     --background: 220 12% 6.5%;
     --foreground: 38 18% 92%;
-    --card: 220 10% 10%;
+    --card: 220 10% 11.5%;
     --card-foreground: 38 18% 92%;
-    --popover: 220 10% 10%;
+    --popover: 220 10% 11.5%;
     --popover-foreground: 38 18% 92%;
 
     /* Indigo 400 stays vivid without blooming against charcoal surfaces. */
@@ -65,13 +65,18 @@
     --secondary: 220 8% 15%;
     --secondary-foreground: 38 16% 84%;
     --muted: 220 6% 13%;
-    --muted-foreground: 220 6% 48%;
+    /* 48% cleared ~3.5:1 on our card surface — under AA for body-size text.
+       56% brings secondary copy to ~4.7:1 without turning it into primary text. */
+    --muted-foreground: 220 7% 56%;
 
     --destructive: 0 62% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 10% 16%;
-    --input: 220 10% 18%;
+    /* Cards and rows sat ~3.5 points above the page and read as one flat
+       plane. A brighter border plus a lifted card gives the list its edges
+       back without making the theme milky. */
+    --border: 220 10% 20%;
+    --input: 220 10% 22%;
     --ring: 234 89% 74%;
     --radius: 0.75rem;
 
@@ -102,6 +107,44 @@
   }
   h2 {
     line-height: 1.15;
+  }
+
+  /* Native date/time fields keep their platform pickers — they are the best
+     input method, especially on touch — but the browser's default indicator
+     glyph is a black icon that reads as foreign next to our controls. Tone it
+     down to muted-foreground and let it brighten on hover/focus. */
+  input[type="time"],
+  input[type="date"],
+  input[type="datetime-local"] {
+    color-scheme: light;
+  }
+  .dark input[type="time"],
+  .dark input[type="date"],
+  .dark input[type="datetime-local"] {
+    color-scheme: dark;
+  }
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    padding: 0;
+    margin-left: 0.25rem;
+    opacity: 0.45;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  input[type="time"]:hover::-webkit-calendar-picker-indicator,
+  input[type="date"]:hover::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+  input[type="time"]:focus::-webkit-calendar-picker-indicator,
+  input[type="date"]:focus::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]:focus::-webkit-calendar-picker-indicator {
+    opacity: 0.85;
+  }
+  /* Firefox draws its own reset "×" inside date fields; it clutters a row of
+     time ranges that already has an explicit Remove button. */
+  input[type="time"]::-moz-clear,
+  input[type="date"]::-moz-clear {
+    display: none;
   }
 }
 
@@ -154,11 +197,6 @@
 @keyframes tt-fade {
   from { opacity: 0; }
   to   { opacity: 1; }
-}
-@keyframes tt-pop {
-  0%   { opacity: 0; transform: scale(0.7); }
-  60%  { opacity: 1; transform: scale(1.06); }
-  100% { opacity: 1; transform: scale(1); }
 }
 @keyframes tt-ring {
   from { opacity: 0.5; transform: scale(0.7); }

@@ -64,30 +64,38 @@ export function DashboardShell({
         {/* Desktop Sidebar */}
         <Sidebar user={user} />
 
-        {/* Mobile header */}
-        <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 backdrop-blur-sm md:hidden">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Menu className="h-[18px] w-[18px]" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[260px] p-0">
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
-            </SheetContent>
-          </Sheet>
-          <span className="text-[15px] font-semibold tracking-[-0.01em]">Tidetime</span>
-          <div className="flex-1" />
-          {breadcrumb && (
-            <span className="hidden text-sm font-medium text-foreground sm:block">{breadcrumb}</span>
-          )}
-          <div className="flex-1 sm:hidden" />
-          <span key="copy-mobile">{copyLinkEl}</span>
-        </div>
-
-        {/* Main area */}
+        {/* Main area. The mobile header lives inside this column — as a sibling
+            of the sidebar it would be laid out as a second row-flex column and
+            push the content off-screen on phones. */}
         <div className="flex min-w-0 flex-1 flex-col">
+          {/* Mobile header */}
+          <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 backdrop-blur-sm md:hidden">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-[18px] w-[18px]" />
+                  <span className="sr-only">Open navigation</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[260px] p-0">
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
+              </SheetContent>
+            </Sheet>
+            {breadcrumb ? (
+              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em]">
+                {breadcrumb}
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em]">
+                Tidetime
+              </span>
+            )}
+            <span key="copy-mobile" className="min-w-0 shrink">
+              {copyLinkEl}
+            </span>
+          </div>
+
           {/* Desktop top bar */}
           <header className="sticky top-0 z-20 hidden h-14 items-center gap-4 border-b border-border/60 bg-background/90 px-8 backdrop-blur-sm md:flex">
             {breadcrumb ? (

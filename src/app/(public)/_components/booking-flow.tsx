@@ -745,18 +745,22 @@ export function BookingFlow({
 
                   <div className="min-w-0 border-t pt-5 md:border-l md:border-t-0 md:pl-5 md:pt-0">
                     <div className="flex min-h-8 items-center justify-between gap-2">
+                      {/* The date and the 12h/24h toggle share a narrow column;
+                          without nowrap the label breaks after the weekday. */}
                       <div className="flex items-center gap-2 text-[13px] font-semibold">
-                        <Calendar className="h-4 w-4 text-muted-foreground/80" />
-                        {selectedDay
-                          ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString(undefined, {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })
-                          : "Select a date"}
+                        <Calendar className="h-4 w-4 shrink-0 text-muted-foreground/80" />
+                        <span className="whitespace-nowrap">
+                          {selectedDay
+                            ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString(undefined, {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "Select a date"}
+                        </span>
                       </div>
                       <div
-                        className="flex overflow-hidden rounded-md border border-border/80 text-[11px] font-semibold"
+                        className="flex shrink-0 overflow-hidden rounded-md border border-border/80 text-[11px] font-semibold"
                         role="group"
                         aria-label="Time format"
                       >

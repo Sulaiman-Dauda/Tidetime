@@ -78,6 +78,9 @@ export function DashboardOverview({
   }
 
   const displayUrl = bookingUrl?.replace(/^https?:\/\//, "") ?? "";
+  // The card is a quarter of the row; a full URL truncates to the host, which
+  // is the least useful half. Show the path — that is what identifies the page.
+  const displayPath = displayUrl.slice(displayUrl.indexOf("/")) || displayUrl;
   const quiet = data.today.length === 0 && data.thisWeek.length === 0;
 
   return (
@@ -137,6 +140,7 @@ export function DashboardOverview({
         {bookingUrl ? (
           <button
             onClick={copyLink}
+            title={displayUrl}
             className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
             <span
@@ -149,7 +153,7 @@ export function DashboardOverview({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{copied ? "Copied!" : "Share link"}</p>
-              <p className="truncate text-xs text-muted-foreground font-mono">{displayUrl}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{displayPath}</p>
             </div>
           </button>
         ) : null}
@@ -248,7 +252,9 @@ function EventList({
                 {formatDay(event.startTime)}
               </span>
             ) : null}
-            <span className="text-sm font-medium tabular-nums w-16 shrink-0 text-muted-foreground">
+            {/* w-16 clipped 12-hour times like "10:00 AM" onto a second line,
+                so rows in the same list had different heights. */}
+            <span className="w-20 shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-muted-foreground">
               {formatTime(event.startTime)}
             </span>
             <div className="h-8 w-px shrink-0 bg-border/60" />
