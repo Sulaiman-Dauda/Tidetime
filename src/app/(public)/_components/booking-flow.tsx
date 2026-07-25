@@ -179,6 +179,68 @@ function contactErrors(values: FieldValues, guests: string[]): Record<string, st
   return errors;
 }
 
+/**
+ * Company brand row at the top of the booking sidebar.
+ *
+ * Logos arrive in two shapes that want opposite treatment. A wordmark already
+ * contains the company name, so it shows on its own and wide — pairing it with
+ * the name read as the brand twice and wrapped onto two lines in this 264px
+ * column. A square icon carries no name and needs to be bigger: at a
+ * wordmark's height it is a 32px speck, so it renders larger and keeps the
+ * name beside it.
+ *
+ * The shape has to be measured on load rather than known up front, because a
+ * logo can be pasted as a URL rather than uploaded. The row height is fixed so
+ * that resolving only reveals the name — nothing below it shifts. Without
+ * JavaScript the logo simply stays in the wordmark layout.
+ */
+function CompanyBrand({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+  // null until the image loads, then true once it proves wide enough to read
+  // as a horizontal lockup rather than a mark.
+  const [wordmark, setWordmark] = useState<boolean | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const isMark = logoUrl && wordmark === false;
+
+  const measure = useCallback((el: HTMLImageElement | null) => {
+    if (!el?.naturalWidth || !el.naturalHeight) return;
+    setWordmark(el.naturalWidth / el.naturalHeight > 1.8);
+  }, []);
+
+  // A cached logo — or a data: URI, which is every uploaded one — finishes
+  // loading before hydration attaches onLoad, so that event never fires.
+  // Measure once on mount as well, or the logo is stuck in its initial layout.
+  useEffect(() => {
+    if (imgRef.current?.complete) measure(imgRef.current);
+  }, [measure, logoUrl]);
+
+  return (
+    <div className="-mx-6 border-b border-border/60 px-6 pb-5">
+      <div className="flex h-10 items-center gap-2.5">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            ref={imgRef}
+            src={logoUrl}
+            alt={name}
+            onLoad={(event) => measure(event.currentTarget)}
+            className={cn(
+              "object-contain",
+              isMark ? "h-10 w-auto max-w-[110px]" : "h-8 w-auto max-w-[190px]",
+            )}
+          />
+        ) : (
+          <Avatar className="h-7 w-7 border bg-background">
+            <AvatarFallback className="text-[10px] font-semibold">{initials(name)}</AvatarFallback>
+          </Avatar>
+        )}
+        {!logoUrl || isMark ? (
+          <span className="truncate text-sm font-semibold tracking-tight">{name}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function BookingFlow({
   slug,
   teamSlug,
@@ -421,28 +483,7 @@ export function BookingFlow({
               </div>
             ) : null}
 
-            {/* Company brand. A logo nearly always carries the company name
-                already, so showing the text alongside it read as the brand
-                twice and wrapped onto two lines in this 264px column. Show
-                the logo on its own when there is one, and fall back to
-                initials plus the name when there isn't. */}
-            <div className="-mx-6 flex items-center gap-2.5 border-b border-border/60 px-6 pb-5">
-              {company.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={company.logoUrl}
-                  alt={company.name}
-                  className="h-8 w-auto max-w-[190px] object-contain"
-                />
-              ) : (
-                <>
-                  <Avatar className="h-7 w-7 border bg-background">
-                    <AvatarFallback className="text-[10px] font-semibold">{initials(company.name)}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-semibold tracking-tight">{company.name}</span>
-                </>
-              )}
-            </div>
+            <CompanyBrand name={company.name} logoUrl={company.logoUrl} />
 
             {/* Member profile — follows the provider selection below */}
             {displayHost ? (
