@@ -410,17 +410,27 @@ export function BookingFlow({
               </div>
             ) : null}
 
-            {/* Company brand */}
+            {/* Company brand. A logo nearly always carries the company name
+                already, so showing the text alongside it read as the brand
+                twice and wrapped onto two lines in this 264px column. Show
+                the logo on its own when there is one, and fall back to
+                initials plus the name when there isn't. */}
             <div className="-mx-6 flex items-center gap-2.5 border-b border-border/60 px-6 pb-5">
               {company.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={company.logoUrl} alt={company.name} className="h-7 w-auto object-contain" />
+                <img
+                  src={company.logoUrl}
+                  alt={company.name}
+                  className="h-8 w-auto max-w-[190px] object-contain"
+                />
               ) : (
-                <Avatar className="h-7 w-7 border bg-background">
-                  <AvatarFallback className="text-[10px] font-semibold">{initials(company.name)}</AvatarFallback>
-                </Avatar>
+                <>
+                  <Avatar className="h-7 w-7 border bg-background">
+                    <AvatarFallback className="text-[10px] font-semibold">{initials(company.name)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-semibold tracking-tight">{company.name}</span>
+                </>
               )}
-              <span className="text-sm font-semibold tracking-tight">{company.name}</span>
             </div>
 
             {/* Member profile — follows the provider selection below */}
@@ -477,6 +487,31 @@ export function BookingFlow({
             ) : null}
 
             <div className="mt-5 space-y-2.5 text-[13px] text-muted-foreground">
+              {/* The chosen slot lives here rather than above the form: the
+                  sidebar is already the "about this booking" column, and
+                  repeating it over the form made the page needlessly tall.
+                  Duration and timezone are separate rows below, so this one
+                  carries only the date and time. */}
+              {step === "details" && selectedSlot ? (
+                <div className="flex items-start gap-2.5">
+                  <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span className="font-medium text-foreground">
+                    {new Date(selectedSlot).toLocaleDateString(undefined, {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      timeZone,
+                    })}
+                    {" · "}
+                    {new Date(selectedSlot).toLocaleTimeString(undefined, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12,
+                      timeZone,
+                    })}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2.5">
                 <Clock className="h-4 w-4 shrink-0 text-muted-foreground/80" />
                 <span>{formatDuration(duration)}</span>
@@ -577,10 +612,7 @@ export function BookingFlow({
                 service={service}
                 duration={duration}
                 timeZone={timeZone}
-                hour12={hour12}
                 slot={selectedSlot}
-                provider={displayHost}
-                anyProvider={!displayHost && teamHosts.length > 1}
                 preferredHostId={providerId ?? undefined}
                 rescheduleUid={rescheduleUid}
                 spamProtection={spamProtection}
@@ -874,10 +906,7 @@ function BookingForm({
   service,
   duration,
   timeZone,
-  hour12,
   slot,
-  provider,
-  anyProvider,
   preferredHostId,
   rescheduleUid,
   spamProtection,
@@ -894,12 +923,7 @@ function BookingForm({
   service: ServiceView;
   duration: number;
   timeZone: string;
-  hour12: boolean;
   slot: string;
-  /** the provider this meeting will be with, when known */
-  provider?: Host | null;
-  /** multiple providers and none chosen — round-robin assigns one */
-  anyProvider?: boolean;
   preferredHostId?: number;
   rescheduleUid?: string;
   spamProtection?: boolean;
@@ -1008,70 +1032,11 @@ function BookingForm({
         Back to date and time
       </button>
 
-      <div className="mt-4 rounded-xl border border-border/70 bg-muted/30 p-3.5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
-            <Calendar className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[15px] font-semibold">
-              {new Date(slot).toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                timeZone,
-              })}
-            </p>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
-              {new Date(slot).toLocaleTimeString(undefined, {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12,
-                timeZone,
-              })}
-              {" · "}
-              {formatDuration(duration)}
-              {" · "}
-              {timeZoneLabel(timeZone)}
-            </p>
-          </div>
-        </div>
-        {provider || anyProvider ? (
-          <div className="mt-3 flex items-center gap-2.5 border-t border-border/60 pt-3">
-            {provider ? (
-              <>
-                <Avatar className="h-8 w-8 border bg-background">
-                  {provider.avatarUrl ? (
-                    <AvatarImage src={provider.avatarUrl} alt={provider.name ?? provider.username} />
-                  ) : null}
-                  <AvatarFallback className="text-[10px] font-semibold">
-                    {initials(provider.name ?? provider.username)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium">
-                    {provider.name ?? provider.username}
-                  </p>
-                  {provider.position ? (
-                    <p className="truncate text-xs text-muted-foreground">{provider.position}</p>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                  <Users className="h-4 w-4" />
-                </div>
-                <p className="text-[13px] text-muted-foreground">
-                  With the first available provider
-                </p>
-              </>
-            )}
-          </div>
-        ) : null}
-      </div>
+      {/* The slot summary and provider both live in the sidebar, which stays
+          visible on this step (and stacks directly above the form on mobile).
+          Duplicating them here only pushed the form further down the page. */}
 
-      <div className="mt-6">
+      <div className="mt-5">
         <h2 className="text-lg font-semibold tracking-tight">Enter your details</h2>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
           We’ll send the confirmation and calendar invite to your email.

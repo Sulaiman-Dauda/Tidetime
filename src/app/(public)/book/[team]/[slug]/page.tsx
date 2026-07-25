@@ -116,7 +116,8 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
 
   return (
     <main className="min-h-screen bg-grid">
-      <CompanyBrandHeader />
+      {/* Accent bar only — the sidebar below carries the logo and company name. */}
+      <CompanyBrandHeader accentOnly />
       <BookingFlow
         slug={slug}
         teamSlug={teamRow.slug}
@@ -133,7 +134,14 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
           disableGuests: service.disableGuests,
           scheduleTimeZone: service.scheduleTimeZone,
         }}
-        company={{ name: teamRow.name, logoUrl: teamRow.logoUrl }}
+        // Teams rarely carry their own logo in the single-company model, so
+        // fall back to the company profile logo from Settings → General.
+        // Without this the sidebar showed initials while the page header
+        // showed the real logo.
+        company={{
+          name: teamRow.name,
+          logoUrl: teamRow.logoUrl || settings.profile.logoUrl || null,
+        }}
         spamProtection={settings.booking.spamProtectionEnabled}
         botChallenge={issueBotChallenge(botChallengeSecret())}
         teamHosts={teamHosts}
