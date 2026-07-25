@@ -8,6 +8,7 @@ import {
   setCompanyLegalContents,
   setCompanyProfile,
 } from "@/server/company-settings";
+import { DEFAULT_DIALLING_COUNTRY, normalizeDiallingCountry } from "@/lib/phone";
 
 export type CompanySettingsState = { ok?: boolean; error?: string } | null;
 
@@ -20,6 +21,14 @@ const profileSchema = z.object({
     .string()
     .trim()
     .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Enter a hex colour, e.g. #4f46e5"),
+  // Unknown codes fall back to the default rather than failing the save — the
+  // value comes from a fixed picker, so a mismatch means a stale form, not
+  // something worth blocking a brand update over.
+  phoneCountry: z
+    .string()
+    .trim()
+    .transform((value) => normalizeDiallingCountry(value))
+    .default(DEFAULT_DIALLING_COUNTRY),
 });
 
 export async function updateCompanyProfileAction(
@@ -31,6 +40,7 @@ export async function updateCompanyProfileAction(
     name: formData.get("name"),
     logoUrl: formData.get("logoUrl") ?? "",
     brandColor: formData.get("brandColor"),
+    phoneCountry: formData.get("phoneCountry") ?? DEFAULT_DIALLING_COUNTRY,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   await setCompanyProfile(parsed.data);

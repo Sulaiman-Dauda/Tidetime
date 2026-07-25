@@ -43,6 +43,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { validateResponses, type FieldValues } from "@/lib/booking-fields";
 import { formatDuration, initials, WEEKDAY_SHORT } from "@/lib/format";
 import { locationLabel } from "@/lib/locations";
+import {
+  DEFAULT_DIALLING_COUNTRY,
+  DIALLING_COUNTRIES,
+  countryFor,
+  normalizeDiallingCountry,
+  splitE164,
+  toE164,
+} from "@/lib/phone";
 import { cn } from "@/lib/utils";
 import { listTimeZones } from "@/lib/timezones";
 
@@ -105,6 +113,8 @@ type Props = {
   prefill?: BookingPrefill;
   /** configured legal pages, linked in the consent microcopy under the submit button */
   legalLinks?: LegalLink[];
+  /** ISO country preselected in phone fields, from Settings → Brand & company */
+  phoneCountry?: string;
 };
 
 function dayKey(date: Date): string {
@@ -180,6 +190,7 @@ export function BookingFlow({
   teamHosts = [],
   prefill,
   legalLinks = [],
+  phoneCountry = DEFAULT_DIALLING_COUNTRY,
 }: Props) {
   const router = useRouter();
   const [duration, setDuration] = useState(service.length);
@@ -620,6 +631,7 @@ export function BookingFlow({
                 prefill={prefill}
                 draft={draft}
                 legalLinks={legalLinks}
+                phoneCountry={phoneCountry}
                 onSlotTaken={handleSlotTaken}
                 onBack={() => setStep("time")}
                 onBooked={finishBooking}
@@ -914,6 +926,7 @@ function BookingForm({
   prefill,
   draft,
   legalLinks = [],
+  phoneCountry,
   onSlotTaken,
   onBack,
   onBooked,
@@ -932,6 +945,7 @@ function BookingForm({
   /** answers preserved from a submit that lost its slot */
   draft?: { values: FieldValues; guests: string } | null;
   legalLinks?: LegalLink[];
+  phoneCountry: string;
   onSlotTaken: (values: FieldValues, guests: string) => void;
   onBack: () => void;
   onBooked: (uid: string) => void;
@@ -1108,6 +1122,7 @@ function BookingForm({
           <CustomField
             key={field.name}
             field={field}
+            phoneCountry={phoneCountry}
             value={values[field.name]}
             error={errors[field.name]}
             onChange={(value) => setValue(field.name, value)}
@@ -1181,17 +1196,118 @@ function BookingForm({
   );
 }
 
-function CustomField({
+/**
+ * Country picker plus national number, so the booker never has to know or type
+ * a dialling code. The country defaults to the company's setting, which means
+ * most people leave it alone entirely. The value handed upward is E.164
+ * (`+447700900123`) once it parses, and the raw digits until then, so
+ * validation can report a half-finished number.
+ */
+function PhoneField({
   field,
   value,
   error,
+  defaultCountry,
   onChange,
 }: {
   field: BookingField;
   value: FieldValues[string];
   error?: string;
+  defaultCountry: string;
+  onChange: (value: string) => void;
+}) {
+  // Local state owns the input after mount: pushing a partially typed number
+  // up and re-deriving from it would fight the user mid-keystroke.
+  const initial = typeof value === "string" ? value : "";
+  const [country, setCountry] = useState(() => {
+    const parts = initial ? splitE164(initial, defaultCountry) : null;
+    return parts?.country ?? normalizeDiallingCountry(defaultCountry);
+  });
+  const [national, setNational] = useState(() => {
+    const parts = initial ? splitE164(initial, defaultCountry) : null;
+    return parts?.national ?? initial;
+  });
+
+  function push(nextNational: string, nextCountry: string) {
+    onChange(toE164(nextNational, nextCountry) ?? nextNational.trim());
+  }
+
+  return (
+    <FormField
+      label={field.label}
+      htmlFor={field.name}
+      required={field.required}
+      hint={field.hint}
+      error={error}
+    >
+      <div className="flex gap-2">
+        {/* The trigger stays narrow (just the dialling code) while the list
+            shows full country names, so people can find "France" without
+            knowing it is FR. Typing in the open list jumps by name. */}
+        <Select
+          value={country}
+          onValueChange={(next) => {
+            setCountry(next);
+            push(national, next);
+          }}
+        >
+          <SelectTrigger
+            aria-label="Country dialling code"
+            className="h-9 w-[5.75rem] shrink-0 bg-background text-sm"
+          >
+            <SelectValue>+{countryFor(country).dial}</SelectValue>
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {DIALLING_COUNTRIES.map((option) => (
+              <SelectItem key={option.code} value={option.code}>
+                {option.name} +{option.dial}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          id={field.name}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel-national"
+          placeholder={country === "GB" ? "7700 900123" : undefined}
+          aria-invalid={Boolean(error)}
+          value={national}
+          onChange={(event) => {
+            setNational(event.target.value);
+            push(event.target.value, country);
+          }}
+        />
+      </div>
+    </FormField>
+  );
+}
+
+function CustomField({
+  field,
+  value,
+  error,
+  phoneCountry,
+  onChange,
+}: {
+  field: BookingField;
+  value: FieldValues[string];
+  error?: string;
+  phoneCountry: string;
   onChange: (value: string | boolean) => void;
 }) {
+  if (field.type === "phone") {
+    return (
+      <PhoneField
+        field={field}
+        value={value}
+        error={error}
+        defaultCountry={phoneCountry}
+        onChange={onChange}
+      />
+    );
+  }
+
   if (field.type === "checkbox") {
     const checked = value === true;
     return (
@@ -1230,23 +1346,22 @@ function CustomField({
     );
   }
 
+  // Phone is handled above by PhoneField.
   const inputType =
-    field.type === "phone"
-      ? "tel"
-      : field.type === "number"
-        ? "number"
-        : field.type === "email"
-          ? "email"
-          : field.type === "date"
-            ? "date"
-            : "text";
+    field.type === "number"
+      ? "number"
+      : field.type === "email"
+        ? "email"
+        : field.type === "date"
+          ? "date"
+          : "text";
 
   return (
     <FormField
       label={field.label}
       htmlFor={field.name}
       required={field.required}
-      hint={field.hint ?? (field.type === "phone" ? "Include your country code, e.g. +44" : undefined)}
+      hint={field.hint}
       error={error}
     >
       {field.type === "textarea" ? (
@@ -1274,9 +1389,7 @@ function CustomField({
         <Input
           id={field.name}
           type={inputType}
-          inputMode={field.type === "phone" ? "tel" : field.type === "number" ? "numeric" : undefined}
-          autoComplete={field.type === "phone" ? "tel" : undefined}
-          placeholder={field.type === "phone" ? "+44 7700 900123" : undefined}
+          inputMode={field.type === "number" ? "numeric" : undefined}
           aria-invalid={Boolean(error)}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}

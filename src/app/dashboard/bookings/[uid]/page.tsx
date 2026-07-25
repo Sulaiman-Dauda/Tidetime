@@ -9,6 +9,7 @@ import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
 import { formatRange, resolveLocale } from "@/lib/format";
 import { answersFromResponses } from "@/lib/booking-fields";
+import { formatPhoneDisplay } from "@/lib/phone";
 import { Badge } from "@/components/ui/badge";
 import { AcceptButton, CancelBookingButton, DeclineButton } from "../_components/booking-actions";
 import {
@@ -173,10 +174,11 @@ export default async function BookingDetailPage({ params }: Props) {
                     <a href={`mailto:${a.email}`} className="hover:underline">
                       {a.email}
                     </a>
+                    {/* Dial the raw E.164; show it grouped for reading. */}
                     {a.phoneNumber ? (
                       <a href={`tel:${a.phoneNumber}`} className="flex items-center gap-1 hover:underline">
                         <Phone className="h-3 w-3" />
-                        {a.phoneNumber}
+                        {formatPhoneDisplay(a.phoneNumber)}
                       </a>
                     ) : null}
                     {rsvp ? (

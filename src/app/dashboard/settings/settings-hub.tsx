@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { CompanySettings } from "@/lib/company-settings";
+import { DIALLING_COUNTRIES, normalizeDiallingCountry } from "@/lib/phone";
 import { CompanyLogoUpload } from "./company-logo-upload";
 import {
   updateCompanyLegalAction,
@@ -162,6 +163,24 @@ function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
             />
             <Input id="brandColor" name="brandColor" defaultValue={profile.brandColor} className="font-mono" />
           </div>
+        </Field>
+        <Field
+          label="Default phone country"
+          htmlFor="phoneCountry"
+          hint="Preselected in phone fields on the booking form, so most customers never touch the country picker. They can still change it."
+        >
+          <select
+            id="phoneCountry"
+            name="phoneCountry"
+            defaultValue={normalizeDiallingCountry(profile.phoneCountry)}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {DIALLING_COUNTRIES.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.name} (+{country.dial})
+              </option>
+            ))}
+          </select>
         </Field>
         <SaveButton />
       </form>

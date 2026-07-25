@@ -15,6 +15,8 @@ import { hashPassword } from "@/lib/crypto";
 const fields: BookingField[] = [
   { name: "name", label: "Your name", type: "text", required: true, system: true },
   { name: "email", label: "Email", type: "email", required: true, system: true },
+  // Seeded so the e2e suite exercises the country picker and E.164 storage.
+  { name: "phone", label: "Phone Number", type: "phone", required: true },
   { name: "notes", label: "Notes", type: "textarea", required: false },
 ];
 

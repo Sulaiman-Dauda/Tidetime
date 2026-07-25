@@ -15,6 +15,7 @@ import {
   type CompanyProfile,
   type CompanySettings,
 } from "@/lib/company-settings";
+import { normalizeDiallingCountry } from "@/lib/phone";
 
 /**
  * Admin-configured, company-wide settings persisted in the `app_settings`
@@ -63,6 +64,7 @@ export function setCompanyProfile(profile: CompanyProfile): Promise<void> {
   return writeSetting(COMPANY_SETTING_KEYS.profile, {
     ...profile,
     brandColor: normalizeBrandColor(profile.brandColor),
+    phoneCountry: normalizeDiallingCountry(profile.phoneCountry),
   });
 }
 

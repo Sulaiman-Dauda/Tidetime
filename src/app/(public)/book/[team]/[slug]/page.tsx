@@ -147,6 +147,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
         teamHosts={teamHosts}
         prefill={prefill}
         legalLinks={legalLinks}
+        phoneCountry={settings.profile.phoneCountry}
       />
       <PublicLegal />
     </main>

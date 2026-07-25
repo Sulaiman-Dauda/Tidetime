@@ -8,6 +8,8 @@
  * testable core — types, defaults and merge/format helpers with no I/O.
  */
 
+import { DEFAULT_DIALLING_COUNTRY } from "./phone";
+
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -19,6 +21,12 @@ export interface CompanyProfile {
   logoUrl: string;
   /** Brand colour applied across the app (hex, e.g. #4f46e5). */
   brandColor: string;
+  /**
+   * ISO 3166-1 alpha-2 country preselected in phone fields on the public
+   * booking form, so most bookers never touch the country picker. See
+   * {@link file://./phone.ts}.
+   */
+  phoneCountry: string;
 }
 
 export interface CompanyBookingDefaults {
@@ -55,6 +63,7 @@ export const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
   name: "Tidetime",
   logoUrl: "",
   brandColor: "#4f46e5",
+  phoneCountry: DEFAULT_DIALLING_COUNTRY,
 };
 
 export const DEFAULT_COMPANY_BOOKING: CompanyBookingDefaults = {

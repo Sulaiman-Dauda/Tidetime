@@ -12,6 +12,8 @@ import { assignTeamHost } from "./round-robin";
 import { getTeamService } from "./teams-public";
 import { deleteCalendarEvent } from "./calendar";
 import { validateResponses as validateFieldResponses, type FieldValues } from "@/lib/booking-fields";
+import { normalizeDiallingCountry, toE164 } from "@/lib/phone";
+import { getCompanySettings } from "./company-settings";
 import { logBookingActivity } from "./activity";
 import { upsertCustomerFromBooking, decrementCustomerBookingCount } from "./customers";
 import { getAppUrl } from "@/server/app-url";
@@ -74,6 +76,34 @@ function validateResponses(fields: BookingField[], responses: Record<string, unk
   return first ?? null;
 }
 
+/**
+ * Rewrite phone answers to E.164 using the company's default dialling country
+ * for numbers that arrive without one. Values that cannot be read as a phone
+ * number are left alone so validation reports them rather than silently
+ * dropping what the booker typed.
+ */
+async function normalizePhoneResponses(
+  fields: BookingField[],
+  responses: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const phoneFields = fields.filter((field) => field.type === "phone");
+  if (phoneFields.length === 0) return responses;
+
+  const { profile } = await getCompanySettings();
+  const country = normalizeDiallingCountry(profile.phoneCountry);
+
+  let next = responses;
+  for (const field of phoneFields) {
+    const value = responses[field.name];
+    if (typeof value !== "string" || !value.trim()) continue;
+    const e164 = toE164(value, country);
+    if (!e164 || e164 === value) continue;
+    if (next === responses) next = { ...responses };
+    next[field.name] = e164;
+  }
+  return next;
+}
+
 /** Load one assigned provider so the service can be rejected early when empty. */
 async function firstAssignedProvider(
   serviceId: number,
@@ -115,6 +145,12 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   if (!isValidTimeZone(input.timeZone)) {
     return { ok: false, error: "Invalid timezone" };
   }
+
+  // Normalise phone answers to E.164 before validating or storing, so the
+  // stored format does not depend on the client. The booking form's country
+  // picker already sends E.164; this covers embeds, the API and anything that
+  // posts a bare national number.
+  input = { ...input, responses: await normalizePhoneResponses(service.bookingFields, input.responses) };
 
   if (!input.force) {
     const validationError = validateResponses(service.bookingFields, input.responses);

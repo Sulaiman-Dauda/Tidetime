@@ -22,6 +22,22 @@ describe("validateResponses", () => {
     expect(errs.tel).toBe("Enter a valid phone number");
   });
 
+  it("requires phone answers to be E.164 by the time they reach validation", () => {
+    const fields: BookingField[] = [
+      { ...base, name: "tel", label: "Tel", type: "phone", required: true },
+    ];
+    expect(validateResponses(fields, { tel: "+447700900123" })).toEqual({});
+    // A bare national number is the server's job to normalise first; reaching
+    // validation still unnormalised means nothing could be made of it.
+    expect(validateResponses(fields, { tel: "07700 900123" }).tel).toBe(
+      "Enter a valid phone number",
+    );
+    // The old regex accepted this.
+    expect(validateResponses(fields, { tel: "------" }).tel).toBe(
+      "Enter a valid phone number",
+    );
+  });
+
   it("accepts valid responses", () => {
     const fields: BookingField[] = [
       { ...base, name: "email", label: "Email", type: "email", required: true },

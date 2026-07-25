@@ -1,4 +1,5 @@
 import type { BookingField } from "@/db/schema";
+import { formatPhoneDisplay, isE164 } from "./phone";
 
 /** A map of field name -> submitted value (string, boolean, or string[]). */
 export type FieldValues = Record<string, string | boolean | string[] | undefined>;
@@ -12,7 +13,6 @@ function isEmpty(value: string | boolean | string[] | undefined): boolean {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^[+]?[\d\s().-]{6,}$/;
 
 /**
  * Validate submitted responses against a field schema. Required fields are
@@ -35,8 +35,11 @@ export function answersFromResponses(
     if (field.system) continue;
     const value = responses[field.name];
     let rendered: string | null = null;
-    if (typeof value === "string" && value.trim()) rendered = value.trim();
-    else if (typeof value === "number") rendered = String(value);
+    if (typeof value === "string" && value.trim()) {
+      // Phone answers are stored as +447700900123; group them for reading.
+      // Answers stored before normalisation pass through untouched.
+      rendered = field.type === "phone" ? formatPhoneDisplay(value.trim()) : value.trim();
+    } else if (typeof value === "number") rendered = String(value);
     else if (value === true) rendered = "Yes";
     if (rendered === null) continue;
     if (excludeValue && rendered === excludeValue) continue;
@@ -66,7 +69,10 @@ export function validateResponses(
 
     if (field.type === "email" && typeof value === "string" && !EMAIL_RE.test(value)) {
       errors[field.name] = "Enter a valid email";
-    } else if (field.type === "phone" && typeof value === "string" && !PHONE_RE.test(value)) {
+      // Phone answers are stored in E.164. The booking form's country picker
+      // produces it, and the server normalises anything else before it gets
+      // here, so a value that still isn't E.164 is genuinely unusable.
+    } else if (field.type === "phone" && typeof value === "string" && !isE164(value)) {
       errors[field.name] = "Enter a valid phone number";
     } else if (field.type === "number" && typeof value === "string" && Number.isNaN(Number(value))) {
       errors[field.name] = "Enter a valid number";

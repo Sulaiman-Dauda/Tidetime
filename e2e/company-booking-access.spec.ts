@@ -14,6 +14,8 @@ test("owner can manage a booking assigned to another provider", async ({ page })
   const attendeeName = `Company Scope ${Date.now()}`;
   await page.locator("#name").fill(attendeeName);
   await page.locator("#email").fill(`${Date.now()}@company-scope.example`);
+  // Required phone field: the country picker supplies the +44.
+  await page.locator("#phone").fill("07700 900123");
   await page.waitForTimeout(2_100);
   await page.getByTestId("confirm-booking").click();
   await expect(page).toHaveURL(/\/booking\//);

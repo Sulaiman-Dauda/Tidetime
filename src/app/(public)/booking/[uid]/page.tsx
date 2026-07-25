@@ -11,6 +11,7 @@ import { CalendarCheck, Clock, MapPin, Users, AlertCircle, CalendarClock, XCircl
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { answersFromResponses } from "@/lib/booking-fields";
+import { formatPhoneDisplay } from "@/lib/phone";
 import { SuccessBurst } from "./success-burst";
 
 export const metadata: Metadata = { title: "Your booking · Tidetime" };
@@ -187,7 +188,7 @@ export default async function BookingDetailPage({ params, searchParams }: Props)
               }
             />
             {primary?.phoneNumber ? (
-              <Detail icon={Phone} label="Phone" value={primary.phoneNumber} />
+              <Detail icon={Phone} label="Phone" value={formatPhoneDisplay(primary.phoneNumber)} />
             ) : null}
             {booking.description ? (
               <Detail icon={MessageSquare} label="Notes" value={booking.description} />

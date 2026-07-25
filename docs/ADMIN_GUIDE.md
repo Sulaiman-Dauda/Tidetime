@@ -34,6 +34,8 @@ You can keep both configured and choose which one is active. See the [integratio
 
 Under **Settings**, set the company name, logo, and brand color. These appear on the public booking pages and in emails, so customers see your identity rather than the product name.
 
+The same page sets the **default phone country**. Phone questions on the booking form show a country picker next to the number box, and this is the country it starts on — so most customers just type their number without a dialling code. They can still change it. Numbers are stored in international format (`+447700900123`) whichever way they were entered.
+
 ## Legal pages
 
 Under **Settings**, you can turn on and write:

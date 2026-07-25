@@ -22,11 +22,17 @@ test.describe("company booking flow", () => {
     await expect(page.getByRole("heading", { name: "Enter your details" })).toBeVisible();
     await page.locator("#name").fill("E2E Tester");
     await page.locator("#email").fill(`e2e-${Date.now()}@example.com`);
+    // Phone: the country picker defaults to the company setting (GB), so a
+    // national number needs no dialling code typed in.
+    await expect(page.getByLabel("Country dialling code")).toHaveText("+44");
+    await page.locator("#phone").fill("07700 900123");
     // The public form deliberately rejects submissions within two seconds of
     // the signed server challenge being issued.
     await page.waitForTimeout(2_100);
     await page.getByTestId("confirm-booking").click();
     await expect(page).toHaveURL(/\/booking\//);
     await expect(page.getByText("Intro Call")).toBeVisible();
+    // Stored in E.164 and shown grouped, from a number typed without +44.
+    await expect(page.getByText("+44 7700 900123").first()).toBeVisible();
   });
 });
