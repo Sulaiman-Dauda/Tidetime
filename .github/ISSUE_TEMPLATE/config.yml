@@ -1,8 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Security policy
-    url: https://github.com/Sulaiman-Dauda/Tidetime/security/policy
-    about: Please report vulnerabilities privately instead of opening a public issue.
+  - name: Security vulnerability
+    url: https://github.com/Sulaiman-Dauda/Tidetime/security/advisories/new
+    about: Report privately. Never open a public issue for a security problem.
+  - name: Question or idea
+    url: https://github.com/Sulaiman-Dauda/Tidetime/discussions
+    about: Usage questions and ideas — Discussions, not issues.
   - name: Documentation
     url: https://tidetime.app
-    about: Read the setup, admin, and deployment guides before opening an issue.
+    about: Install, configuration and how the scheduling model works.
