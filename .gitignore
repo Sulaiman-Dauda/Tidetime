@@ -40,3 +40,10 @@ yarn-error.log*
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Keys and certificates
+*.pem
+*.key
+*.p12
+id_rsa*
+.netrc
