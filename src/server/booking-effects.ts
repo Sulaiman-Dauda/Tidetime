@@ -257,6 +257,9 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
         {
           uid: ctx.booking.uid,
           serviceId: ctx.booking.serviceId,
+          // The slug as well as the id, because a subscriber that branches on
+          // which service was booked should not break when ids are renumbered.
+          serviceSlug: ctx.service?.slug ?? null,
           title,
           startTime: ctx.booking.startTime.toISOString(),
           endTime: ctx.booking.endTime.toISOString(),
@@ -264,7 +267,20 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
             name: primary.name,
             email: primary.email,
             timeZone: primary.timeZone,
+            // Collected on every service and previously kept to ourselves,
+            // which left a subscriber with no way to ring the customer back.
+            phone: primary.phoneNumber ?? null,
           },
+          // The custom questions, already resolved to their labels.
+          //
+          // Resolved here rather than sent raw because the field names are
+          // per-service timestamps: "Site Postcode" is question_1785008013680
+          // on one service and question_1786457497496 on another. Only this
+          // side knows which is which, so sending the raw responses would push
+          // that problem onto every subscriber.
+          answers: bookingAnswers(ctx),
+          // The notes answer, which the booking form stores as the description.
+          description: ctx.booking.description ?? null,
           status: ctx.booking.status,
         },
       ),
