@@ -252,9 +252,24 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
                   onChange={(e) => update({ hint: e.target.value || undefined })}
                 />
               )}
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch checked={field.required} onCheckedChange={(value) => update({ required: value })} /> Required
-              </label>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Switch checked={field.required} onCheckedChange={(value) => update({ required: value })} /> Required
+                </label>
+                {/* A textarea beside another field looks broken, so the choice
+                    is only offered where it makes sense. Short answers pairing
+                    up is the difference between a form that fits on a phone
+                    screen and one that scrolls. */}
+                {field.type === "textarea" ? null : (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Switch
+                      checked={field.width === "half"}
+                      onCheckedChange={(value) => update({ width: value ? "half" : undefined })}
+                    />{" "}
+                    Half width
+                  </label>
+                )}
+              </div>
             </div>
           );
         })}

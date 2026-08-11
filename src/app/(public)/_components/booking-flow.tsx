@@ -266,7 +266,6 @@ export function BookingFlow({
   // Day selection is remembered per month, so paging to another month and back
   // doesn't lose the choice.
   const [dayByMonth, setDayByMonth] = useState<Record<string, string>>({});
-  const [pendingSlot, setPendingSlot] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [hour12, setHour12] = useState(true);
   const [weekStart, setWeekStart] = useState(0);
@@ -444,14 +443,12 @@ export function BookingFlow({
       (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
     // The per-month day selection survives paging; only the unconfirmed slot resets.
-    setPendingSlot(null);
     setSelectedSlot(null);
   }
 
   /** Availability inputs changed — every remembered selection is stale. */
   function resetSelection() {
     setDayByMonth({});
-    setPendingSlot(null);
     setSelectedSlot(null);
   }
 
@@ -467,7 +464,6 @@ export function BookingFlow({
     // The cached availability is what let the booker pick a dead slot — drop it.
     slotCache.current = {};
     setReloadNonce((value) => value + 1);
-    setPendingSlot(null);
     setSelectedSlot(null);
     setStep("time");
   }, []);
@@ -769,7 +765,6 @@ export function BookingFlow({
                             aria-pressed={selected}
                             onClick={() => {
                               setSelectedDay(key);
-                              setPendingSlot(null);
                               setSelectedSlot(null);
                             }}
                             className={cn(
@@ -813,7 +808,6 @@ export function BookingFlow({
                             const key = `${nextAvailable.month.getFullYear()}-${nextAvailable.month.getMonth()}`;
                             setViewDate(nextAvailable.month);
                             setDayByMonth((current) => ({ ...current, [key]: nextAvailable.day }));
-                            setPendingSlot(null);
                             setSelectedSlot(null);
                           }}
                         >
@@ -911,29 +905,21 @@ export function BookingFlow({
                             hour12,
                             timeZone,
                           });
-                          // Calendly-style confirm: the first click arms the slot,
-                          // splitting it into the time + an explicit Next button.
-                          return pendingSlot === slot ? (
-                            <div key={slot} className="flex gap-1.5">
-                              <div className="flex-1 select-none rounded-lg border border-transparent bg-muted py-2.5 text-center text-[13px] font-semibold text-muted-foreground">
-                                {label}
-                              </div>
-                              <button
-                                type="button"
-                                data-testid="slot-confirm"
-                                autoFocus
-                                onClick={() => chooseSlot(slot)}
-                                className="flex-1 rounded-lg bg-primary py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-[0.99]"
-                              >
-                                Next
-                              </button>
-                            </div>
-                          ) : (
+                          // One click goes to the form.
+                          //
+                          // This used to arm the slot and split the row into
+                          // the time plus a Next button. Two taps for every
+                          // booking, to guard against a mistake that costs
+                          // nothing: the next screen is a form you have to fill
+                          // in, so nobody books by accident. Worse, the button
+                          // you then wanted appeared exactly where your finger
+                          // had just been and pushed the rest of the list down.
+                          return (
                             <button
                               key={slot}
                               type="button"
                               data-testid="slot"
-                              onClick={() => setPendingSlot(slot)}
+                              onClick={() => chooseSlot(slot)}
                               className="w-full rounded-lg border border-input bg-background py-2.5 text-[13px] font-semibold text-foreground transition hover:border-primary hover:bg-primary hover:text-primary-foreground active:scale-[0.99]"
                             >
                               {label}
@@ -1098,7 +1084,11 @@ function BookingForm({
         </p>
       </div>
 
-      <form action={submit} className="mt-5 space-y-4" noValidate>
+      <form
+        action={submit}
+        className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4 [&>*]:col-span-2"
+        noValidate
+      >
         <div
           aria-hidden="true"
           className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden"
@@ -1160,14 +1150,18 @@ function BookingForm({
         ) : null}
 
         {customFields.map((field) => (
-          <CustomField
+          <div
             key={field.name}
-            field={field}
-            phoneCountry={phoneCountry}
-            value={values[field.name]}
-            error={errors[field.name]}
-            onChange={(value) => setValue(field.name, value)}
-          />
+            className={field.width === "half" ? "col-span-2 sm:col-span-1" : "col-span-2"}
+          >
+            <CustomField
+              field={field}
+              phoneCountry={phoneCountry}
+              value={values[field.name]}
+              error={errors[field.name]}
+              onChange={(value) => setValue(field.name, value)}
+            />
+          </div>
         ))}
 
         {spamProtection ? (

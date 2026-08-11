@@ -597,6 +597,15 @@ export type BookingField = {
   options?: string[];
   /** helper text shown under the input on the public form */
   hint?: string;
+  /**
+   * How much of the row the field takes on the public form.
+   *
+   * Absent means full, so every service that existed before this was added
+   * keeps the layout it had. Half lets short answers pair up, which is the
+   * difference between a booking form that fits on a phone screen and one that
+   * scrolls: phone beside postcode is two lines rather than four.
+   */
+  width?: "full" | "half";
 };
 
 
