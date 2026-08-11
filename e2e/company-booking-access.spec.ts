@@ -6,10 +6,9 @@ test("owner can manage a booking assigned to another provider", async ({ page })
   const providerSelect = page.getByRole("combobox").last();
   await providerSelect.click();
   await page.getByRole("option", { name: "Demo Provider" }).click();
-  // Calendly-style confirm: the first click arms the slot, the split "Next"
-  // button commits it.
+  // Choosing a time moves straight to the details step. There is no separate
+  // confirm button: the extra click bought nothing and cost a step.
   await page.getByTestId("slot").nth(3).click();
-  await page.getByTestId("slot-confirm").click();
 
   const attendeeName = `Company Scope ${Date.now()}`;
   await page.locator("#name").fill(attendeeName);
