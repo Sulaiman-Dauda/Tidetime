@@ -1092,12 +1092,12 @@ function BookingForm({
 
       <form
         action={submit}
-        className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4 [&>*]:col-span-2"
+        className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4"
         noValidate
       >
         <div
           aria-hidden="true"
-          className="absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden"
+          className="absolute left-[-9999px] top-[-9999px] col-span-2 h-0 w-0 overflow-hidden"
         >
           <label htmlFor="company">Company</label>
           <input id="company" name="company" tabIndex={-1} autoComplete="off" />
@@ -1131,6 +1131,7 @@ function BookingForm({
         </div>
 
         {!service.disableGuests ? (
+          <div className="col-span-2">
           <FormField
             label="Invite guests"
             htmlFor="guests"
@@ -1157,6 +1158,7 @@ function BookingForm({
               />
             </div>
           </FormField>
+          </div>
         ) : null}
 
         {customFields.map((field) => (
@@ -1175,7 +1177,7 @@ function BookingForm({
         ))}
 
         {spamProtection ? (
-          <div className="space-y-1.5">
+          <div className="col-span-2 space-y-1.5">
             <AltchaWidget onChange={setAltcha} />
             {errors.altcha ? (
               <p className="text-xs text-destructive">{errors.altcha}</p>
