@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { getCompanySettings } from "@/server/company-settings";
+import { LegalContent } from "../../_components/legal-content";
 
 type Doc = "terms" | "privacy";
 
@@ -51,9 +52,7 @@ export default async function LegalDocPage({ params }: { params: Promise<{ doc: 
           Back
         </Link>
         <h1 className="mt-6 text-2xl font-semibold tracking-tight">{data.title}</h1>
-        <div className="mt-6 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {data.content}
-        </div>
+        <LegalContent content={data.content} />
       </div>
     </main>
   );
