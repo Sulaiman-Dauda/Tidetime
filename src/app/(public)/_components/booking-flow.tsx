@@ -1198,7 +1198,7 @@ function BookingForm({
           type="submit"
           data-testid="confirm-booking"
           size="lg"
-          className="w-full rounded-xl"
+          className="col-span-2 w-full rounded-xl"
           disabled={pending}
         >
           {pending ? (
@@ -1215,7 +1215,7 @@ function BookingForm({
               : "Confirm booking"}
         </Button>
 
-        <p className="text-center text-xs leading-5 text-muted-foreground">
+        <p className="col-span-2 text-center text-xs leading-5 text-muted-foreground">
           By continuing, you agree to receive emails about this booking
           {legalLinks.length > 0 ? (
             <>
