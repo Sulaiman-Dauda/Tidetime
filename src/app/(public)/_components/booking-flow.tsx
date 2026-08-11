@@ -1015,6 +1015,12 @@ function BookingForm({
     (field) => !["name", "email"].includes(field.name),
   );
 
+  /** Width for a field rendered outside the custom loop, so name and email
+   *  follow the same setting as everything else rather than ignoring it. */
+  function widthOf(name: string): "full" | "half" {
+    return service.bookingFields.find((f) => f.name === name)?.width ?? "full";
+  }
+
   function setValue(name: string, value: string | boolean) {
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => {
@@ -1097,6 +1103,7 @@ function BookingForm({
           <input id="company" name="company" tabIndex={-1} autoComplete="off" />
         </div>
 
+        <div className={widthOf("name") === "half" ? "col-span-2 sm:col-span-1" : "col-span-2"}>
         <FormField label="Your name" htmlFor="name" required error={errors.name}>
           <Input
             id="name"
@@ -1107,7 +1114,9 @@ function BookingForm({
             onChange={(event) => setValue("name", event.target.value)}
           />
         </FormField>
+        </div>
 
+        <div className={widthOf("email") === "half" ? "col-span-2 sm:col-span-1" : "col-span-2"}>
         <FormField label="Email address" htmlFor="email" required error={errors.email}>
           <Input
             id="email"
@@ -1119,6 +1128,7 @@ function BookingForm({
             onChange={(event) => setValue("email", event.target.value)}
           />
         </FormField>
+        </div>
 
         {!service.disableGuests ? (
           <FormField
