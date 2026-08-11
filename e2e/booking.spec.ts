@@ -15,10 +15,9 @@ test.describe("company booking flow", () => {
       page.getByRole("heading", { name: "Select a date & time" }),
     ).toBeVisible();
     await expect(page.getByTestId("day-available").first()).toBeVisible();
-    // Calendly-style confirm: the first click arms the slot, the split "Next"
-    // button commits it.
+    // Choosing a time moves straight to the details step. There is no separate
+    // confirm button: the extra click bought nothing and cost a step.
     await page.getByTestId("slot").first().click();
-    await page.getByTestId("slot-confirm").click();
     await expect(page.getByRole("heading", { name: "Enter your details" })).toBeVisible();
     await page.locator("#name").fill("E2E Tester");
     await page.locator("#email").fill(`e2e-${Date.now()}@example.com`);
