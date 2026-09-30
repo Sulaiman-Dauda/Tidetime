@@ -23,6 +23,16 @@ a stable release. Published releases and their notes are also available on the
 
 ### Fixed
 
+- Webhooks were never delivered on Node 20 or later. Every delivery failed with
+  "Invalid IP address: undefined" and was retried until it was marked failed.
+  The SSRF guard pins each request to the address it has already checked by
+  passing its own `lookup`, which answered in the single-address form. Node 20+
+  connects with `autoSelectFamily`, asks for `{ all: true }` and needs a list,
+  so the connection failed before it was made. `pinnedLookup` now answers both
+  shapes, and a new test drives it through the real `node:http` stack, which the
+  existing mocked test could not. Deliveries already marked failed are not
+  retried.
+
 - The dashboard was unusable on screens narrower than 768px. The mobile header
   was a sibling of the sidebar inside a row-direction flex container, so it took
   a column of its own and pushed the content area off-screen — every dashboard
