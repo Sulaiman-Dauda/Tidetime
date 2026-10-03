@@ -4,6 +4,10 @@ Self-hosted appointment scheduling for a single company with multiple services a
 
 Tidetime is open source and runs on your own server. There is no hosted plan, no per-seat pricing, and no third-party analytics.
 
+![Screen recording of a visitor booking an Intro Call on Tidetime, choosing the service, picking a date and time, entering their details, seeing the confirmation, and receiving the confirmation email.](docs/media/booking.gif)
+
+![The Tidetime Bookings page in the staff dashboard, listing the new Intro Call booked by Alex Taylor with Reschedule and Cancel actions.](docs/media/admin.png)
+
 ## Features
 
 - **Services and providers.** Define services with their own duration, location, intake questions, and confirmation message. Assign one or more providers to each service.
@@ -68,7 +72,7 @@ In production the app validates its configuration on boot and refuses to start w
 
 ## Production
 
-On a fresh Linux server (root or sudo), one command installs everything — Docker, secrets, firewall, the stack — and prints the address when it is live:
+On a fresh Linux server (root or sudo), one command installs everything (Docker, secrets, firewall, the stack) and prints the address when it is live:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/Tidetime/main/install.sh | bash
@@ -82,7 +86,7 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-The app container applies database migrations before it starts. The jobs worker calls the protected cron endpoint on an interval to handle webhook retries and data retention. The application port stays bound to localhost so all remote traffic passes through Caddy — the instance is reached at `http://<your-server-ip>` (or `https://<your-domain>` once a domain is attached).
+The app container applies database migrations before it starts. The jobs worker calls the protected cron endpoint on an interval to handle webhook retries and data retention. The application port stays bound to localhost so all remote traffic passes through Caddy, so the instance is reached at `http://<your-server-ip>` (or `https://<your-domain>` once a domain is attached).
 
 For domain setup, backups, Microsoft 365 email, and upgrade notes, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -90,10 +94,10 @@ For domain setup, backups, Microsoft 365 email, and upgrade notes, see [docs/DEP
 
 Team members are managed under **Members**, each with one of four roles:
 
-- **Owner** — full control, including settings, integrations, and transferring or deleting the instance.
-- **Admin** — everything except deleting the instance: the service catalog, members, availability, all bookings, and settings.
-- **Scheduler** — a front-desk role for managing all bookings and customers; not bookable, and no access to the catalog, members, or settings.
-- **Member** — a bookable provider who manages their own availability, bookings, and calendar connection.
+- **Owner** (full control, including settings, integrations, and transferring or deleting the instance).
+- **Admin** (everything except deleting the instance, including the service catalog, members, availability, all bookings, and settings).
+- **Scheduler** (a front-desk role for managing all bookings and customers, not bookable, with no access to the catalog, members, or settings).
+- **Member** (a bookable provider who manages their own availability, bookings, and calendar connection).
 
 A provider is a member assigned to a service. These boundaries are enforced in the server queries and mutations, not only in the interface.
 
