@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -16,7 +16,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader2, CalendarRange, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CalendarRange } from "lucide-react";
+import { ConnectionBody, ConnectionCard, ConnectionFooter, ConnectionNotice } from "./connection-card";
 
 const OAUTH_ERRORS: Record<string, string> = {
   access_denied: "You declined access on the Microsoft consent screen.",
@@ -92,78 +93,66 @@ export function MicrosoftCalendarSettings() {
     }
   }
 
-  if (loading) {
-    return (
-      <Card className="p-6">
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Checking Microsoft 365 Calendar status...</p>
-        </div>
-      </Card>
-    );
-  }
+  const status = loading ? (
+    <Skeleton className="h-5 w-24 rounded-full" />
+  ) : !configured ? (
+    <Badge variant="outline">Not set up</Badge>
+  ) : connected ? (
+    <Badge variant="success" dot>Connected</Badge>
+  ) : expired ? (
+    <Badge variant="warning" dot>Expired</Badge>
+  ) : (
+    <Badge variant="outline">Not connected</Badge>
+  );
 
   return (
-    <Card className="p-6">
-      <div className="mb-1 flex items-center gap-2">
-        <CalendarRange className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-base font-semibold">Microsoft 365 Calendar</h2>
-        {connected && (
-          <Badge variant="success" className="ml-2">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Connected
-          </Badge>
-        )}
-      </div>
-      <p className="mb-5 text-sm text-muted-foreground">
-        Read-only busy-time sync: events on your Outlook calendar block your public availability so
-        double-bookings can&apos;t happen.
-      </p>
-
-      {!configured ? (
-        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4 text-sm text-muted-foreground">
-          Ask an admin to configure the Microsoft 365 application under Connections → Email delivery
-          first — the calendar uses the same app registration.
-        </div>
+    <ConnectionCard
+      icon={CalendarRange}
+      title="Microsoft 365 Calendar"
+      description="Read-only busy-time sync. Events on your Outlook calendar block your public availability, so double bookings can't happen."
+      status={status}
+    >
+      {loading ? (
+        <ConnectionBody>
+          <Skeleton className="h-4 w-2/3" />
+        </ConnectionBody>
+      ) : !configured ? (
+        <ConnectionBody>
+          <p className="text-sm text-muted-foreground">
+            Ask an admin to set up the Microsoft 365 app under Email delivery first. The calendar
+            uses the same app registration.
+          </p>
+        </ConnectionBody>
       ) : !connected ? (
-        <div className="space-y-4">
+        <>
           {expired ? (
-            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="font-medium">Your Microsoft connection expired</p>
-                <p className="mt-0.5">Outlook busy times stopped blocking your availability. Reconnect to resume.</p>
-              </div>
-            </div>
+            <ConnectionBody>
+              <ConnectionNotice tone="warning" title="Your Microsoft connection expired">
+                Outlook busy times stopped blocking your availability. Reconnect to resume.
+              </ConnectionNotice>
+            </ConnectionBody>
           ) : null}
-          <Button onClick={connect} disabled={connecting}>
-            {connecting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Redirecting...
-              </>
-            ) : expired ? (
-              "Reconnect Microsoft 365 Calendar"
-            ) : (
-              "Connect Microsoft 365 Calendar"
-            )}
-          </Button>
-        </div>
+          <ConnectionFooter>
+            <Button onClick={connect} loading={connecting}>
+              {connecting
+                ? "Redirecting…"
+                : expired
+                  ? "Reconnect Microsoft 365 Calendar"
+                  : "Connect Microsoft 365 Calendar"}
+            </Button>
+          </ConnectionFooter>
+        </>
       ) : (
-        <div className="space-y-4">
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
-            <p className="font-medium">Outlook busy times are syncing</p>
-            <p className="mt-1 text-emerald-700 dark:text-emerald-400">
+        <>
+          <ConnectionBody>
+            <p className="text-sm text-muted-foreground">
               Times you&apos;re busy in Outlook are removed from your public booking page.
             </p>
-          </div>
-          <div className="flex items-center gap-2 border-t border-border/60 pt-2">
-            <Button variant="outline" size="sm" onClick={loadStatus}>
-              Refresh
-            </Button>
+          </ConnectionBody>
+          <ConnectionFooter>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                <Button variant="ghost" className="mr-auto text-destructive hover:bg-destructive-subtle hover:text-destructive">
                   Disconnect
                 </Button>
               </AlertDialogTrigger>
@@ -178,16 +167,19 @@ export function MicrosoftCalendarSettings() {
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={disconnect}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+                    className={buttonVariants({ variant: "destructive" })}
                   >
                     Disconnect
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
-        </div>
+            <Button variant="outline" onClick={loadStatus}>
+              Refresh
+            </Button>
+          </ConnectionFooter>
+        </>
       )}
-    </Card>
+    </ConnectionCard>
   );
 }

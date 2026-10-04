@@ -7,23 +7,11 @@ import { env } from "@/lib/env";
 import { getAppUrl } from "@/server/app-url";
 import "./globals.css";
 
-const clashDisplay = localFont({
-  src: [
-    { path: "../../public/fonts/ClashDisplay-Regular.woff2", weight: "400" },
-    { path: "../../public/fonts/ClashDisplay-Medium.woff2", weight: "500" },
-    { path: "../../public/fonts/ClashDisplay-SemiBold.woff2", weight: "600" },
-    { path: "../../public/fonts/ClashDisplay-Bold.woff2", weight: "700" },
-  ],
-  variable: "--font-serif",
-  display: "swap",
-});
-
-const satoshi = localFont({
-  src: [
-    { path: "../../public/fonts/Satoshi-Regular.woff2", weight: "400" },
-    { path: "../../public/fonts/Satoshi-Medium.woff2", weight: "500" },
-    { path: "../../public/fonts/Satoshi-Bold.woff2", weight: "700" },
-  ],
+// Geist (SIL Open Font License 1.1, see public/fonts/Geist-OFL.txt): one
+// variable file covers every weight the UI uses. The previous ITF fonts were
+// removed because their licence forbids redistribution in a public repository.
+const geist = localFont({
+  src: [{ path: "../../public/fonts/Geist-Variable.woff2", weight: "100 900", style: "normal" }],
   variable: "--font-sans",
   display: "swap",
 });
@@ -35,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
   applicationName: env.appName,
   title: {
-    default: `${env.appName} — Book a service`,
+    default: `Book a service · ${env.appName}`,
     template: `%s · ${env.appName}`,
   },
   description,
@@ -47,12 +35,12 @@ export async function generateMetadata(): Promise<Metadata> {
     type: "website",
     url: appUrl,
     siteName: env.appName,
-    title: `${env.appName} — Book a service`,
+    title: `Book a service · ${env.appName}`,
     description,
   },
   twitter: {
     card: "summary",
-    title: `${env.appName} — Book a service`,
+    title: `Book a service · ${env.appName}`,
     description,
   },
   icons: {
@@ -67,7 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${clashDisplay.variable} ${satoshi.variable} font-sans`}>
+      <body className={`${geist.variable} font-sans`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

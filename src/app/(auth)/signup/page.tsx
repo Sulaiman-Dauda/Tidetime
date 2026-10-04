@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { invites, teams } from "@/db/schema";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthCard, AuthLink } from "../_components/auth-card";
+import { Button } from "@/components/ui/button";
 import { SignupForm } from "./signup-form";
 
 export const metadata: Metadata = { title: "Sign up" };
@@ -35,19 +37,14 @@ export default async function SignupPage({ searchParams }: Props) {
 
   if (!inviteRow) {
     return (
-      <div className="w-full max-w-sm space-y-7">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Invalid invitation</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            This invite link is invalid or has expired. Please ask your team admin for a new invitation.
-          </p>
-        </div>
-        <p className="text-center text-sm text-muted-foreground">
-          <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
-            Go to login
-          </Link>
-        </p>
-      </div>
+      <AuthCard
+        title="Invalid invitation"
+        description="This invite link is invalid or has expired. Ask your team admin for a new one."
+      >
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/login">Back to log in</Link>
+        </Button>
+      </AuthCard>
     );
   }
 
@@ -58,22 +55,16 @@ export default async function SignupPage({ searchParams }: Props) {
     .limit(1);
 
   return (
-    <div className="w-full max-w-sm space-y-7">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Join {team?.name ?? "the team"}</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          You&apos;ve been invited to join. Create your account to get started.
-        </p>
-      </div>
-
+    <AuthCard
+      title={`Join ${team?.name ?? "the team"}`}
+      description="You've been invited to join. Create your account to get started."
+      footer={
+        <>
+          Already have an account? <AuthLink href="/login">Log in</AuthLink>
+        </>
+      }
+    >
       <SignupForm inviteToken={invite} inviteEmail={inviteRow.email} />
-
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
-        <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthCard>
   );
 }

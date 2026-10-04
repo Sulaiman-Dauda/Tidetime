@@ -16,7 +16,7 @@ export interface FilterOption {
 
 /**
  * Filter dropdown for the GET forms on list pages. Radix renders a hidden
- * native select for `name`, so the surrounding form still submits normally —
+ * native select for `name`, so the surrounding form still submits normally, and
  * we get the design-system trigger without hand-rolling form plumbing.
  *
  * Radix reserves the empty string for "no value", so callers use a sentinel
@@ -39,7 +39,7 @@ export function FilterSelect({
     <Select name={name} defaultValue={defaultValue}>
       <SelectTrigger
         aria-label={ariaLabel}
-        className={cn("h-8 w-auto min-w-[8.5rem] gap-2 rounded-lg text-[13px]", className)}
+        className={cn("h-8 w-auto min-w-36 text-meta", className)}
       >
         <SelectValue />
       </SelectTrigger>

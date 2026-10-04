@@ -5,8 +5,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 /**
  * A hairline progress bar at the very top of the app. It starts when an internal
- * link is clicked and completes when the new route resolves — the "expensive
- * SaaS" navigation cue (Linear/Vercel style). Pure state + CSS, no library.
+ * link is clicked and completes when the new route resolves. Pure state and
+ * CSS, no library.
  */
 function RouteProgressInner() {
   const pathname = usePathname();
@@ -77,10 +77,10 @@ function RouteProgressInner() {
 
   if (!visible) return null;
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-[2px]">
+    <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-0.5">
       <div
         className="h-full rounded-r-full bg-primary transition-[width] duration-200 ease-out"
-        style={{ width: `${width}%`, boxShadow: "0 0 8px hsl(var(--primary) / 0.6)" }}
+        style={{ width: `${width}%` }}
       />
     </div>
   );

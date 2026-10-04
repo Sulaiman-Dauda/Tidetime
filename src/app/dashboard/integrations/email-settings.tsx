@@ -6,20 +6,19 @@ import {
   CheckCircle2,
   Copy,
   ExternalLink,
-  Loader2,
   Mail,
   Server,
   Unplug,
-  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { ConnectionBody, ConnectionCard, ConnectionFooter, ConnectionNotice } from "./connection-card";
 
 type EmailProvider = "smtp" | "microsoft365";
 
@@ -67,18 +66,7 @@ function TestResult({
   result: { provider: EmailProvider; ok: boolean; message: string } | null;
 }) {
   if (!result || result.provider !== provider) return null;
-  return (
-    <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-      result.ok
-        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-        : "bg-destructive/10 text-destructive"
-    }`}>
-      {result.ok
-        ? <CheckCircle2 className="h-4 w-4" />
-        : <XCircle className="h-4 w-4" />}
-      {result.message}
-    </div>
-  );
+  return <ConnectionNotice tone={result.ok ? "success" : "destructive"} title={result.message} />;
 }
 
 export function EmailSettings() {
@@ -107,7 +95,7 @@ export function EmailSettings() {
 
   const load = useCallback(async () => {
     const response = await fetch("/api/settings?key=email", { cache: "no-store" });
-    if (!response.ok) throw new Error("Could not load email settings");
+    if (!response.ok) throw new Error("Please refresh the page.");
     const data = await response.json() as EmailSettingsResponse;
     setActiveProvider(data.provider);
     setTab(data.provider);
@@ -163,7 +151,7 @@ export function EmailSettings() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("microsoft_error")) {
       toast({
-        title: "Microsoft 365 connection failed",
+        title: "Couldn't connect Microsoft 365",
         description: params.get("microsoft_error") || "Please try again.",
         variant: "destructive",
       });
@@ -302,7 +290,7 @@ export function EmailSettings() {
         message: data.message || "Test failed",
       });
     } catch {
-      setTestResult({ provider, ok: false, message: "Network error — please try again" });
+      setTestResult({ provider, ok: false, message: "Network error. Please try again." });
     } finally {
       setTesting(null);
     }
@@ -331,255 +319,272 @@ export function EmailSettings() {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
-  if (!loaded) {
-    return (
-      <Card className="p-6">
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading email delivery settings…</p>
-        </div>
-      </Card>
-    );
-  }
+  const healthy = activeProvider === "smtp"
+    ? smtp.host.trim().length > 0
+    : microsoftConnection.connected;
 
   return (
-    <Card className="p-6 lg:col-span-2">
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <Mail className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-base font-semibold">Email delivery</h2>
-        {/* The badge reflects actual health, not just the stored preference —
-            an active-but-unconfigured provider means mail is silently dropped. */}
-        {(activeProvider === "smtp" ? smtp.host.trim().length > 0 : microsoftConnection.connected) ? (
-          <Badge variant="success" className="ml-auto">
-            {activeProvider === "smtp" ? "SMTP active" : "Microsoft 365 active"}
-          </Badge>
-        ) : (
-          <Badge variant="destructive" className="ml-auto">
-            {activeProvider === "smtp" ? "SMTP not configured" : "Microsoft 365 disconnected"}
-          </Badge>
-        )}
-      </div>
-      <p className="mb-5 text-sm text-muted-foreground">
-        Keep both connections configured and choose which one Tidetime uses for booking
-        confirmations, invitations, password resets, and team invitations.
-      </p>
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value as EmailProvider)}>
-        <TabsList>
-          <TabsTrigger value="microsoft365">Microsoft 365</TabsTrigger>
-          <TabsTrigger value="smtp">SMTP</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="microsoft365" className="mt-5 space-y-5">
-          <div className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-            <h3 className="text-sm font-semibold">Before you connect</h3>
-            <ol className="mt-2 list-inside list-decimal space-y-1 text-sm text-muted-foreground">
-              <li>Create a single-tenant Web app registration in Microsoft Entra.</li>
-              <li>Add the callback URL below as a Web redirect URI.</li>
-              <li>Add delegated Microsoft Graph permissions: Mail.Send and User.Read.</li>
-              <li>Create a client secret, paste the details below, then connect the mailbox.</li>
-            </ol>
-            <a
-              href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-            >
-              Open Microsoft Entra app registrations
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>
-              App Callback URL{" "}
-              <InfoTip>Copy this exactly into the app registration&apos;s Web redirect URI.</InfoTip>
-            </Label>
-            <div className="flex gap-2">
-              <Input value={callbackUrl} readOnly className="font-mono text-xs" />
-              <Button type="button" variant="outline" size="icon" onClick={copyCallback}>
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                <span className="sr-only">Copy callback URL</span>
-              </Button>
-            </div>
-          </div>
-
+    <ConnectionCard
+      icon={Mail}
+      title="Email delivery"
+      description="Send booking confirmations, invitations, password resets and team invitations through Microsoft 365 or SMTP."
+      status={!loaded ? (
+        <Skeleton className="h-5 w-24 rounded-full" />
+      ) : (
+        // The badge reflects actual health, not just the stored preference:
+        // an active but unconfigured provider means mail is silently dropped.
+        <Badge variant={healthy ? "success" : "destructive"} dot>
+          {healthy
+            ? activeProvider === "smtp" ? "SMTP active" : "Microsoft 365 active"
+            : activeProvider === "smtp" ? "SMTP not configured" : "Microsoft 365 disconnected"}
+        </Badge>
+      )}
+    >
+      {!loaded ? (
+        <ConnectionBody>
+          <Skeleton className="h-9 w-48" />
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>
-                Directory Tenant ID{" "}
-                <InfoTip>Find this on the app registration Overview page.</InfoTip>
-              </Label>
-              <Input
-                value={microsoft.tenantId}
-                onChange={(event) =>
-                  setMicrosoft({ ...microsoft, tenantId: event.target.value })}
-                placeholder="00000000-0000-0000-0000-000000000000"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Application Client ID</Label>
-              <Input
-                value={microsoft.clientId}
-                onChange={(event) =>
-                  setMicrosoft({ ...microsoft, clientId: event.target.value })}
-                placeholder="00000000-0000-0000-0000-000000000000"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Application Client Secret</Label>
-              <Input
-                value={microsoft.clientSecret}
-                onChange={(event) =>
-                  setMicrosoft({ ...microsoft, clientSecret: event.target.value })}
-                type="password"
-                placeholder={microsoftSecretConfigured
-                  ? "Saved — leave blank to keep it"
-                  : "Paste the secret value, not its Secret ID"}
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Sender name</Label>
-              <Input
-                value={microsoft.fromName}
-                onChange={(event) =>
-                  setMicrosoft({ ...microsoft, fromName: event.target.value })}
-                placeholder="Tidetime"
-              />
-              <p className="text-xs text-muted-foreground">
-                The email address comes from the Microsoft mailbox you connect.
-              </p>
-            </div>
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+          </div>
+        </ConnectionBody>
+      ) : (
+        <Tabs value={tab} onValueChange={(value) => setTab(value as EmailProvider)} className="flex flex-1 flex-col">
+          <div className="border-t px-5 pt-5">
+            <TabsList>
+              <TabsTrigger value="microsoft365">Microsoft 365</TabsTrigger>
+              <TabsTrigger value="smtp">SMTP</TabsTrigger>
+            </TabsList>
           </div>
 
-          {microsoftConnection.connected && microsoftConnection.account ? (
-            <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 sm:flex-row sm:items-center">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                  Connected as {microsoftConnection.account.name}
-                </p>
-                <p className="truncate text-xs text-emerald-700 dark:text-emerald-400">
-                  {microsoftConnection.account.email}
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={disconnectMicrosoft} loading={pending}>
-                <Unplug className="h-4 w-4" />
-                Disconnect
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-              No Microsoft 365 mailbox is connected yet.
-            </div>
-          )}
-
-          <TestResult provider="microsoft365" result={testResult} />
-
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={saveMicrosoftOnly} loading={pending}>
-              Save app details
-            </Button>
-            <Button onClick={connectMicrosoft} loading={connecting || pending}>
-              {microsoftConnection.connected ? "Reconnect mailbox" : "Connect Microsoft 365"}
-            </Button>
-            {microsoftConnection.connected ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => test("microsoft365")}
-                  loading={testing === "microsoft365"}
+          <TabsContent value="microsoft365" className="flex flex-1 flex-col">
+            <div className="space-y-5 p-5">
+              <div className="rounded-lg border bg-muted/50 p-4">
+                <h3 className="text-sm font-medium text-foreground">Before you connect</h3>
+                <ol className="mt-2 list-inside list-decimal space-y-1 text-sm text-muted-foreground">
+                  <li>Create a single-tenant Web app registration in Microsoft Entra.</li>
+                  <li>Add the callback URL below as a Web redirect URI.</li>
+                  <li>Add delegated Microsoft Graph permissions: Mail.Send and User.Read.</li>
+                  <li>Create a client secret, paste the details below, then connect the mailbox.</li>
+                </ol>
+                <a
+                  href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                 >
-                  Send test email
-                </Button>
-                {activeProvider !== "microsoft365" ? (
-                  <Button variant="secondary" onClick={() => activate("microsoft365")} loading={pending}>
-                    Use Microsoft 365
+                  Open Microsoft Entra app registrations
+                  <ExternalLink className="size-3.5" />
+                </a>
+              </div>
+
+              <Field
+                label="Callback URL"
+                htmlFor="ms-callback-url"
+                aside={<InfoTip>Copy this exactly into the app registration&apos;s Web redirect URI.</InfoTip>}
+              >
+                <div className="flex gap-2">
+                  <Input id="ms-callback-url" value={callbackUrl} readOnly className="font-mono text-meta" />
+                  <Button type="button" variant="outline" size="icon" onClick={copyCallback}>
+                    {copied ? <Check /> : <Copy />}
+                    <span className="sr-only">Copy callback URL</span>
                   </Button>
-                ) : null}
-              </>
-            ) : null}
-          </div>
-        </TabsContent>
+                </div>
+              </Field>
 
-        <TabsContent value="smtp" className="mt-5 space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>SMTP Host</Label>
-              <Input
-                value={smtp.host}
-                onChange={(event) => setSmtp({ ...smtp, host: event.target.value })}
-                placeholder="smtp.example.com"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Port <InfoTip>Common values are 587 for STARTTLS or 465 for implicit TLS.</InfoTip>
-              </Label>
-              <Input
-                value={smtp.port}
-                onChange={(event) => setSmtp({ ...smtp, port: event.target.value })}
-                inputMode="numeric"
-                placeholder="587"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Username</Label>
-              <Input
-                value={smtp.user}
-                onChange={(event) => setSmtp({ ...smtp, user: event.target.value })}
-                placeholder="user@example.com"
-                autoComplete="off"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Password</Label>
-              <Input
-                value={smtp.pass}
-                onChange={(event) => setSmtp({ ...smtp, pass: event.target.value })}
-                type="password"
-                placeholder={smtpPasswordConfigured
-                  ? "Saved — leave blank to keep it"
-                  : "SMTP password"}
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>
-                From address{" "}
-                <InfoTip>For example: Tidetime &lt;noreply@example.com&gt;.</InfoTip>
-              </Label>
-              <Input
-                value={smtp.from}
-                onChange={(event) => setSmtp({ ...smtp, from: event.target.value })}
-                placeholder="Tidetime <noreply@example.com>"
-              />
-            </div>
-          </div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field
+                  label="Directory (tenant) ID"
+                  htmlFor="ms-tenant-id"
+                  aside={<InfoTip>Find this on the app registration Overview page.</InfoTip>}
+                >
+                  <Input
+                    id="ms-tenant-id"
+                    value={microsoft.tenantId}
+                    onChange={(event) =>
+                      setMicrosoft({ ...microsoft, tenantId: event.target.value })}
+                    placeholder="00000000-0000-0000-0000-000000000000"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Application (client) ID" htmlFor="ms-client-id">
+                  <Input
+                    id="ms-client-id"
+                    value={microsoft.clientId}
+                    onChange={(event) =>
+                      setMicrosoft({ ...microsoft, clientId: event.target.value })}
+                    placeholder="00000000-0000-0000-0000-000000000000"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Client secret" htmlFor="ms-client-secret" className="sm:col-span-2">
+                  <Input
+                    id="ms-client-secret"
+                    value={microsoft.clientSecret}
+                    onChange={(event) =>
+                      setMicrosoft({ ...microsoft, clientSecret: event.target.value })}
+                    type="password"
+                    placeholder={microsoftSecretConfigured
+                      ? "Saved. Leave blank to keep it."
+                      : "Paste the secret value, not its Secret ID"}
+                    autoComplete="new-password"
+                  />
+                </Field>
+                <Field
+                  label="Sender name"
+                  htmlFor="ms-from-name"
+                  hint="The email address comes from the Microsoft mailbox you connect."
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    id="ms-from-name"
+                    value={microsoft.fromName}
+                    onChange={(event) =>
+                      setMicrosoft({ ...microsoft, fromName: event.target.value })}
+                    placeholder="Tidetime"
+                  />
+                </Field>
+              </div>
 
-          <TestResult provider="smtp" result={testResult} />
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
+                {microsoftConnection.connected && microsoftConnection.account ? (
+                  <>
+                    <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Connected as {microsoftConnection.account.name}
+                      </p>
+                      <p className="truncate text-meta text-muted-foreground">
+                        {microsoftConnection.account.email}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={disconnectMicrosoft} loading={pending}>
+                      <Unplug />
+                      Disconnect
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Unplug className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <p className="text-sm text-muted-foreground">
+                      No Microsoft 365 mailbox is connected yet.
+                    </p>
+                  </>
+                )}
+              </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={saveSmtp} loading={pending}>Save SMTP</Button>
-            <Button
-              variant="outline"
-              onClick={() => test("smtp")}
-              loading={testing === "smtp"}
-            >
-              Test connection
-            </Button>
-            {activeProvider !== "smtp" ? (
-              <Button variant="secondary" onClick={() => activate("smtp")} loading={pending}>
-                <Server className="h-4 w-4" />
-                Use SMTP
+              <TestResult provider="microsoft365" result={testResult} />
+            </div>
+
+            <ConnectionFooter>
+              {microsoftConnection.connected ? (
+                <>
+                  {activeProvider !== "microsoft365" ? (
+                    <Button variant="secondary" onClick={() => activate("microsoft365")} loading={pending}>
+                      Use Microsoft 365
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="outline"
+                    onClick={() => test("microsoft365")}
+                    loading={testing === "microsoft365"}
+                  >
+                    Send test email
+                  </Button>
+                </>
+              ) : null}
+              <Button variant="outline" onClick={saveMicrosoftOnly} loading={pending}>
+                Save app details
               </Button>
-            ) : null}
-          </div>
-        </TabsContent>
-      </Tabs>
-    </Card>
+              <Button onClick={connectMicrosoft} loading={connecting || pending}>
+                {microsoftConnection.connected ? "Reconnect mailbox" : "Connect Microsoft 365"}
+              </Button>
+            </ConnectionFooter>
+          </TabsContent>
+
+          <TabsContent value="smtp" className="flex flex-1 flex-col">
+            <div className="space-y-5 p-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="SMTP host" htmlFor="smtp-host">
+                  <Input
+                    id="smtp-host"
+                    value={smtp.host}
+                    onChange={(event) => setSmtp({ ...smtp, host: event.target.value })}
+                    placeholder="smtp.example.com"
+                  />
+                </Field>
+                <Field
+                  label="Port"
+                  htmlFor="smtp-port"
+                  aside={<InfoTip>Common values are 587 for STARTTLS or 465 for implicit TLS.</InfoTip>}
+                >
+                  <Input
+                    id="smtp-port"
+                    value={smtp.port}
+                    onChange={(event) => setSmtp({ ...smtp, port: event.target.value })}
+                    inputMode="numeric"
+                    placeholder="587"
+                    className="tabular-nums"
+                  />
+                </Field>
+                <Field label="Username" htmlFor="smtp-user">
+                  <Input
+                    id="smtp-user"
+                    value={smtp.user}
+                    onChange={(event) => setSmtp({ ...smtp, user: event.target.value })}
+                    placeholder="user@example.com"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Password" htmlFor="smtp-pass">
+                  <Input
+                    id="smtp-pass"
+                    value={smtp.pass}
+                    onChange={(event) => setSmtp({ ...smtp, pass: event.target.value })}
+                    type="password"
+                    placeholder={smtpPasswordConfigured
+                      ? "Saved. Leave blank to keep it."
+                      : "SMTP password"}
+                    autoComplete="new-password"
+                  />
+                </Field>
+                <Field
+                  label="From address"
+                  htmlFor="smtp-from"
+                  aside={<InfoTip>For example: Tidetime &lt;noreply@example.com&gt;.</InfoTip>}
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    id="smtp-from"
+                    value={smtp.from}
+                    onChange={(event) => setSmtp({ ...smtp, from: event.target.value })}
+                    placeholder="Tidetime <noreply@example.com>"
+                  />
+                </Field>
+              </div>
+
+              <TestResult provider="smtp" result={testResult} />
+            </div>
+
+            <ConnectionFooter>
+              {activeProvider !== "smtp" ? (
+                <Button variant="secondary" onClick={() => activate("smtp")} loading={pending}>
+                  <Server />
+                  Use SMTP
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                onClick={() => test("smtp")}
+                loading={testing === "smtp"}
+              >
+                Test connection
+              </Button>
+              <Button onClick={saveSmtp} loading={pending}>Save SMTP</Button>
+            </ConnectionFooter>
+          </TabsContent>
+        </Tabs>
+      )}
+    </ConnectionCard>
   );
 }

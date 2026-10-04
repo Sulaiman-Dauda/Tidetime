@@ -3,22 +3,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium leading-none transition-colors",
+  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-medium [&_svg]:size-3",
   {
     variants: {
       variant: {
-        default:
-          "bg-primary/12 text-foreground border border-primary/20",
-        secondary:
-          "bg-secondary text-secondary-foreground border border-border/50",
-        destructive:
-          "bg-destructive/10 text-destructive border border-destructive/20",
-        outline:
-          "border border-border text-foreground",
-        success:
-          "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-500/20",
-        pending:
-          "bg-amber-500/10 text-amber-700 border border-amber-500/20 dark:text-amber-400",
+        default: "bg-accent text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground",
+        outline: "border text-muted-foreground",
+        success: "bg-success-subtle text-success",
+        warning: "bg-warning-subtle text-warning",
+        // Kept as an alias of warning: booking status code reads better with it.
+        pending: "bg-warning-subtle text-warning",
+        info: "bg-info-subtle text-info",
+        destructive: "bg-destructive-subtle text-destructive",
       },
     },
     defaultVariants: { variant: "default" },
@@ -27,10 +24,18 @@ const badgeVariants = cva(
 
 interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {}
-
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+    VariantProps<typeof badgeVariants> {
+  /** Leading status dot in the badge's own colour. */
+  dot?: boolean;
 }
 
-export { Badge };
+function Badge({ className, variant, dot, children, ...props }: BadgeProps) {
+  return (
+    <span className={cn(badgeVariants({ variant }), className)} {...props}>
+      {dot ? <span className="size-1.5 rounded-full bg-current" aria-hidden /> : null}
+      {children}
+    </span>
+  );
+}
+
+export { Badge, badgeVariants };

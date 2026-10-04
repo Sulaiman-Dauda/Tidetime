@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { Menu, ChevronRight } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Sidebar, SidebarContent } from "./sidebar";
-import { UserMenu } from "./user-menu";
+import { SidebarContent } from "./sidebar";
 import { RouteProgress } from "./route-progress";
 
-const BREADCRUMB_LABELS: Record<string, string> = {
+const SECTION_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
   "/dashboard/services": "Services",
   "/dashboard/bookings": "Bookings",
@@ -33,6 +34,22 @@ type User = {
   role: string;
 };
 
+/** The section a path belongs to: its own entry, or the nearest parent's. */
+function sectionFor(pathname: string): { href: string; label: string } | null {
+  const segments = pathname.split("/").filter(Boolean);
+  for (let i = segments.length; i > 0; i--) {
+    const href = "/" + segments.slice(0, i).join("/");
+    if (SECTION_LABELS[href]) return { href, label: SECTION_LABELS[href] };
+  }
+  return null;
+}
+
+/*
+ * Layout: the sidebar sits on the canvas colour and the page content lives in
+ * an inset panel beside it. From md up the panel scrolls on its own, so the
+ * sidebar and header stay put; on phones the window scrolls and the header
+ * sticks.
+ */
 export function DashboardShell({
   user,
   children,
@@ -44,80 +61,55 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  function getBreadcrumb() {
-    if (BREADCRUMB_LABELS[pathname]) return BREADCRUMB_LABELS[pathname];
-    const segments = pathname.split("/").filter(Boolean);
-    for (let i = segments.length; i > 0; i--) {
-      const prefix = "/" + segments.slice(0, i).join("/");
-      if (BREADCRUMB_LABELS[prefix]) return BREADCRUMB_LABELS[prefix];
-    }
-    return null;
-  }
-
-  const breadcrumb = getBreadcrumb();
+  const section = sectionFor(pathname);
+  const nested = section !== null && section.href !== pathname;
 
   return (
     <TooltipProvider delayDuration={300}>
       <RouteProgress />
-      <div className="flex min-h-screen bg-background">
-        {/* Desktop Sidebar */}
-        <Sidebar user={user} />
+      <div className="flex min-h-dvh bg-canvas md:h-dvh md:overflow-hidden">
+        <aside className="hidden w-60 shrink-0 flex-col md:flex">
+          <SidebarContent user={user} />
+        </aside>
 
-        {/* Main area. The mobile header lives inside this column — as a sibling
-            of the sidebar it would be laid out as a second row-flex column and
-            push the content off-screen on phones. */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Mobile header */}
-          <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 backdrop-blur-sm md:hidden">
-            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9">
-                  <Menu className="h-[18px] w-[18px]" />
-                  <span className="sr-only">Open navigation</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[260px] p-0">
-                <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
-              </SheetContent>
-            </Sheet>
-            {breadcrumb ? (
-              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em]">
-                {breadcrumb}
-              </span>
-            ) : (
-              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-[-0.01em]">
-                Tidetime
-              </span>
-            )}
-            <span key="copy-mobile" className="min-w-0 shrink">
-              {copyLinkEl}
-            </span>
-          </div>
+        <div className="flex min-w-0 flex-1 flex-col md:p-2 md:pl-0">
+          <div className="flex min-h-0 flex-1 flex-col bg-background md:overflow-hidden md:rounded-xl md:border md:shadow-xs">
+            <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur md:px-6">
+              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" className="md:hidden">
+                    <PanelLeft />
+                    <span className="sr-only">Open navigation</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 bg-canvas p-0">
+                  <SheetTitle className="sr-only">Navigation</SheetTitle>
+                  <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
+                </SheetContent>
+              </Sheet>
 
-          {/* Desktop top bar */}
-          <header className="sticky top-0 z-20 hidden h-14 items-center gap-4 border-b border-border/60 bg-background/90 px-8 backdrop-blur-sm md:flex">
-            {breadcrumb ? (
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="text-muted-foreground">Dashboard</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
-                <span className="font-medium text-foreground">{breadcrumb}</span>
+              <div className="min-w-0 flex-1 truncate text-sm font-medium">
+                {section && nested ? (
+                  <Link
+                    href={section.href as Route}
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {section.label}
+                  </Link>
+                ) : (
+                  <span className="text-foreground">{section?.label ?? "Tidetime"}</span>
+                )}
               </div>
-            ) : (
-              <div />
-            )}
-            <div className="flex-1" />
-            <span key="copy-desktop">{copyLinkEl}</span>
-            <UserMenu user={user} />
-          </header>
 
-          {/* Content */}
-          <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
-            <div className="max-w-7xl mx-auto">
-              {children}
-            </div>
-          </main>
+              <div className="min-w-0 shrink">{copyLinkEl}</div>
+            </header>
+
+            <main className="min-h-0 flex-1 md:overflow-y-auto">
+              <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 md:px-8 md:py-8">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
       </div>
     </TooltipProvider>

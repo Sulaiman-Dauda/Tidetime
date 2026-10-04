@@ -226,9 +226,9 @@ export async function loginAction(_prev: LoginResult, formData: FormData): Promi
   }
 
   await createSession(user.id);
-  // Return success (instead of a server redirect) so the client can play the
-  // brief sign-in animation before navigating to the dashboard. The session
-  // cookie is already set, so the subsequent client navigation is authenticated.
+  // Return success instead of a server redirect: the form keeps its button in
+  // the busy state while the client navigates to the dashboard. The session
+  // cookie is already set, so that navigation is authenticated.
   return { ok: true };
 }
 

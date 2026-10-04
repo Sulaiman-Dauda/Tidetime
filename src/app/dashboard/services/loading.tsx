@@ -1,11 +1,12 @@
 import { PageHeaderSkeleton, CardListSkeleton } from "@/components/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="animate-fade-in space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <PageHeaderSkeleton />
-        <div className="h-8 w-32 animate-pulse rounded-full bg-muted" />
+        <Skeleton className="h-8 w-28 rounded-lg" />
       </div>
       <CardListSkeleton rows={4} />
     </div>

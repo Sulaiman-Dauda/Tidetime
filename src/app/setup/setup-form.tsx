@@ -3,17 +3,20 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { setupAction, type SetupResult } from "./actions";
+import { AuthCard, FieldError, FormAlert } from "@/app/(auth)/_components/auth-card";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+
+const STEPS = ["Your account", "Company details"] as const;
 
 function FinishButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="flex-1" disabled={pending}>
-      {pending ? "Setting up…" : "Finish setup"}
+    <Button type="submit" className="flex-1" loading={pending}>
+      Finish setup
     </Button>
   );
 }
@@ -38,7 +41,7 @@ export function SetupForm() {
     }
   }, []);
 
-  // A server-side error always belongs to the account step — surface it there.
+  // A server-side error always belongs to the account step, so surface it there.
   useEffect(() => {
     if (state.fieldErrors?.name || state.fieldErrors?.email || state.fieldErrors?.password || state.fieldErrors?.confirmPassword) {
       setStep(1);
@@ -56,79 +59,95 @@ export function SetupForm() {
   }
 
   const err = (field: string) => clientErrors[field] ?? state.fieldErrors?.[field];
+  const invalid = (field: string) => (err(field) ? true : undefined);
 
   return (
-    <form action={formAction} className="space-y-5">
-      <input type="hidden" name="timeZone" value={tz} />
+    <AuthCard
+      title="Welcome to Tidetime"
+      description={
+        step === 1
+          ? "Create the owner account for this instance."
+          : "Name your company. Next, you'll create your first service."
+      }
+    >
+      <form action={formAction} className="space-y-5">
+        <input type="hidden" name="timeZone" value={tz} />
 
-      <Steps step={step} />
+        <StepIndicator step={step} />
 
-      {state.error && (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
-      )}
+        {state.error ? <FormAlert>{state.error}</FormAlert> : null}
 
-      {/* Step 1 — account. Hidden (not unmounted) on step 2 so values still submit. */}
-      <div className={cn("space-y-4", step === 2 && "hidden")}>
-        <div className="space-y-2">
-          <Label htmlFor="name">Your name</Label>
-          <Input id="name" name="name" autoComplete="name" placeholder="Jane Rivers" value={name} onChange={(e) => setName(e.target.value)} />
-          {err("name") && <FieldError msg={err("name")!} />}
+        {/* Step 1, the account. Hidden (not unmounted) on step 2 so its values still submit. */}
+        <div className={cn("space-y-4", step === 2 && "hidden")}>
+          <Field label="Your name" htmlFor="name">
+            <Input id="name" name="name" autoComplete="name" placeholder="Jane Rivers" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={invalid("name")} />
+            <FieldError>{err("name")}</FieldError>
+          </Field>
+          <Field label="Email" htmlFor="email">
+            <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={invalid("email")} />
+            <FieldError>{err("email")}</FieldError>
+          </Field>
+          <Field label="Password" htmlFor="password">
+            <Input id="password" name="password" type="password" autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={invalid("password")} />
+            <FieldError>{err("password")}</FieldError>
+          </Field>
+          <Field label="Confirm password" htmlFor="confirmPassword">
+            <Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" placeholder="Re-enter your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} aria-invalid={invalid("confirmPassword")} />
+            <FieldError>{err("confirmPassword")}</FieldError>
+          </Field>
+          <div className="pt-1">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => {
+                if (validateAccount()) setStep(2);
+              }}
+            >
+              Continue <ArrowRight />
+            </Button>
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-          {err("email") && <FieldError msg={err("email")!} />}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
-          {err("password") && <FieldError msg={err("password")!} />}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm password</Label>
-          <Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" placeholder="Re-enter your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-          {err("confirmPassword") && <FieldError msg={err("confirmPassword")!} />}
-        </div>
-        <Button
-          type="button"
-          className="w-full"
-          onClick={() => {
-            if (validateAccount()) setStep(2);
-          }}
-        >
-          Continue <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
 
-      {/* Step 2 — company details. */}
-      <div className={cn("space-y-4", step === 1 && "hidden")}>
-        <div className="space-y-2">
-          <Label htmlFor="instanceName">Company name</Label>
-          <Input id="instanceName" name="instanceName" placeholder="Acme Scheduling" />
-          <p className="text-xs text-muted-foreground">Displayed across the public booking pages.</p>
-          {state.fieldErrors?.instanceName && <FieldError msg={state.fieldErrors.instanceName} />}
+        {/* Step 2, company details. */}
+        <div className={cn("space-y-4", step === 1 && "hidden")}>
+          <Field label="Company name" htmlFor="instanceName" hint="Shown on your public booking pages.">
+            <Input id="instanceName" name="instanceName" placeholder="Acme Scheduling" aria-invalid={state.fieldErrors?.instanceName ? true : undefined} />
+            <FieldError>{state.fieldErrors?.instanceName}</FieldError>
+          </Field>
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={() => setStep(1)}>
+              <ArrowLeft /> Back
+            </Button>
+            <FinishButton />
+          </div>
         </div>
-        <div className="flex gap-2 pt-1">
-          <Button type="button" variant="outline" onClick={() => setStep(1)}>
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <FinishButton />
-        </div>
-      </div>
-    </form>
+      </form>
+    </AuthCard>
   );
 }
 
-function Steps({ step }: { step: 1 | 2 }) {
+function StepIndicator({ step }: { step: 1 | 2 }) {
   return (
-    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-      <span className={cn(step === 1 && "text-foreground")}>1. Your account</span>
-      <span className="h-px w-6 bg-border" />
-      <span className={cn(step === 2 && "text-foreground")}>2. Company details</span>
-    </div>
+    <ol className="grid grid-cols-2 gap-2" aria-label={`Step ${step} of ${STEPS.length}`}>
+      {STEPS.map((label, i) => {
+        const n = i + 1;
+        return (
+          <li key={label} className="space-y-2" aria-current={n === step ? "step" : undefined}>
+            <span
+              className={cn("block h-1 rounded-sm", n <= step ? "bg-primary" : "bg-border")}
+              aria-hidden
+            />
+            <span
+              className={cn(
+                "block text-meta",
+                n === step ? "font-medium text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {n}. {label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
-}
-
-function FieldError({ msg }: { msg: string }) {
-  return <p className="text-xs text-destructive">{msg}</p>;
 }

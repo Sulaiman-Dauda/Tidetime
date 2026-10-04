@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Camera, Loader2, Trash2 } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -86,41 +86,35 @@ export function AvatarUpload({
   return (
     <div className="flex items-center gap-4">
       <div className="relative">
-        <Avatar className="h-16 w-16 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
+        <Avatar className="size-16">
           {preview && <AvatarImage src={preview} alt="" />}
-          <AvatarFallback className="text-lg font-semibold bg-primary/15 text-primary">
-            {initials(name)}
-          </AvatarFallback>
+          <AvatarFallback className="text-lg">{initials(name)}</AvatarFallback>
         </Avatar>
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center rounded-full bg-background/60">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => fileRef.current?.click()}
-          disabled={pending}
-        >
-          <Camera className="h-3.5 w-3.5" />
-          {preview ? "Change" : "Upload"}
-        </Button>
-        {preview && (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={remove}
+            variant="outline"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
             disabled={pending}
           >
-            <Trash2 className="h-4 w-4" />
+            <Camera />
+            {preview ? "Change photo" : "Upload photo"}
           </Button>
-        )}
+          {preview && (
+            <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={pending}>
+              Remove
+            </Button>
+          )}
+        </div>
+        <p className="text-meta text-muted-foreground">JPG, PNG, GIF or WebP, up to 1 MB.</p>
         <input
           ref={fileRef}
           type="file"

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Field } from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -24,7 +25,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Calendar, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Calendar } from "lucide-react";
+import { ConnectionBody, ConnectionCard, ConnectionFooter, ConnectionNotice } from "./connection-card";
 
 interface GoogleCalendarView {
   id: string;
@@ -51,7 +53,7 @@ export function GoogleCalendarSettings() {
 
   useEffect(() => {
     loadStatus();
-    // Surface the OAuth outcome the callback redirect put in the URL — a
+    // Surface the OAuth outcome the callback redirect put in the URL: a
     // failed connect must never be silent.
     const params = new URLSearchParams(window.location.search);
     const googleError = params.get("google_error") ?? params.get("app_error");
@@ -160,142 +162,111 @@ export function GoogleCalendarSettings() {
     });
   }
 
-  if (loading) {
-    return (
-      <Card className="p-6">
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Checking Google Calendar status...</p>
-        </div>
-      </Card>
-    );
-  }
+  const status = loading ? (
+    <Skeleton className="h-5 w-24 rounded-full" />
+  ) : connected ? (
+    <Badge variant="success" dot>Connected</Badge>
+  ) : expired ? (
+    <Badge variant="warning" dot>Expired</Badge>
+  ) : (
+    <Badge variant="outline">Not connected</Badge>
+  );
 
   return (
-    <Card className="p-6">
-      <div className="flex items-center gap-2 mb-1">
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-base font-semibold">Google Calendar</h2>
-        {connected && (
-          <Badge variant="success" className="ml-2">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Connected
-          </Badge>
-        )}
-      </div>
-      <p className="text-sm text-muted-foreground mb-5">
-        Sync your availability with Google Calendar. Tidetime reads your busy time to prevent
-        double-bookings and can create calendar events for new appointments.
-      </p>
-
-      {!connected ? (
-        <div className="space-y-4">
+    <ConnectionCard
+      icon={Calendar}
+      title="Google Calendar"
+      description="Busy times on your Google Calendar block your public availability, and new bookings are added as events."
+      status={status}
+    >
+      {loading ? (
+        <ConnectionBody>
+          <Skeleton className="h-4 w-2/3" />
+        </ConnectionBody>
+      ) : !connected ? (
+        <>
           {expired ? (
-            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="font-medium">Your Google connection expired</p>
-                <p className="mt-0.5">
-                  Busy-time conflict checking and calendar events have stopped. Reconnect to
-                  resume syncing.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border/60 bg-secondary/30 p-4 text-sm text-muted-foreground">
-              <p>Connect your Google account to:</p>
-              <ul className="mt-2 list-disc list-inside space-y-1">
-                <li>Automatically block times you&apos;re busy on your Google Calendar</li>
-                <li>Have new bookings created as Google Calendar events</li>
-                <li>Keep your schedule in sync without manual copying</li>
-              </ul>
-            </div>
-          )}
-          <Button onClick={connect} disabled={connecting}>
-            {connecting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Redirecting...
-              </>
-            ) : expired ? (
-              "Reconnect Google Calendar"
-            ) : (
-              "Connect Google Calendar"
-            )}
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
-            <p className="font-medium">Google Calendar is connected</p>
-            <p className="mt-1 text-emerald-700 dark:text-emerald-400">
-              Your busy time is synced and new bookings will appear on your calendar.
-            </p>
-          </div>
-
-          {calendars.length > 0 && (
-            <>
-              <div>
-                <h3 className="mb-3 text-sm font-semibold">Select calendars to check for conflicts</h3>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Tidetime will read busy time from selected calendars. Uncheck any you want to ignore.
-                </p>
-                <div className="max-h-60 space-y-2 overflow-y-auto">
-                  {calendars.map((cal) => (
-                    <label
-                      key={cal.id}
-                      className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 p-3 text-sm hover:bg-secondary/30"
-                    >
-                      <div>
-                        <span className="font-medium">{cal.summary}</span>
-                        {cal.primary && (
-                          <Badge variant="secondary" className="ml-2 text-[10px]">
-                            Primary
-                          </Badge>
-                        )}
-                      </div>
-                      <Switch
-                        checked={selected.includes(cal.id)}
-                        onCheckedChange={(c) => toggleCalendar(cal.id, c)}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-3 text-sm font-semibold">Where new bookings should be created</h3>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Choose the Google Calendar that receives new booking events. Leave it on the primary calendar if you do not need a custom destination.
-                </p>
-                <Select
-                  value={destinationCalendarId ?? "primary"}
-                  onValueChange={saveDestination}
-                >
-                  <SelectTrigger className="max-w-md">
-                    <SelectValue placeholder="Primary calendar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="primary">Primary calendar</SelectItem>
-                    {calendars.map((cal) => (
-                      <SelectItem key={cal.id} value={cal.id}>
-                        {cal.summary}
-                        {cal.primary ? " (Primary)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
-
-          <div className="flex items-center gap-2 border-t border-border/60 pt-2">
-            <Button variant="outline" size="sm" onClick={loadStatus}>
-              Refresh
+            <ConnectionBody>
+              <ConnectionNotice tone="warning" title="Your Google connection expired">
+                Busy-time conflict checking and calendar events have stopped. Reconnect to resume
+                syncing.
+              </ConnectionNotice>
+            </ConnectionBody>
+          ) : null}
+          <ConnectionFooter>
+            <Button onClick={connect} loading={connecting}>
+              {connecting
+                ? "Redirecting…"
+                : expired
+                  ? "Reconnect Google Calendar"
+                  : "Connect Google Calendar"}
             </Button>
+          </ConnectionFooter>
+        </>
+      ) : (
+        <>
+          <ConnectionBody>
+            {calendars.length > 0 ? (
+              <>
+                <div className="space-y-3">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-medium text-foreground">Check these calendars for conflicts</h3>
+                    <p className="text-meta text-muted-foreground">
+                      Tidetime reads busy time from the calendars switched on here.
+                    </p>
+                  </div>
+                  <div className="max-h-60 divide-y overflow-y-auto rounded-lg border">
+                    {calendars.map((cal) => (
+                      <label
+                        key={cal.id}
+                        className="flex cursor-pointer items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:bg-muted/50"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm text-foreground">{cal.summary}</span>
+                          {cal.primary ? <Badge variant="secondary">Primary</Badge> : null}
+                        </span>
+                        <Switch
+                          checked={selected.includes(cal.id)}
+                          onCheckedChange={(c) => toggleCalendar(cal.id, c)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <Field
+                  label="Add new bookings to"
+                  hint="The calendar that receives new booking events. Leave it on the primary calendar unless you need another."
+                >
+                  <Select
+                    value={destinationCalendarId ?? "primary"}
+                    onValueChange={saveDestination}
+                  >
+                    <SelectTrigger aria-label="Add new bookings to">
+                      <SelectValue placeholder="Primary calendar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="primary">Primary calendar</SelectItem>
+                      {calendars.map((cal) => (
+                        <SelectItem key={cal.id} value={cal.id}>
+                          {cal.summary}
+                          {cal.primary ? " (Primary)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your busy time is synced and new bookings will appear on your calendar.
+              </p>
+            )}
+          </ConnectionBody>
+          <ConnectionFooter>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                <Button variant="ghost" className="mr-auto text-destructive hover:bg-destructive-subtle hover:text-destructive">
                   Disconnect
                 </Button>
               </AlertDialogTrigger>
@@ -311,17 +282,20 @@ export function GoogleCalendarSettings() {
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={disconnect}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+                    className={buttonVariants({ variant: "destructive" })}
                   >
                     Disconnect
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            {saving ? <span className="text-xs text-muted-foreground">Saving…</span> : null}
-          </div>
-        </div>
+            {saving ? <span className="text-meta text-muted-foreground">Saving…</span> : null}
+            <Button variant="outline" onClick={loadStatus}>
+              Refresh
+            </Button>
+          </ConnectionFooter>
+        </>
       )}
-    </Card>
+    </ConnectionCard>
   );
 }

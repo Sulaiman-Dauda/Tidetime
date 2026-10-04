@@ -5,30 +5,28 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium outline-none transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:ring-4 focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm active:scale-[0.98]",
+        default: "bg-primary text-primary-foreground shadow-button hover:bg-primary/90",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm active:scale-[0.98]",
+          "bg-destructive text-destructive-foreground shadow-button hover:bg-destructive/90 focus-visible:ring-destructive/25",
         outline:
-          "border border-input bg-card text-foreground hover:bg-secondary hover:border-border/70 active:scale-[0.98]",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98]",
-        ghost:
-          "text-muted-foreground hover:bg-secondary hover:text-foreground",
-        link:
-          "text-primary underline-offset-4 hover:underline",
+          "border border-input bg-background text-foreground shadow-xs hover:bg-secondary",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/70",
+        ghost: "text-muted-foreground hover:bg-secondary hover:text-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-5 py-2",
-        sm: "h-8 rounded-full px-4 text-xs",
-        lg: "h-10 rounded-full px-7 text-sm",
-        icon: "h-9 w-9",
+        default: "h-9 px-3.5",
+        sm: "h-8 gap-1.5 px-3 text-meta",
+        lg: "h-10 px-5",
+        icon: "size-9",
+        "icon-sm": "size-8",
       },
     },
+    compoundVariants: [{ variant: "link", className: "h-auto px-0" }],
     defaultVariants: { variant: "default", size: "default" },
   },
 );
@@ -52,7 +50,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="animate-spin" />
             {children}
           </>
         ) : (

@@ -40,7 +40,7 @@ async function loadEvents(
   const rangeEnd = zonedTimeToUtc(year, month + 2, 7, 0, 0, timeZone);
 
   // Team-wide viewers are scoped by the members' bookings, not the service's
-  // team — a booking whose service was deleted must not vanish.
+  // team, so a booking whose service was deleted does not vanish.
   const teamWide = can(role, "booking.all.view");
   const memberRows = teamWide
     ? await db
@@ -57,8 +57,8 @@ async function loadEvents(
     .leftJoin(users, eq(users.id, bookings.userId))
     .where(
       and(
-        // Members' bookings OR this team's services — robust to both deleted
-        // services and removed members.
+        // Members' bookings OR this team's services, so neither a deleted
+        // service nor a removed member hides a booking.
         teamWide
           ? or(inArray(bookings.userId, scopeIds), eq(services.teamId, teamId))
           : inArray(bookings.userId, scopeIds),

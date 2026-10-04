@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { CalendarClock, CalendarX2, Check, MoreHorizontal, X } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,15 +17,35 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { cancelByHostAction, decideBookingAction } from "../actions";
-import { Check, X } from "lucide-react";
 
-export function AcceptButton({ uid }: { uid: string }) {
+type DecisionVariant = "default" | "outline" | "ghost";
+
+function DecisionButton({
+  uid,
+  decision,
+  variant,
+  className,
+}: {
+  uid: string;
+  decision: "accepted" | "rejected";
+  variant: DecisionVariant;
+  className?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
   return (
     <form
+      className={className}
       action={async (formData) => {
         start(async () => {
           await decideBookingAction(formData);
@@ -31,83 +54,150 @@ export function AcceptButton({ uid }: { uid: string }) {
       }}
     >
       <input type="hidden" name="uid" value={uid} />
-      <input type="hidden" name="decision" value="accepted" />
-      <Button type="submit" size="sm" loading={pending}>
-        <Check className="h-3.5 w-3.5" />
-        Accept
+      <input type="hidden" name="decision" value={decision} />
+      <Button type="submit" variant={variant} size="sm" loading={pending} className="w-full">
+        {decision === "accepted" ? <Check /> : <X />}
+        {decision === "accepted" ? "Accept" : "Decline"}
       </Button>
     </form>
   );
 }
 
-export function DeclineButton({ uid }: { uid: string }) {
+export function AcceptButton({
+  uid,
+  variant = "default",
+  className,
+}: {
+  uid: string;
+  variant?: DecisionVariant;
+  className?: string;
+}) {
+  return <DecisionButton uid={uid} decision="accepted" variant={variant} className={className} />;
+}
+
+export function DeclineButton({
+  uid,
+  variant = "outline",
+  className,
+}: {
+  uid: string;
+  variant?: DecisionVariant;
+  className?: string;
+}) {
+  return <DecisionButton uid={uid} decision="rejected" variant={variant} className={className} />;
+}
+
+/** The confirm step for cancelling, shared by the booking page button and the row menu. */
+function CancelBookingDialogContent({ uid, onDone }: { uid: string; onDone: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
   return (
-    <form
-      action={async (formData) => {
-        start(async () => {
-          await decideBookingAction(formData);
-          router.refresh();
-        });
-      }}
-    >
-      <input type="hidden" name="uid" value={uid} />
-      <input type="hidden" name="decision" value="rejected" />
-      <Button type="submit" variant="outline" size="sm" loading={pending}>
-        <X className="h-3.5 w-3.5" />
-        Decline
-      </Button>
-    </form>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+        <AlertDialogDescription>
+          The attendee will be notified and this time slot will become available again.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Keep booking</AlertDialogCancel>
+        <form
+          action={async (formData) => {
+            start(async () => {
+              await cancelByHostAction(formData);
+              onDone();
+              router.refresh();
+            });
+          }}
+        >
+          <input type="hidden" name="uid" value={uid} />
+          <AlertDialogAction
+            type="submit"
+            className={buttonVariants({ variant: "destructive" })}
+            disabled={pending}
+          >
+            {pending ? "Cancelling…" : "Cancel booking"}
+          </AlertDialogAction>
+        </form>
+      </AlertDialogFooter>
+    </AlertDialogContent>
   );
 }
 
-export function CancelBookingButton({ uid }: { uid: string }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+export function CancelBookingButton({ uid, className }: { uid: string; className?: string }) {
   const [open, setOpen] = useState(false);
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="text-muted-foreground hover:text-destructive"
+          className={cn("text-destructive hover:text-destructive", className)}
         >
-          Cancel
+          <CalendarX2 />
+          Cancel booking
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
-          <AlertDialogDescription>
-            The attendee will be notified and this time slot will become available again.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <form
-            action={async (formData) => {
-              start(async () => {
-                await cancelByHostAction(formData);
-                setOpen(false);
-                router.refresh();
-              });
-            }}
-          >
-            <input type="hidden" name="uid" value={uid} />
-            <AlertDialogAction
-              type="submit"
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
-              disabled={pending}
-            >
-              {pending ? "Cancelling…" : "Cancel booking"}
-            </AlertDialogAction>
-          </form>
-        </AlertDialogFooter>
-      </AlertDialogContent>
+      <CancelBookingDialogContent uid={uid} onDone={() => setOpen(false)} />
     </AlertDialog>
+  );
+}
+
+/**
+ * Overflow menu for an upcoming booking row. The confirm dialog is a sibling of
+ * the menu, not a child: a Radix menu unmounts its items on close, which would
+ * take a nested dialog with it.
+ */
+export function BookingRowMenu({
+  uid,
+  title,
+  rescheduleHref,
+}: {
+  uid: string;
+  title: string;
+  rescheduleHref: string | null;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Actions for ${title}`}
+          >
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {rescheduleHref ? (
+            <>
+              <DropdownMenuItem asChild>
+                <Link href={rescheduleHref as Route}>
+                  <CalendarClock />
+                  Reschedule
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <DropdownMenuItem
+            className="text-destructive focus:bg-destructive-subtle focus:text-destructive [&_svg]:text-destructive"
+            onSelect={() => setConfirmOpen(true)}
+          >
+            <CalendarX2 />
+            Cancel booking
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <CancelBookingDialogContent uid={uid} onDone={() => setConfirmOpen(false)} />
+      </AlertDialog>
+    </>
   );
 }

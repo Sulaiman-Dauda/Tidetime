@@ -33,5 +33,9 @@ test.describe("company booking flow", () => {
     await expect(page.getByText("Intro Call")).toBeVisible();
     // Stored in E.164 and shown grouped, from a number typed without +44.
     await expect(page.getByText("+44 7700 900123").first()).toBeVisible();
+    // The phone question's answer is also the attendee's number: shown once.
+    await expect(page.getByText("+44 7700 900123")).toHaveCount(1);
+    // The root layout appends the app name; the page must not add its own.
+    await expect(page).toHaveTitle(/^Your booking · [^·]+$/);
   });
 });

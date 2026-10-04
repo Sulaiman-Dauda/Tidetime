@@ -5,14 +5,17 @@ import { services, serviceProviders, memberships, teams, users } from "@/db/sche
 import { getAppUrl } from "@/server/app-url";
 import { ServiceEditor } from "./editor";
 import { can } from "@/lib/rbac";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, initials } from "@/lib/format";
 import { locationLabel } from "@/lib/locations";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, ExternalLink, MapPin, Users as UsersIcon } from "lucide-react";
-import Link from "next/link";
+import { Clock, ExternalLink, MapPin, type LucideIcon } from "lucide-react";
 import { requireAnyPermission } from "@/lib/guard";
+import { PageHeader } from "../../_components/page-header";
+
+type Provider = { id: number; name: string | null; email: string; avatarUrl: string | null };
 
 export default async function ServicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,7 +42,7 @@ export default async function ServicePage({ params }: { params: Promise<{ id: st
   if (!canManage && !can(role, "service.assigned.view")) notFound();
 
   const [providers, selected] = await Promise.all([
-    db.select({ id: users.id, name: users.name, email: users.email })
+    db.select({ id: users.id, name: users.name, email: users.email, avatarUrl: users.avatarUrl })
       .from(memberships).innerJoin(users, eq(users.id, memberships.userId))
       .where(and(eq(memberships.teamId, teamId), eq(memberships.accepted, true)))
       .orderBy(asc(users.name)),
@@ -81,72 +84,91 @@ function AssignedServiceView({
 }: {
   service: typeof services.$inferSelect;
   publicUrl: string;
-  providers: { id: number; name: string | null; email: string }[];
+  providers: Provider[];
 }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button asChild variant="ghost" size="icon">
-          <Link href="/dashboard/services">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold">{service.title}</h1>
-            <Badge variant="secondary">Assigned</Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Read-only service details. An owner or manager controls configuration and assignments.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4" />
-            Booking page
-          </a>
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/dashboard/services", label: "My services" }}
+        title={service.title}
+        meta={<Badge variant="secondary">Assigned</Badge>}
+        description="Read-only service details. An owner or manager controls configuration and assignments."
+        action={
+          <Button asChild variant="outline">
+            <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink />
+              Booking page
+            </a>
+          </Button>
+        }
+      />
 
-      <Card className="space-y-5 p-6">
-        <div>
-          <h2 className="text-sm font-semibold">Service details</h2>
-          {service.description ? (
-            <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
-              {service.description}
-            </p>
-          ) : null}
-        </div>
-        <dl className="grid gap-4 text-sm sm:grid-cols-2">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <dt className="text-xs text-muted-foreground">Duration</dt>
-              <dd>{formatDuration(service.length)}</dd>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <dt className="text-xs text-muted-foreground">Location</dt>
-              <dd>{service.locations[0] ? locationLabel(service.locations[0]) : "Not configured"}</dd>
-            </div>
-          </div>
-        </dl>
-        <div className="border-t border-border/60 pt-5">
-          <div className="flex items-center gap-2">
-            <UsersIcon className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Assigned teammates</h2>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {providers.map((provider) => (
-              <Badge key={provider.id} variant="outline">
-                {provider.name ?? provider.email}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Service details</CardTitle>
+            {service.description ? (
+              <CardDescription className="whitespace-pre-wrap leading-6">
+                {service.description}
+              </CardDescription>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 border-t pt-5 sm:grid-cols-2">
+              <Detail icon={Clock} label="Duration">
+                <span className="tabular-nums">{formatDuration(service.length)}</span>
+              </Detail>
+              <Detail icon={MapPin} label="Location">
+                {service.locations[0] ? locationLabel(service.locations[0]) : "Not configured"}
+              </Detail>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="self-start">
+          <CardHeader>
+            <CardTitle>Assigned teammates</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {providers.map((provider) => (
+                <li key={provider.id} className="flex min-w-0 items-center gap-3">
+                  <Avatar className="size-8">
+                    {provider.avatarUrl ? <AvatarImage src={provider.avatarUrl} alt="" /> : null}
+                    <AvatarFallback>{initials(provider.name ?? provider.email)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{provider.name ?? provider.email}</p>
+                    {provider.name ? (
+                      <p className="truncate text-meta text-muted-foreground">{provider.email}</p>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Detail({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <dt className="text-meta text-muted-foreground">{label}</dt>
+        <dd className="text-sm text-foreground">{children}</dd>
+      </div>
     </div>
   );
 }

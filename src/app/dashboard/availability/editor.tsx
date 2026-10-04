@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Plus, Star, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SegmentedLinks } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
@@ -17,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { DeleteScheduleButton } from "./delete-schedule-button";
 import { weekdayLabel } from "@/lib/format";
@@ -32,13 +36,13 @@ export type Interval = { start: string; end: string };
 export type WeeklyRule = { day: number; intervals: Interval[] };
 export type DateOverride = { date: string; intervals: Interval[] };
 
-/** "+ New" pill at the end of the schedule switcher. */
-function NewScheduleInlineButton({ targetUserId }: { targetUserId?: number }) {
+/** Sits at the end of the schedule switcher and opens the new schedule. */
+function NewScheduleButton({ targetUserId }: { targetUserId?: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       disabled={pending}
       onClick={() =>
         start(async () => {
@@ -53,10 +57,9 @@ function NewScheduleInlineButton({ targetUserId }: { targetUserId?: number }) {
           }
         })
       }
-      className="rounded-full border border-dashed border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50"
     >
-      + New
-    </button>
+      <Plus /> New schedule
+    </Button>
   );
 }
 
@@ -185,9 +188,32 @@ export function AvailabilityEditor({
   }
 
   const active = schedules.find((s) => s.id === schedule.id);
+  const orderedWeek = [...weekly].sort(
+    (a, b) => ((a.day - weekStart + 7) % 7) - ((b.day - weekStart + 7) % 7),
+  );
+
+  function updateOverrideInterval(date: string, idx: number, key: keyof Interval, value: string) {
+    setOverrides((o) =>
+      o.map((x) =>
+        x.date === date
+          ? { ...x, intervals: x.intervals.map((y, j) => (j === idx ? { ...y, [key]: value } : y)) }
+          : x,
+      ),
+    );
+  }
+
+  function toggleOverrideHours(date: string) {
+    setOverrides((o) =>
+      o.map((x) =>
+        x.date === date
+          ? { ...x, intervals: x.intervals.length ? [] : [{ start: "09:00", end: "17:00" }] }
+          : x,
+      ),
+    );
+  }
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Availability"
         description={
@@ -197,154 +223,185 @@ export function AvailabilityEditor({
         }
         action={
           <Button onClick={save} loading={pending}>
-            <Check className="h-4 w-4" /> Save
+            <Check /> Save
           </Button>
         }
       />
 
-      {(members.length > 1 || schedules.length > 0) && (
-        <div className="flex flex-wrap items-center gap-3">
-          {members.length > 1 ? (
-            <Select
-              value={String(targetUserId ?? viewerId ?? "")}
-              onValueChange={(value) => {
-                const id = Number(value);
-                router.push(scheduleHref({ user: id === viewerId ? null : id, schedule: undefined }) as Parameters<typeof router.push>[0]);
-              }}
-            >
-              <SelectTrigger aria-label="Whose availability" className="h-8 w-auto min-w-[10rem] gap-2 rounded-lg text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((member) => (
-                  <SelectItem key={member.id} value={String(member.id)}>
-                    {member.id === viewerId ? `${member.name} (you)` : member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            {schedules.map((s) => (
-              <Link
-                key={s.id}
-                href={scheduleHref({ schedule: s.id }) as never}
-                className={
-                  s.id === schedule.id
-                    ? "rounded-full border border-primary bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow-sm"
-                    : "rounded-full border border-border bg-card px-3 py-1 text-xs font-medium transition-colors hover:border-primary/40 hover:text-primary"
-                }
-              >
+      <div className="flex flex-wrap items-center gap-2">
+        {members.length > 1 ? (
+          <Select
+            value={String(targetUserId ?? viewerId ?? "")}
+            onValueChange={(value) => {
+              const id = Number(value);
+              router.push(scheduleHref({ user: id === viewerId ? null : id, schedule: undefined }) as Parameters<typeof router.push>[0]);
+            }}
+          >
+            <SelectTrigger aria-label="Whose availability" className="w-auto min-w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((member) => (
+                <SelectItem key={member.id} value={String(member.id)}>
+                  {member.id === viewerId ? `${member.name} (you)` : member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        <SegmentedLinks
+          aria-label="Schedules"
+          items={schedules.map((s) => ({
+            href: scheduleHref({ schedule: s.id }),
+            active: s.id === schedule.id,
+            label: (
+              <>
                 {s.name}
-                {s.isDefault ? " ★" : ""}
-              </Link>
-            ))}
-            <NewScheduleInlineButton targetUserId={targetUserId} />
-          </div>
-        </div>
-      )}
+                {s.isDefault ? <span className="text-meta font-normal text-muted-foreground">Default</span> : null}
+              </>
+            ),
+          }))}
+        />
+        <NewScheduleButton targetUserId={targetUserId} />
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="rounded-2xl border border-border/60 bg-card p-5">
-          <h3 className="mb-4 text-sm font-semibold">Weekly hours</h3>
-          <div className="space-y-1">
-            {[...weekly].sort((a, b) => ((a.day - weekStart + 7) % 7) - ((b.day - weekStart + 7) % 7)).map((rule) => {
+      <div>
+        <FormSection
+          title="Weekly hours"
+          description={
+            <>
+              Times are in {timeZone.replace(/_/g, " ")}. Each{" "}
+              <Link href="/dashboard/services" className="font-medium text-foreground underline-offset-4 hover:underline">
+                service
+              </Link>{" "}
+              adds its own buffers, notice and slot spacing inside these hours.
+            </>
+          }
+          contentClassName="gap-0 p-0"
+        >
+          <div className="divide-y">
+            {orderedWeek.map((rule) => {
               const enabled = rule.intervals.length > 0;
+              const dayName = weekdayLabel(rule.day);
               return (
-                <div key={rule.day} className="flex flex-col gap-3 border-b py-3 last:border-0 sm:flex-row sm:items-start sm:gap-4">
-                  <div className="flex w-32 shrink-0 items-center gap-2 pt-1.5">
-                    <Switch checked={enabled} onCheckedChange={(c) => toggleDay(rule.day, c)} />
-                    <span className="text-sm font-medium">{weekdayLabel(rule.day).slice(0, 3)}</span>
+                <div key={rule.day} className={ROW_CLASS}>
+                  <div className="flex h-9 items-center gap-3">
+                    <Switch id={`day-${rule.day}`} checked={enabled} onCheckedChange={(c) => toggleDay(rule.day, c)} />
+                    <Label htmlFor={`day-${rule.day}`}>{dayName}</Label>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    {!enabled ? (
-                      <span className="inline-block pt-1.5 text-sm text-muted-foreground">Unavailable</span>
-                    ) : (
-                      rule.intervals.map((iv, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <Input
-                            type="time"
-                            value={iv.start}
-                            className="w-28 min-w-0 flex-1 sm:flex-none"
-                            onChange={(e) => updateInterval(rule.day, i, "start", e.target.value)}
-                          />
-                          <span className="text-muted-foreground">–</span>
-                          <Input
-                            type="time"
-                            value={iv.end}
-                            className="w-28 min-w-0 flex-1 sm:flex-none"
-                            onChange={(e) => updateInterval(rule.day, i, "end", e.target.value)}
-                          />
-                          <Tooltip content="Remove">
-                            <Button variant="ghost" size="icon" onClick={() => removeInterval(rule.day, i)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </Tooltip>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  {enabled && (
-                    <div className="flex shrink-0 items-center gap-1 pt-0.5">
+                  {enabled ? (
+                    <div className={INTERVALS_CLASS}>
+                      {rule.intervals.map((iv, i) => (
+                        <TimeRange
+                          key={i}
+                          label={dayName}
+                          interval={iv}
+                          onChange={(key, value) => updateInterval(rule.day, i, key, value)}
+                          action={
+                            <Tooltip content="Remove">
+                              <Button variant="ghost" size="icon-sm" aria-label="Remove hours" onClick={() => removeInterval(rule.day, i)}>
+                                <X />
+                              </Button>
+                            </Tooltip>
+                          }
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="hidden h-9 items-center text-sm text-muted-foreground sm:flex">Unavailable</p>
+                  )}
+                  {enabled ? (
+                    <div className="flex h-9 items-center gap-1 justify-self-end">
                       <Tooltip content="Add interval">
-                        <Button variant="ghost" size="icon" onClick={() => addInterval(rule.day)}>
-                          <Plus className="h-4 w-4" />
+                        <Button variant="ghost" size="icon-sm" aria-label="Add interval" onClick={() => addInterval(rule.day)}>
+                          <Plus />
                         </Button>
                       </Tooltip>
                       <Tooltip content="Copy to all days">
-                        <Button variant="ghost" size="icon" onClick={() => copyToAll(rule.day)}>
-                          <Copy className="h-4 w-4" />
+                        <Button variant="ghost" size="icon-sm" aria-label="Copy to all days" onClick={() => copyToAll(rule.day)}>
+                          <Copy />
                         </Button>
                       </Tooltip>
                     </div>
+                  ) : (
+                    <p className="flex h-9 items-center justify-self-end text-meta text-muted-foreground sm:hidden">Unavailable</p>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
+        </FormSection>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-border/60 bg-card p-5">
-            <h3 className="mb-3 text-sm font-semibold">Schedule</h3>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Timezone</Label>
-                <Select value={timeZone} onValueChange={setTimeZone}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {timezones.map((tz) => (
-                      <SelectItem key={tz} value={tz}>
-                        {tz.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  All hours on this page are wall-clock times in this timezone.
-                </p>
-              </div>
+        <FormSection
+          title="Date overrides"
+          description="Add hours or block specific dates."
+          contentClassName="gap-0 p-0"
+        >
+          <div className="flex flex-wrap items-center gap-2 p-5">
+            <Input
+              type="date"
+              aria-label="Override date"
+              value={newDate}
+              min={new Date().toISOString().slice(0, 10)}
+              className="w-auto flex-1 sm:w-44 sm:flex-none"
+              onChange={(e) => setNewDate(e.target.value)}
+            />
+            <Button variant="outline" onClick={addOverride} disabled={!newDate} aria-label="Add override">
+              <Plus /> Add override
+            </Button>
+          </div>
+          {overrides.length > 0 ? (
+            <div className="divide-y border-t">
+              {overrides.map((ov) => (
+                <div key={ov.date} className={ROW_CLASS}>
+                  <p className="flex h-9 items-center text-sm font-medium tabular-nums">{formatOverrideDate(ov.date)}</p>
+                  {ov.intervals.length === 0 ? (
+                    <p className={cn(INTERVALS_CLASS, "flex h-9 items-center text-sm text-muted-foreground")}>Unavailable</p>
+                  ) : (
+                    <div className={INTERVALS_CLASS}>
+                      {ov.intervals.map((iv, i) => (
+                        <TimeRange
+                          key={i}
+                          label={formatOverrideDate(ov.date)}
+                          interval={iv}
+                          onChange={(key, value) => updateOverrideInterval(ov.date, i, key, value)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex h-9 items-center gap-1 justify-self-end">
+                    <Button variant="ghost" size="sm" onClick={() => toggleOverrideHours(ov.date)}>
+                      {ov.intervals.length ? "Mark unavailable" : "Add hours"}
+                    </Button>
+                    <Tooltip content="Remove override">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Remove override"
+                        onClick={() => setOverrides((o) => o.filter((x) => x.date !== ov.date))}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="mt-3 rounded-lg bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
-              Buffers, minimum notice and slot spacing are configured per service in the{" "}
-              <Link href="/dashboard/services" className="font-medium text-foreground underline-offset-2 hover:underline">
-                service editor
-              </Link>
-              ; these hours are the outer bounds.
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-border/40 pt-3">
+          ) : null}
+        </FormSection>
+
+        <FormSection
+          title="Schedule"
+          description="Name this schedule and choose the timezone its hours are in."
+          footer={
+            <>
+              <div className="mr-auto">
+                <DeleteScheduleButton scheduleId={schedule.id} scheduleName={name} targetUserId={targetUserId} />
+              </div>
               {active && !active.isDefault ? (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="text-muted-foreground"
                   disabled={pending}
                   onClick={() =>
                     start(async () => {
@@ -356,13 +413,12 @@ export function AvailabilityEditor({
                     })
                   }
                 >
-                  <Star className="h-3.5 w-3.5" /> Make default
+                  <Star /> Make default
                 </Button>
               ) : null}
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="text-muted-foreground"
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
@@ -376,98 +432,75 @@ export function AvailabilityEditor({
                   })
                 }
               >
-                <Copy className="h-3.5 w-3.5" /> Duplicate
+                <Copy /> Duplicate
               </Button>
-              <DeleteScheduleButton scheduleId={schedule.id} scheduleName={name} targetUserId={targetUserId} />
-            </div>
+            </>
+          }
+        >
+          <div className="grid items-start gap-5 sm:grid-cols-2">
+            <Field label="Name" htmlFor="schedule-name">
+              <Input id="schedule-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Field label="Timezone" htmlFor="schedule-timezone" hint="All hours on this page are wall-clock times in this timezone.">
+              <Select value={timeZone} onValueChange={setTimeZone}>
+                <SelectTrigger id="schedule-timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {timezones.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
-
-          <div className="rounded-2xl border border-border/60 bg-card p-5">
-            <h3 className="mb-1 text-sm font-semibold">Date overrides</h3>
-            <p className="mb-3 text-sm text-muted-foreground">Add hours or block specific dates.</p>
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={newDate}
-                min={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setNewDate(e.target.value)}
-              />
-              <Button variant="outline" size="icon" onClick={addOverride} aria-label="Add override">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="mt-3 space-y-3">
-              {overrides.map((ov) => (
-                <div key={ov.date} className="rounded-md border border-border bg-secondary/30 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-medium">{formatOverrideDate(ov.date)}</span>
-                  <Tooltip content="Remove override">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setOverrides((o) => o.filter((x) => x.date !== ov.date))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </Tooltip>
-                  </div>
-                  {ov.intervals.length === 0 ? (
-                    <span className="text-sm text-muted-foreground">Unavailable</span>
-                  ) : (
-                    ov.intervals.map((iv, i) => (
-                      <div key={i} className="mb-1.5 flex items-center gap-2">
-                        <Input
-                          type="time"
-                          value={iv.start}
-                          className="w-24 min-w-0 flex-1 sm:flex-none"
-                          onChange={(e) =>
-                            setOverrides((o) =>
-                              o.map((x) =>
-                                x.date === ov.date
-                                  ? { ...x, intervals: x.intervals.map((y, j) => (j === i ? { ...y, start: e.target.value } : y)) }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                        <span className="text-muted-foreground">–</span>
-                        <Input
-                          type="time"
-                          value={iv.end}
-                          className="w-24 min-w-0 flex-1 sm:flex-none"
-                          onChange={(e) =>
-                            setOverrides((o) =>
-                              o.map((x) =>
-                                x.date === ov.date
-                                  ? { ...x, intervals: x.intervals.map((y, j) => (j === i ? { ...y, end: e.target.value } : y)) }
-                                  : x,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                    ))
-                  )}
-                  <button
-                    className="mt-1 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() =>
-                      setOverrides((o) =>
-                        o.map((x) =>
-                          x.date === ov.date
-                            ? { ...x, intervals: x.intervals.length ? [] : [{ start: "09:00", end: "17:00" }] }
-                            : x,
-                        ),
-                      )
-                    }
-                  >
-                    {ov.intervals.length ? "Mark unavailable" : "Add hours"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        </FormSection>
       </div>
+    </div>
+  );
+}
+
+/*
+ * Weekly days and date overrides share one row grid so their columns line up:
+ * label, time ranges, actions. On phones the ranges drop below the label row.
+ */
+const ROW_CLASS =
+  "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 px-5 py-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto]";
+const INTERVALS_CLASS = "order-last col-span-2 space-y-2 sm:order-none sm:col-span-1";
+
+function TimeRange({
+  label,
+  interval,
+  onChange,
+  action,
+}: {
+  label: string;
+  interval: Interval;
+  onChange: (key: keyof Interval, value: string) => void;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="time"
+        aria-label={`${label} start`}
+        value={interval.start}
+        className="min-w-0 flex-1 tabular-nums sm:w-32 sm:flex-none"
+        onChange={(e) => onChange("start", e.target.value)}
+      />
+      <span aria-hidden className="text-muted-foreground">
+        –
+      </span>
+      <Input
+        type="time"
+        aria-label={`${label} end`}
+        value={interval.end}
+        className="min-w-0 flex-1 tabular-nums sm:w-32 sm:flex-none"
+        onChange={(e) => onChange("end", e.target.value)}
+      />
+      {action}
     </div>
   );
 }

@@ -32,7 +32,9 @@ You can keep both configured and choose which one is active. See the [integratio
 
 ## Branding
 
-Under **Settings**, set the company name, logo, and brand color. These appear on the public booking pages and in emails, so customers see your identity rather than the product name.
+Under **Settings**, set the company name, logo, and brand colour. These appear on the public booking, confirmation and legal pages, so customers see your identity rather than the product name.
+
+The brand colour is used for buttons, links, the selected date and time, and focus rings on those pages. On light pages a colour that would be hard to read, such as a pale yellow, is deepened just enough to reach 3:1 contrast, and any other colour is used as entered. Dark mode lightens the colour to at least 62% lightness, and further if it still falls short of 3:1, so it reads on a dark page. The dashboard keeps Tidetime's own colours.
 
 The same page sets the **default phone country**. Phone questions on the booking form show a country picker next to the number box, and this is the country it starts on — so most customers just type their number without a dialling code. They can still change it. Numbers are stored in international format (`+447700900123`) whichever way they were entered.
 

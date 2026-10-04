@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { getCompanySettings } from "@/server/company-settings";
 import { LegalContent } from "../../_components/legal-content";
+import { CompanyBrandHeader } from "../../_components/company-brand-header";
+import { PublicLegal } from "../../_components/public-legal";
 
 type Doc = "terms" | "privacy";
 
@@ -42,18 +44,24 @@ export default async function LegalDocPage({ params }: { params: Promise<{ doc: 
   if (!data) notFound();
 
   return (
-    <main className="min-h-screen bg-grid">
-      <div className="mx-auto max-w-2xl px-4 py-16 sm:py-24">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Link>
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight">{data.title}</h1>
-        <LegalContent content={data.content} />
+    <main className="flex min-h-screen flex-col bg-canvas">
+      <CompanyBrandHeader />
+      <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:py-14">
+        <article className="rounded-2xl bg-card px-5 py-8 text-card-foreground shadow-popover sm:px-12 sm:py-12">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Back
+          </Link>
+          <h1 className="mt-6 border-b pb-6 text-2xl font-semibold tracking-tight">{data.title}</h1>
+          <div className="pt-6">
+            <LegalContent content={data.content} />
+          </div>
+        </article>
       </div>
+      <PublicLegal />
     </main>
   );
 }

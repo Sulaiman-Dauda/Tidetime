@@ -1,37 +1,23 @@
 import { getCompanySettings } from "@/server/company-settings";
-import { normalizeBrandColor } from "@/lib/company-settings";
 
 /**
- * Company-wide branding banner for public pages (single-company model):
- * a thin brand-colour accent bar plus the company logo/name. Driven by the
- * admin's Company Settings → General profile.
+ * The company brand, centred above the content of a public page: the logo
+ * when one is set in Settings, otherwise the company name. Never both, because
+ * a logo nearly always carries the name already.
  *
- * `accentOnly` keeps the accent bar but drops the logo/name row, for pages
- * that already show the company brand in their own layout (the booking page
- * carries it at the top of the service sidebar). Repeating it in both places
- * read as two competing headers.
+ * The brand colour needs no bar of its own here: (public)/layout.tsx already
+ * turns it into the accent every public page uses.
  */
-export async function CompanyBrandHeader({ accentOnly = false }: { accentOnly?: boolean }) {
+export async function CompanyBrandHeader() {
   const { profile } = await getCompanySettings();
-  const brand = normalizeBrandColor(profile.brandColor);
 
   return (
-    <header>
-      <div className="h-1 w-full" style={{ backgroundColor: brand }} aria-hidden />
-      {accentOnly ? null : (
-        <div className="mx-auto flex max-w-2xl items-center gap-2.5 px-4 py-4">
-          {profile.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.logoUrl} alt={profile.name} className="h-7 w-auto object-contain" />
-          ) : (
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: brand }}
-              aria-hidden
-            />
-          )}
-          <span className="text-sm font-semibold tracking-tight">{profile.name}</span>
-        </div>
+    <header className="flex justify-center px-4 pt-8 sm:pt-10">
+      {profile.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={profile.logoUrl} alt={profile.name} className="h-8 w-auto max-w-56 object-contain" />
+      ) : (
+        <span className="text-base font-semibold tracking-tight text-foreground">{profile.name}</span>
       )}
     </header>
   );

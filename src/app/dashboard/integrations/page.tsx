@@ -17,18 +17,18 @@ export default async function IntegrationsPage() {
     : [];
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Connections"
         description={user.isAdmin
-          ? "Connect calendars, email delivery, and Zapier webhooks."
+          ? "Connect calendars, email delivery and Zapier webhooks."
           : "Connect your calendar to prevent conflicts and keep bookings in sync."}
       />
-      <div className={user.isAdmin ? "grid gap-6 lg:grid-cols-2" : "grid max-w-2xl gap-6"}>
+      <div className="grid gap-6 lg:grid-cols-2">
         <GoogleCalendarSettings />
         <MicrosoftCalendarSettings />
-        {user.isAdmin ? <EmailSettings /> : null}
       </div>
+      {user.isAdmin ? <EmailSettings /> : null}
       {user.isAdmin ? <WebhookManager hooks={hooks} /> : null}
     </div>
   );

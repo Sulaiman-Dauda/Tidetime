@@ -2,11 +2,13 @@ import { requireAnyPermission } from "@/lib/guard";
 import { can } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
 import { DashboardOverview, type OverviewData } from "./_components/dashboard-overview";
+import { NewServiceButton } from "./_components/new-service-button";
+import { PageHeader } from "./_components/page-header";
 import { getAppUrl } from "@/server/app-url";
 import { db } from "@/db";
 import { attendees, bookings, memberships, services, teams, users } from "@/db/schema";
 import { and, asc, count, eq, gte, inArray, lt, or } from "drizzle-orm";
-import { getZonedParts, zonedTimeToUtc, addDaysToKey } from "@/lib/time";
+import { getZonedParts, zonedTimeToUtc, addDaysToKey, formatDateKey } from "@/lib/time";
 import { resolveLocale } from "@/lib/format";
 
 export const metadata = { title: "Overview" };
@@ -31,13 +33,13 @@ async function loadOverview(
         .where(and(eq(memberships.teamId, teamId), eq(memberships.accepted, true)))
     : [];
   const scopeIds = teamWide ? memberRows.map((row) => row.userId) : [userId];
-  // Members' bookings OR this team's services — robust to both deleted
-  // services and removed members. Every query below left-joins services.
+  // Members' bookings OR this team's services, so neither a deleted service
+  // nor a removed member hides a booking. Every query below left-joins services.
   const scope = teamWide
     ? or(inArray(bookings.userId, scopeIds), eq(services.teamId, teamId))!
     : inArray(bookings.userId, scopeIds);
 
-  // Day windows in the viewer's timezone — the server's clock must not decide
+  // Day windows in the viewer's timezone: the server's clock must not decide
   // what "today" means.
   const now = new Date();
   const parts = getZonedParts(now, timeZone);
@@ -58,7 +60,6 @@ async function loadOverview(
     startTime: bookings.startTime,
     endTime: bookings.endTime,
     location: bookings.location,
-    meetingUrl: bookings.meetingUrl,
     hostId: bookings.userId,
   };
 
@@ -134,7 +135,6 @@ async function loadOverview(
     attendeeName: attendeeByBooking.get(row.id) ?? null,
     hostName: teamWide && row.hostId !== null ? hostById.get(row.hostId) ?? null : null,
     location: row.location,
-    meetingUrl: row.meetingUrl,
   });
 
   return {
@@ -169,11 +169,17 @@ export default async function DashboardPage() {
     day: "numeric",
   }).format(new Date());
 
+  const canManageServices = can(role, "service.catalog.manage");
+
   return (
-    <div className="animate-fade-in">
+    <div className="space-y-6">
+      <PageHeader
+        title={`${greeting}, ${firstName}`}
+        description={todayLabel}
+        action={canManageServices ? <NewServiceButton /> : undefined}
+      />
       <DashboardOverview
-        greeting={`${greeting}, ${firstName}`}
-        todayLabel={todayLabel}
+        todayKey={formatDateKey(new Date(), user.timeZone)}
         timeZone={user.timeZone}
         hour12={user.timeFormat === 12}
         locale={resolveLocale(user.locale)}

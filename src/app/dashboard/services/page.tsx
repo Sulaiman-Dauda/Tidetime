@@ -1,16 +1,19 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Clock, ExternalLink, EyeOff, Zap } from "lucide-react";
+import { Layers } from "lucide-react";
 import { db } from "@/db";
-import { teams } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { serviceProviders, teams, users } from "@/db/schema";
+import { asc, eq, inArray } from "drizzle-orm";
 import { listServices } from "./actions";
 import { NewServiceButton } from "../_components/new-service-button";
 import { ServiceRowActions } from "../_components/service-row-actions";
 import { PageHeader } from "../_components/page-header";
+import { CopyLinkButton } from "../_components/copy-link-button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { formatDuration } from "@/lib/format";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { formatDuration, initials } from "@/lib/format";
 import { getAppUrl } from "@/server/app-url";
 import { locationLabel } from "@/lib/locations";
 import { can } from "@/lib/rbac";
@@ -21,6 +24,8 @@ export const metadata = { title: "Services" };
 interface Props {
   searchParams: Promise<{ welcome?: string }>;
 }
+
+type Provider = { id: number; name: string | null; email: string; avatarUrl: string | null };
 
 export default async function ServicesPage({ searchParams }: Props) {
   const { welcome } = await searchParams;
@@ -37,9 +42,30 @@ export default async function ServicesPage({ searchParams }: Props) {
     .where(eq(teams.id, teamId))
     .limit(1);
   const canManage = can(role, "service.catalog.manage");
+  const companySlug = company?.slug ?? "company";
+
+  // listServices is already scoped to this company, so its ids bound the lookup.
+  const assignments = items.length
+    ? await db
+        .select({
+          serviceId: serviceProviders.serviceId,
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(serviceProviders)
+        .innerJoin(users, eq(users.id, serviceProviders.userId))
+        .where(inArray(serviceProviders.serviceId, items.map((service) => service.id)))
+        .orderBy(asc(users.name))
+    : [];
+  const providersByService = new Map<number, Provider[]>();
+  for (const { serviceId, ...provider } of assignments) {
+    providersByService.set(serviceId, [...(providersByService.get(serviceId) ?? []), provider]);
+  }
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Services"
         description={
@@ -51,131 +77,164 @@ export default async function ServicesPage({ searchParams }: Props) {
       />
 
       {items.length === 0 ? (
-        <EmptyState firstRun={welcome === "1"} canManage={canManage} />
+        canManage ? (
+          <FirstServiceEmptyState firstRun={welcome === "1"} />
+        ) : (
+          <EmptyState
+            icon={Layers}
+            title="No assigned services"
+            description="An owner or manager can assign you to a company service."
+          />
+        )
       ) : (
-        <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
-          {items.map((et, index) => {
-            const publicUrl = `${appUrl}/book/${company?.slug ?? "company"}/${et.slug}`;
+        <Card className="divide-y overflow-hidden">
+          {items.map((service, index) => {
+            const path = `/book/${companySlug}/${service.slug}`;
+            const providers = providersByService.get(service.id) ?? [];
             return (
               <div
-                key={et.id}
-                className="group relative flex items-center gap-4 px-5 py-4 transition-colors hover:bg-secondary/30"
+                key={service.id}
+                className="relative flex items-center gap-4 px-5 py-3 transition-colors hover:bg-muted/50"
               >
-                <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-primary/70" />
-
-                <Link
-                  href={`/dashboard/services/${et.id}` as Route}
-                  className="min-w-0 flex-1"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{et.title}</span>
-                    {et.draft && (
-                      <Badge variant="outline" className="border-amber-500/30 text-[11px] text-amber-700 dark:text-amber-400">
-                        Draft
-                      </Badge>
-                    )}
-                    {et.hidden && (
-                      <Badge variant="secondary" className="gap-1 text-[11px]">
-                        <EyeOff className="h-2.5 w-2.5" />
-                        Hidden
-                      </Badge>
-                    )}
-                    {et.requiresConfirmation && (
-                      <Badge variant="outline" className="text-[11px]">
-                        Confirmation required
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[12px] text-muted-foreground">
-                    <span className="font-mono">
-                      /book/{company?.slug ?? "company"}/{et.slug}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatDuration(et.length)}
-                    </span>
-                    {et.locations.length > 0 && (
-                      <span>{locationLabel(et.locations[0])}</span>
-                    )}
-                  </div>
-                </Link>
-
-                {/* One named primary action, one preview, everything else
-                    behind a labelled overflow menu. */}
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-                    <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Preview</span>
-                    </a>
-                  </Button>
-                  <Button asChild variant="outline" size="sm" className="h-8">
-                    <Link href={`/dashboard/services/${et.id}` as Route}>
-                      {canManage ? "Edit" : "View"}
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {/* The link stretches over the whole row; the controls on
+                        the right sit above it. */}
+                    <Link
+                      href={`/dashboard/services/${service.id}` as Route}
+                      className="truncate text-sm font-medium text-foreground outline-none after:absolute after:inset-0 focus-visible:underline"
+                    >
+                      {service.title}
                     </Link>
-                  </Button>
-                  {canManage ? (
+                    <ServiceStatus draft={service.draft} hidden={service.hidden} />
+                  </div>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-meta text-muted-foreground">
+                    <span className="tabular-nums">{formatDuration(service.length)}</span>
+                    {service.locations.length > 0 ? (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>{locationLabel(service.locations[0])}</span>
+                      </>
+                    ) : null}
+                    {service.requiresConfirmation ? (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>Needs confirmation</span>
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+
+                {providers.length > 0 ? (
+                  <ProviderStack providers={providers} className="relative hidden md:flex" />
+                ) : null}
+                {/* Drafts have no public page yet, so there is no link to share. */}
+                {service.draft ? null : (
+                  <div className="relative min-w-0">
+                    <CopyLinkButton url={`${appUrl}${path}`} label={path} />
+                  </div>
+                )}
+                {canManage ? (
+                  <div className="relative">
                     <ServiceRowActions
-                      id={et.id}
-                      title={et.title}
-                      hidden={et.hidden}
+                      id={service.id}
+                      title={service.title}
+                      hidden={service.hidden}
                       canMoveUp={index > 0}
                       canMoveDown={index < items.length - 1}
                     />
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}
-        </div>
+        </Card>
       )}
     </div>
   );
 }
 
-function EmptyState({
-  firstRun = false,
-  canManage,
-}: {
-  firstRun?: boolean;
-  canManage: boolean;
-}) {
+/** Shown to roles that can create services. Setup lands here with ?welcome=1. */
+function FirstServiceEmptyState({ firstRun }: { firstRun: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
-      {firstRun ? <Badge variant="secondary" className="mb-4">Step 2 of 2</Badge> : null}
-      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-        <Zap className="h-6 w-6 text-primary" />
+    <div className="rounded-xl border bg-card shadow-xs">
+      {firstRun ? (
+        <div className="flex justify-center pt-10">
+          <Badge variant="secondary">Step 2 of 2</Badge>
+        </div>
+      ) : null}
+      <EmptyState
+        bare
+        icon={Layers}
+        className={firstRun ? "pt-4" : undefined}
+        title="Create your first service"
+        description={
+          firstRun
+            ? "Your workspace is ready. Create the first service people can book and the editor opens straight away."
+            : "A service is what people book, like a 30-minute consultation or a class. Each one gets its own booking page."
+        }
+        action={<NewServiceButton label="Create your first service" size="default" />}
+      />
+      <div className="border-t px-6 py-5">
+        <div className="mx-auto max-w-sm">
+          <p className="text-meta font-medium text-foreground">After you create a service you can</p>
+          <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {FIRST_SERVICE_NEXT_STEPS.map((step, index) => (
+              <li key={index} className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent text-meta font-medium tabular-nums text-accent-foreground">
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
-      <h2 className="text-lg font-semibold tracking-tight text-foreground">
-        {canManage ? "Create your first service" : "No assigned services"}
-      </h2>
-      <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        {!canManage
-          ? "An owner or manager can assign you to a company service."
-          : firstRun
-          ? "Your workspace is ready. Create the first service people can book with you — we’ll open the editor right away so you can adjust duration, location, providers, questions, and more."
-          : "Services are what people book — like a 30-minute consultation, a haircut, or a class. Each one gets its own booking page."}
-      </p>
-      {canManage ? <div className="mt-6">
-        <NewServiceButton label="Create your first service" size="default" />
-      </div> : null}
-      {canManage ? <div className="mt-8 max-w-md space-y-3 text-left text-xs text-muted-foreground">
-        <p className="font-medium text-foreground/70">After you create a service you can:</p>
-        <ul className="space-y-1.5">
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] text-emerald-600">1</span>
-            Set your weekly availability under <strong>Availability</strong>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] text-emerald-600">2</span>
-            Share your link <code className="rounded bg-muted px-1 py-0.5 text-[11px]">/yourname</code> with clients
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] text-emerald-600">3</span>
-            Connect Google Calendar, email, and Zapier in <strong>Connections</strong>
-          </li>
-        </ul>
-      </div> : null}
+    </div>
+  );
+}
+
+const FIRST_SERVICE_NEXT_STEPS = [
+  <>
+    Set your weekly hours under <span className="font-medium text-foreground">Availability</span>
+  </>,
+  <>Share its booking page link with your customers</>,
+  <>
+    Connect Google Calendar, email and Zapier in{" "}
+    <span className="font-medium text-foreground">Connections</span>
+  </>,
+];
+
+function ServiceStatus({ draft, hidden }: { draft: boolean; hidden: boolean }) {
+  if (draft) return <Badge variant="warning" dot>Draft</Badge>;
+  if (hidden) return <Badge variant="secondary">Hidden</Badge>;
+  return <Badge variant="success" dot>Public</Badge>;
+}
+
+const STACK_LIMIT = 3;
+
+function ProviderStack({ providers, className }: { providers: Provider[]; className?: string }) {
+  const shown = providers.slice(0, STACK_LIMIT);
+  const extra = providers.length - shown.length;
+  const names = providers.map((provider) => provider.name ?? provider.email).join(", ");
+  // A native title rather than Tooltip: Radix's asChild trigger drops
+  // server-rendered children during SSR here, which broke hydration.
+  return (
+    <div className={className} title={names}>
+      <span className="sr-only">Providers: {names}</span>
+      <div className="flex -space-x-1.5" aria-hidden>
+        {shown.map((provider) => (
+          <Avatar key={provider.id} className="size-7 ring-2 ring-card">
+            {provider.avatarUrl ? <AvatarImage src={provider.avatarUrl} alt="" /> : null}
+            <AvatarFallback>{initials(provider.name ?? provider.email)}</AvatarFallback>
+          </Avatar>
+        ))}
+        {extra > 0 ? (
+          <span className="flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-medium tabular-nums text-muted-foreground ring-2 ring-card">
+            +{extra}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

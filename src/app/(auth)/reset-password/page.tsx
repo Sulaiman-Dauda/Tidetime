@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthCard } from "../_components/auth-card";
+import { Button } from "@/components/ui/button";
 import { ResetPasswordForm } from "./reset-form";
 
 export const metadata: Metadata = { title: "Choose a new password" };
@@ -13,32 +15,20 @@ export default async function ResetPasswordPage({ searchParams }: Props) {
 
   if (!token) {
     return (
-      <div className="w-full max-w-sm space-y-7">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Invalid link</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            This password reset link is missing or malformed.
-          </p>
-        </div>
-        <p className="text-center text-sm text-muted-foreground">
-          <Link href="/forgot-password" className="font-medium text-foreground underline-offset-4 hover:underline">
-            Request a new link
-          </Link>
-        </p>
-      </div>
+      <AuthCard title="Invalid link" description="This password reset link is missing or malformed.">
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/forgot-password">Request a new link</Link>
+        </Button>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="w-full max-w-sm space-y-7">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Choose a new password</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Pick a strong password you don&apos;t use elsewhere.
-        </p>
-      </div>
-
+    <AuthCard
+      title="Choose a new password"
+      description="Pick a strong password you don't use elsewhere."
+    >
       <ResetPasswordForm token={token} />
-    </div>
+    </AuthCard>
   );
 }

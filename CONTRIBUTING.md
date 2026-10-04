@@ -122,6 +122,22 @@ Before opening a PR, make sure:
 - `src/app` contains route handlers, pages, layouts, and server actions.
 - `src/db` contains schema and migration utilities.
 
+### Interface
+
+- Build screens from the primitives in `src/components/ui` (Button, Field, FormSection,
+  Card, Table, Badge, Segmented, Dialog and the rest) and `PageHeader` / `EmptyState`.
+  If one is missing something, extend it rather than styling a one-off.
+- Colours come from the tokens in `src/app/globals.css`: surfaces (`canvas`, `background`,
+  `card`, `popover`), `primary` and `accent`, and the status colours `success`, `warning`,
+  `info` and `destructive`, each with a `-subtle` fill. No Tailwind palette classes
+  (`text-emerald-600`) and no hex values in components.
+- Public pages take their accent from the company brand colour (`src/lib/brand-theme.ts`),
+  so they must only use `primary`, `accent` and `ring` for accent colour.
+- Text is never smaller than `text-xs` (12px). Make layouts compact with spacing, not
+  smaller type.
+- Fonts must be under a licence that allows redistribution (the app ships Geist, SIL OFL 1.1).
+- Check every screen you touch in light and dark mode and at a phone width.
+
 ### Validation and security
 
 - Validate all external input at the boundary.
