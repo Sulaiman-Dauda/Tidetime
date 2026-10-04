@@ -20,7 +20,7 @@ export function NewServiceButton({
       onSubmit={() => start(() => {})}
     >
       <Button type="submit" size={size} loading={pending}>
-        <Plus className="h-3.5 w-3.5" />
+        <Plus />
         {label}
       </Button>
     </form>

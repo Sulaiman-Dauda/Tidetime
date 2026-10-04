@@ -19,10 +19,10 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Configure your company brand, booking defaults, domain, and legal pages."
+        description="Your company brand, booking defaults, legal pages and custom domain."
       />
       <SettingsHub
         settings={settings}

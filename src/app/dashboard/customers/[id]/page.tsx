@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CalendarX2 } from "lucide-react";
 import { requirePermission } from "@/lib/guard";
 import { getCustomerWithBookings } from "@/server/customers";
 import { formatRange, resolveLocale } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "../../_components/page-header";
 import { DeleteCustomerButton } from "./delete-customer-button";
-import { ArrowLeft, Mail, Phone, Globe2 } from "lucide-react";
 
 export const metadata = { title: "Customer" };
 
-const STATUS_BADGES: Record<string, { label: string; variant: "default" | "pending" | "destructive" }> = {
-  accepted: { label: "Confirmed", variant: "default" },
+const STATUS_BADGES: Record<
+  string,
+  { label: string; variant: "success" | "pending" | "secondary" | "destructive" }
+> = {
+  accepted: { label: "Confirmed", variant: "success" },
   pending: { label: "Pending", variant: "pending" },
-  cancelled: { label: "Cancelled", variant: "destructive" },
+  cancelled: { label: "Cancelled", variant: "secondary" },
   rejected: { label: "Rejected", variant: "destructive" },
 };
 
@@ -33,81 +38,128 @@ export default async function CustomerDetailPage({
   const { customer, history } = data;
   const hour12 = user.timeFormat === 12;
 
-  const sinceFmt = new Intl.DateTimeFormat(resolveLocale(user.locale), {
+  const dateFmt = new Intl.DateTimeFormat(resolveLocale(user.locale), {
     timeZone: user.timeZone,
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
+  const details: { label: string; value: React.ReactNode }[] = [
+    {
+      label: "Email",
+      value: (
+        <a href={`mailto:${customer.email}`} className="break-all hover:underline">
+          {customer.email}
+        </a>
+      ),
+    },
+    {
+      label: "Phone",
+      value: customer.phoneNumber ? (
+        <a href={`tel:${customer.phoneNumber}`} className="tabular-nums hover:underline">
+          {customer.phoneNumber}
+        </a>
+      ) : (
+        <span className="text-muted-foreground">Not provided</span>
+      ),
+    },
+    {
+      label: "Time zone",
+      value: customer.timeZone ? (
+        customer.timeZone.replace(/_/g, " ")
+      ) : (
+        <span className="text-muted-foreground">Not known</span>
+      ),
+    },
+    {
+      label: "Active bookings",
+      value: <span className="tabular-nums">{customer.bookingsCount}</span>,
+    },
+    {
+      label: "Last booking",
+      value: customer.lastBookingAt ? (
+        <span className="tabular-nums">{dateFmt.format(new Date(customer.lastBookingAt))}</span>
+      ) : (
+        <span className="text-muted-foreground">None</span>
+      ),
+    },
+  ];
+
   return (
-    <div className="animate-fade-in space-y-8">
-      <div>
-        <Link
-          href="/dashboard/customers"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to customers
-        </Link>
-        <PageHeader
-          title={customer.name}
-          description={`Customer since ${sinceFmt.format(new Date(customer.createdAt))}`}
-          action={<DeleteCustomerButton id={customer.id} name={customer.name} />}
-        />
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/dashboard/customers", label: "Customers" }}
+        title={customer.name}
+        description={`Customer since ${dateFmt.format(new Date(customer.createdAt))}`}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr] lg:items-start">
-        <Card className="space-y-3 p-5 text-sm">
-          <h2 className="text-sm font-semibold">Contact</h2>
-          <a href={`mailto:${customer.email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
-            <Mail className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{customer.email}</span>
-          </a>
-          {customer.phoneNumber ? (
-            <a href={`tel:${customer.phoneNumber}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
-              <Phone className="h-3.5 w-3.5 shrink-0" />
-              {customer.phoneNumber}
-            </a>
-          ) : null}
-          {customer.timeZone ? (
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Globe2 className="h-3.5 w-3.5 shrink-0" />
-              {customer.timeZone.replace(/_/g, " ")}
-            </p>
-          ) : null}
-          <p className="border-t border-border/60 pt-3 text-muted-foreground">
-            {customer.bookingsCount} active booking{customer.bookingsCount === 1 ? "" : "s"} made
-          </p>
-        </Card>
-
-        <Card className="p-5">
-          <h2 className="text-sm font-semibold">Booking history</h2>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b py-4">
+            <CardTitle>Booking history</CardTitle>
+          </CardHeader>
           {history.length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">No bookings found for this customer.</p>
+            <EmptyState
+              bare
+              icon={CalendarX2}
+              title="No bookings found"
+              description="Bookings this customer makes with you will appear here."
+            />
           ) : (
-            <div className="mt-4 divide-y divide-border/50">
+            <ul className="divide-y">
               {history.map((b) => {
-                const badge = STATUS_BADGES[b.status] ?? { label: b.status, variant: "default" as const };
+                const badge = STATUS_BADGES[b.status] ?? { label: b.status, variant: "secondary" as const };
+                const inactive = b.status === "cancelled" || b.status === "rejected";
                 return (
-                  <Link
-                    key={b.uid}
-                    href={`/dashboard/bookings/${b.uid}`}
-                    className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm transition-colors hover:bg-secondary/20"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium">{b.serviceTitle ?? b.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatRange(b.startTime, b.endTime, user.timeZone, hour12, user.locale)}
-                        {b.location ? ` · ${b.location}` : ""}
-                      </p>
-                    </div>
-                    <Badge variant={badge.variant}>{badge.label}</Badge>
-                  </Link>
+                  <li key={b.uid}>
+                    <Link
+                      href={`/dashboard/bookings/${b.uid}`}
+                      className="flex items-center justify-between gap-4 px-5 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/40"
+                    >
+                      <div className="min-w-0">
+                        <p
+                          className={cn(
+                            "truncate text-sm font-medium",
+                            inactive && "text-muted-foreground line-through",
+                          )}
+                        >
+                          {b.serviceTitle ?? b.title}
+                        </p>
+                        <p className="mt-0.5 break-words text-meta text-muted-foreground tabular-nums sm:truncate">
+                          {formatRange(b.startTime, b.endTime, user.timeZone, hour12, user.locale)}
+                          {b.location ? ` · ${b.location}` : ""}
+                        </p>
+                      </div>
+                      <Badge variant={badge.variant} dot>
+                        {badge.label}
+                      </Badge>
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b py-4">
+            <CardTitle>Details</CardTitle>
+          </CardHeader>
+          <dl className="space-y-4 p-5 text-sm">
+            {details.map((row) => (
+              <div key={row.label} className="space-y-0.5">
+                <dt className="text-meta text-muted-foreground">{row.label}</dt>
+                <dd className="text-foreground">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="border-t px-5 py-4">
+            <DeleteCustomerButton id={customer.id} name={customer.name} />
+            <p className="mt-2 text-meta text-muted-foreground">
+              Removes them from this directory. Their bookings are kept.
+            </p>
+          </div>
         </Card>
       </div>
     </div>

@@ -2,86 +2,102 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens. Every colour in the UI resolves to one of these, as HSL
+ * channels so Tailwind can apply opacity (bg-primary/10). Pages never use raw
+ * palette classes (text-emerald-600) or hex values: status colour comes from
+ * success / warning / info / destructive, and each has a `-subtle` fill.
+ *
+ * Surfaces, from back to front:
+ *   canvas      sidebar and the area around the content panel, public page backdrop
+ *   background  the content panel
+ *   card        raised blocks inside the panel
+ *   popover     menus, dialogs, toasts
+ */
 @layer base {
   :root {
-    /* ── Indigo + neutral light ── */
-    /* Surfaces */
+    --canvas: 220 14% 96.5%;
     --background: 0 0% 100%;
-    --foreground: 220 12% 10%;
+    --foreground: 222 22% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 220 12% 10%;
+    --card-foreground: 222 22% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 12% 10%;
+    --popover-foreground: 222 22% 11%;
 
-    /* Indigo 600: strong contrast on white and consistent with company branding. */
-    --brand: 243 75% 59%;
-    --brand-foreground: 0 0% 100%;
+    /* Tidetime indigo. Public booking pages replace these four with the
+       company brand colour (see src/lib/brand-theme.ts). */
     --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
+    --accent: 238 90% 97%;
+    --accent-foreground: 243 60% 42%;
+    --brand: var(--primary);
+    --brand-foreground: var(--primary-foreground);
 
-    /* A restrained indigo tint for hover and selected surfaces. */
-    --accent: 239 84% 95%;
-    --accent-foreground: 243 75% 35%;
+    --secondary: 220 14% 95.5%;
+    --secondary-foreground: 222 22% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 43%;
 
-    /* Secondary & muted — charcoal-tinted */
-    --secondary: 220 10% 96%;
-    --secondary-foreground: 220 12% 12%;
-    --muted: 220 8% 96%;
-    --muted-foreground: 220 6% 44%;
-
-    /* Destructive */
-    --destructive: 0 55% 52%;
+    --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-subtle: 0 86% 97%;
+    --success: 152 64% 29%;
+    --success-subtle: 145 65% 95%;
+    --warning: 30 92% 34%;
+    --warning-subtle: 45 100% 94%;
+    --info: 212 78% 42%;
+    --info-subtle: 212 90% 96%;
 
-    /* Chrome */
-    --border: 220 12% 90%;
-    --input: 220 12% 90%;
+    --border: 220 13% 91%;
+    --input: 220 13% 86%;
     --ring: 243 75% 59%;
-    --radius: 0.75rem;
+    /* Active segment of a segmented control, sitting on a muted track. */
+    --segment: 0 0% 100%;
 
-    /* Sidebar — same as background */
-    --sidebar: 0 0% 100%;
-    --sidebar-border: 220 10% 92%;
+    --sidebar: var(--canvas);
+    --sidebar-border: 220 13% 90%;
+
+    --shadow: 222 30% 12%;
+    --radius: 0.5rem;
   }
 
   .dark {
-    /* ── Deep charcoal + luminous indigo dark ── */
-    --background: 220 12% 6.5%;
-    --foreground: 38 18% 92%;
-    --card: 220 10% 11.5%;
-    --card-foreground: 38 18% 92%;
-    --popover: 220 10% 11.5%;
-    --popover-foreground: 38 18% 92%;
+    --canvas: 225 12% 5%;
+    --background: 225 10% 8%;
+    --foreground: 220 14% 93%;
+    --card: 225 9% 10%;
+    --card-foreground: 220 14% 93%;
+    --popover: 225 9% 11%;
+    --popover-foreground: 220 14% 93%;
 
-    /* Indigo 400 stays vivid without blooming against charcoal surfaces. */
-    --brand: 234 89% 74%;
-    --brand-foreground: 240 21% 10%;
     --primary: 234 89% 74%;
-    --primary-foreground: 240 21% 10%;
+    --primary-foreground: 240 30% 10%;
+    --accent: 236 35% 17%;
+    --accent-foreground: 234 90% 84%;
 
-    --accent: 235 30% 18%;
-    --accent-foreground: 234 89% 82%;
+    --secondary: 225 8% 15%;
+    --secondary-foreground: 220 14% 90%;
+    --muted: 225 8% 12.5%;
+    --muted-foreground: 220 8% 62%;
 
-    --secondary: 220 8% 15%;
-    --secondary-foreground: 38 16% 84%;
-    --muted: 220 6% 13%;
-    /* 48% cleared ~3.5:1 on our card surface — under AA for body-size text.
-       56% brings secondary copy to ~4.7:1 without turning it into primary text. */
-    --muted-foreground: 220 7% 56%;
-
-    --destructive: 0 62% 52%;
+    --destructive: 0 75% 62%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-subtle: 0 45% 14%;
+    --success: 150 55% 56%;
+    --success-subtle: 150 40% 12%;
+    --warning: 38 92% 62%;
+    --warning-subtle: 38 50% 12%;
+    --info: 212 90% 70%;
+    --info-subtle: 212 50% 14%;
 
-    /* Cards and rows sat ~3.5 points above the page and read as one flat
-       plane. A brighter border plus a lifted card gives the list its edges
-       back without making the theme milky. */
-    --border: 220 10% 20%;
-    --input: 220 10% 22%;
+    --border: 225 8% 17%;
+    --input: 225 8% 22%;
     --ring: 234 89% 74%;
-    --radius: 0.75rem;
+    --segment: 225 8% 21%;
 
-    --sidebar: 220 12% 6.5%;
-    --sidebar-border: 220 10% 14%;
+    --sidebar-border: 225 8% 14%;
+
+    --shadow: 0 0% 0%;
   }
 }
 
@@ -89,30 +105,35 @@
   * {
     @apply border-border;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    text-rendering: optimizeLegibility;
   }
+  /* Keyboard focus is always visible. Primitives that draw their own ring
+     (buttons, inputs) opt out with outline-none. */
   :focus-visible {
-    outline: none;
+    outline: 2px solid hsl(var(--ring) / 0.6);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
   }
 
   h1, h2, h3, h4 {
-    font-family: var(--font-serif), ui-serif, Georgia, serif;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
     text-wrap: balance;
   }
-  h1 {
-    line-height: 1.08;
-  }
-  h2 {
-    line-height: 1.15;
+
+  /* Figures line up in tables, times and counts. */
+  table, time, .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Native date/time fields keep their platform pickers — they are the best
-     input method, especially on touch — but the browser's default indicator
-     glyph is a black icon that reads as foreign next to our controls. Tone it
-     down to muted-foreground and let it brighten on hover/focus. */
+  /* Native date/time fields keep their platform pickers (the best input
+     method, especially on touch); only the indicator glyph is toned down. */
   input[type="time"],
   input[type="date"],
   input[type="datetime-local"] {
@@ -140,121 +161,10 @@
   input[type="datetime-local"]:focus::-webkit-calendar-picker-indicator {
     opacity: 0.85;
   }
-  /* Firefox draws its own reset "×" inside date fields; it clutters a row of
+  /* Firefox draws its own reset "x" inside date fields; it clutters a row of
      time ranges that already has an explicit Remove button. */
   input[type="time"]::-moz-clear,
   input[type="date"]::-moz-clear {
     display: none;
   }
-}
-
-/* Subtle dot-grid backdrop */
-.bg-grid,
-.bg-dot-grid {
-  background-image: radial-gradient(circle, hsl(var(--border) / 0.35) 1px, transparent 1px);
-  background-size: 28px 28px;
-}
-
-@layer utilities {
-  /* Soft layered elevation */
-  .shadow-elevated {
-    box-shadow:
-      0 0 0 1px hsl(var(--border) / 0.5),
-      0 2px 8px hsl(220 10% 8% / 0.04),
-      0 8px 28px hsl(220 10% 8% / 0.05);
-  }
-  .dark .shadow-elevated {
-    box-shadow:
-      0 0 0 1px hsl(var(--border) / 0.7),
-      0 2px 10px hsl(0 0% 0% / 0.3),
-      0 14px 36px hsl(0 0% 0% / 0.22);
-  }
-
-  .tabular-stat {
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-  }
-
-  /* Gentle attention pulse for a can't-miss action (e.g. the update button). */
-  .tt-attn {
-    animation: tt-attn-pulse 2.2s ease-in-out infinite;
-  }
-}
-
-@keyframes tt-attn-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--brand) / 0); }
-  50%      { box-shadow: 0 0 0 3px hsl(var(--brand) / 0.35), 0 0 16px 2px hsl(var(--brand) / 0.45); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tt-attn { animation: none; box-shadow: 0 0 0 2px hsl(var(--brand) / 0.4); }
-}
-
-/* ── Motion primitives (pure CSS, no animation library) ──────────────────── */
-@keyframes tt-rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes tt-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes tt-ring {
-  from { opacity: 0.5; transform: scale(0.7); }
-  to   { opacity: 0;   transform: scale(2.3); }
-}
-@keyframes tt-wave-draw {
-  from { stroke-dashoffset: 30; }
-  to   { stroke-dashoffset: 0; }
-}
-@keyframes tt-wave-bob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-1.5px); }
-}
-
-/* Gentle staggered entrance for lists/cards — pair with an inline
-   animation-delay for a silky, professional cascade. */
-.tt-rise { animation: tt-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.tt-fade { animation: tt-fade 0.5s ease both; }
-/* App-wide route-enter transition (dashboard template). */
-.tt-page-enter { animation: tt-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
-
-/* Skeleton shimmer — a soft light sweeps across loading placeholders. */
-@keyframes tt-shimmer { 100% { transform: translateX(100%); } }
-.tt-shimmer { position: relative; overflow: hidden; }
-.tt-shimmer::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
-  animation: tt-shimmer 1.5s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tt-rise,
-  .tt-fade,
-  .tt-page-enter,
-  .tt-shimmer::after {
-    animation: none !important;
-  }
-}
-
-/* Booking-confirmed moment — icon pops in, celebration dots burst outward. */
-@keyframes tt-pop {
-  0% { transform: scale(0.4); opacity: 0; }
-  60% { transform: scale(1.08); }
-  100% { transform: scale(1); opacity: 1; }
-}
-@keyframes tt-burst {
-  0% {
-    transform: translate(-50%, -50%) scale(0.4);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(calc(-50% + var(--tt-tx)), calc(-50% + var(--tt-ty))) scale(1);
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tt-burst-dot { animation: none !important; opacity: 0 !important; }
 }

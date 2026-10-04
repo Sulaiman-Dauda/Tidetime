@@ -11,8 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
-  ArrowLeft,
-  Calendar,
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -20,17 +19,21 @@ import {
   Globe2,
   Loader2,
   MapPin,
+  Phone,
   RefreshCw,
   UserRound,
   Users,
+  Video,
 } from "lucide-react";
 import type { BookingField, EventLocation } from "@/db/schema";
 import { bookAction, type BookActionState } from "@/app/(public)/actions";
 import { AltchaWidget } from "@/components/altcha-widget";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
+import { Input, fieldClassName } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
 import {
   Select,
   SelectContent,
@@ -149,6 +152,15 @@ function timeZoneLabel(timeZone: string): string {
   }
 }
 
+function formatTime(iso: string | Date, timeZone: string, hour12: boolean): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12,
+    timeZone,
+  });
+}
+
 function parseGuestEmails(value: string): string[] {
   return Array.from(
     new Set(
@@ -180,64 +192,39 @@ function contactErrors(values: FieldValues, guests: string[]): Record<string, st
 }
 
 /**
- * Company brand row at the top of the booking sidebar.
- *
- * Logos arrive in two shapes that want opposite treatment. A wordmark already
- * contains the company name, so it shows on its own and wide — pairing it with
- * the name read as the brand twice and wrapped onto two lines in this 264px
- * column. A square icon carries no name and needs to be bigger: at a
- * wordmark's height it is a 32px speck, so it renders larger and keeps the
- * name beside it.
- *
- * The shape has to be measured on load rather than known up front, because a
- * logo can be pasted as a URL rather than uploaded. The row height is fixed so
- * that resolving only reveals the name — nothing below it shifts. Without
- * JavaScript the logo simply stays in the wordmark layout.
+ * The company brand at the top of the booking card: the logo when there is
+ * one, otherwise the name. Never both, because a logo nearly always carries
+ * the name already and the pair read as the brand twice.
  */
 function CompanyBrand({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
-  // null until the image loads, then true once it proves wide enough to read
-  // as a horizontal lockup rather than a mark.
-  const [wordmark, setWordmark] = useState<boolean | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const isMark = logoUrl && wordmark === false;
+  if (logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logoUrl} alt={name} className="h-8 w-auto max-w-48 object-contain object-left" />
+    );
+  }
+  return <p className="text-base font-semibold tracking-tight text-foreground">{name}</p>;
+}
 
-  const measure = useCallback((el: HTMLImageElement | null) => {
-    if (!el?.naturalWidth || !el.naturalHeight) return;
-    setWordmark(el.naturalWidth / el.naturalHeight > 1.8);
-  }, []);
+function hostName(host: Host): string {
+  return host.name ?? host.username;
+}
 
-  // A cached logo — or a data: URI, which is every uploaded one — finishes
-  // loading before hydration attaches onLoad, so that event never fires.
-  // Measure once on mount as well, or the logo is stuck in its initial layout.
-  useEffect(() => {
-    if (imgRef.current?.complete) measure(imgRef.current);
-  }, [measure, logoUrl]);
+function locationIcon(type: EventLocation["type"]) {
+  if (type === "in_person") return <MapPin />;
+  if (type === "phone" || type === "attendee_phone") return <Phone />;
+  return <Video />;
+}
 
+/** One fact about the service (duration, location, timezone) beside its icon. */
+function InfoRow({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="-mx-6 border-b border-border/60 px-6 pb-5">
-      <div className="flex h-10 items-center gap-2.5">
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            ref={imgRef}
-            src={logoUrl}
-            alt={name}
-            onLoad={(event) => measure(event.currentTarget)}
-            className={cn(
-              "object-contain",
-              isMark ? "h-10 w-auto max-w-[110px]" : "h-8 w-auto max-w-[190px]",
-            )}
-          />
-        ) : (
-          <Avatar className="h-7 w-7 border bg-background">
-            <AvatarFallback className="text-[10px] font-semibold">{initials(name)}</AvatarFallback>
-          </Avatar>
-        )}
-        {!logoUrl || isMark ? (
-          <span className="truncate text-sm font-semibold tracking-tight">{name}</span>
-        ) : null}
-      </div>
-    </div>
+    <li className="flex min-h-6 items-center gap-2.5">
+      <span className="flex shrink-0 text-muted-foreground [&_svg]:size-4" aria-hidden>
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </li>
   );
 }
 
@@ -431,6 +418,9 @@ export function BookingFlow({
     new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getTime() >
     currentMonth.getTime();
   const daySlots = selectedDay ? slots[selectedDay] ?? [] : [];
+  const monthHasTimes = Object.values(slots).some((day) => day.length > 0);
+  const firstLoad = loading && Object.keys(slots).length === 0;
+  const location = service.locations[0];
 
   const finishBooking = useCallback(
     // confirmed=1 triggers the one-time success animation on the detail page.
@@ -446,7 +436,7 @@ export function BookingFlow({
     setSelectedSlot(null);
   }
 
-  /** Availability inputs changed — every remembered selection is stale. */
+  /** Availability inputs changed, so every remembered selection is stale. */
   function resetSelection() {
     setDayByMonth({});
     setSelectedSlot(null);
@@ -461,7 +451,7 @@ export function BookingFlow({
   const handleSlotTaken = useCallback((values: FieldValues, guests: string) => {
     setDraft({ values, guests });
     setConflictNotice(true);
-    // The cached availability is what let the booker pick a dead slot — drop it.
+    // The cached availability is what let the booker pick a dead slot, so drop it.
     slotCache.current = {};
     setReloadNonce((value) => value + 1);
     setSelectedSlot(null);
@@ -469,107 +459,92 @@ export function BookingFlow({
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:py-10">
-      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04),0_16px_40px_-24px_rgba(16,24,40,0.24)]">
-        <div className="grid lg:grid-cols-[minmax(0,264px)_minmax(0,1fr)]">
-          <aside className="border-b bg-muted/20 p-6 lg:min-h-[532px] lg:border-b-0 lg:border-r">
-            {rescheduleUid ? (
-              <div className="mb-5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-                Rescheduling your booking
-              </div>
-            ) : null}
-
+    <div className="mx-auto w-full max-w-5xl flex-1 bg-card pb-8 sm:bg-transparent sm:px-6 sm:py-10 lg:py-14">
+      <div className="overflow-hidden bg-card text-card-foreground sm:rounded-2xl sm:shadow-popover">
+        <div className="grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="border-b p-5 sm:p-6 lg:border-b-0 lg:border-r">
             <CompanyBrand name={company.name} logoUrl={company.logoUrl} />
 
-            {/* Member profile — follows the provider selection below */}
-            {displayHost ? (
-              <div className="mt-6">
-                <Avatar className="h-14 w-14 border-2 border-background bg-background shadow-md ring-1 ring-border/60">
-                  {displayHost.avatarUrl ? (
-                    <AvatarImage src={displayHost.avatarUrl} alt={displayHost.name ?? displayHost.username} />
-                  ) : null}
-                  <AvatarFallback className="text-sm font-semibold">
-                    {initials(displayHost.name ?? displayHost.username)}
-                  </AvatarFallback>
-                </Avatar>
-                <p className="mt-3.5 text-sm font-medium text-muted-foreground">
-                  {displayHost.name ?? displayHost.username}
-                </p>
-                {displayHost.position ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground/80">{displayHost.position}</p>
-                ) : null}
-              </div>
-            ) : teamHosts.length > 1 ? (
-              <div className="mt-6">
-                <div className="flex -space-x-2.5">
+            {rescheduleUid ? (
+              <Badge variant="info" className="mt-5">
+                Rescheduling your booking
+              </Badge>
+            ) : null}
+
+            <div className="mt-6">
+              {/* Follows the provider selection below. */}
+              {displayHost ? (
+                <div className="mb-4 flex items-center gap-3">
+                  <Avatar className="size-10">
+                    {displayHost.avatarUrl ? (
+                      <AvatarImage src={displayHost.avatarUrl} alt={hostName(displayHost)} />
+                    ) : null}
+                    <AvatarFallback className="text-sm">
+                      {initials(hostName(displayHost))}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {hostName(displayHost)}
+                    </p>
+                    {displayHost.position ? (
+                      <p className="truncate text-meta text-muted-foreground">
+                        {displayHost.position}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : teamHosts.length > 1 ? (
+                <div className="mb-4 flex -space-x-2">
                   {teamHosts.slice(0, 4).map((member) => (
                     <Avatar
                       key={member.id}
-                      className="h-11 w-11 border-2 border-card bg-background shadow-sm"
+                      title={hostName(member)}
+                      className="size-9 ring-2 ring-card"
                     >
                       {member.avatarUrl ? (
-                        <AvatarImage src={member.avatarUrl} alt={member.name ?? member.username} />
+                        <AvatarImage src={member.avatarUrl} alt={hostName(member)} />
                       ) : null}
-                      <AvatarFallback className="text-xs font-semibold">
-                        {initials(member.name ?? member.username)}
-                      </AvatarFallback>
+                      <AvatarFallback>{initials(hostName(member))}</AvatarFallback>
                     </Avatar>
                   ))}
                 </div>
-                <p className="mt-3.5 text-sm font-medium text-muted-foreground">Any available provider</p>
-              </div>
-            ) : null}
-
-            <h1
-              className={cn(
-                "text-xl font-semibold tracking-tight",
-                displayHost || teamHosts.length > 1 ? "mt-1" : "mt-6",
-              )}
-            >
-              {service.title}
-            </h1>
-            {service.description ? (
-              <p className="mt-2.5 text-[13px] leading-6 text-muted-foreground">
-                {service.description}
-              </p>
-            ) : null}
-
-            <div className="mt-5 space-y-2.5 text-[13px] text-muted-foreground">
-              {/* The chosen slot lives here rather than above the form: the
-                  sidebar is already the "about this booking" column, and
-                  repeating it over the form made the page needlessly tall.
-                  Duration and timezone are separate rows below, so this one
-                  carries only the date and time. */}
-              {step === "details" && selectedSlot ? (
-                <div className="flex items-start gap-2.5">
-                  <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span className="font-medium text-foreground">
-                    {new Date(selectedSlot).toLocaleDateString(undefined, {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      timeZone,
-                    })}
-                    {" · "}
-                    {new Date(selectedSlot).toLocaleTimeString(undefined, {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12,
-                      timeZone,
-                    })}
-                  </span>
-                </div>
               ) : null}
-              <div className="flex items-center gap-2.5">
-                <Clock className="h-4 w-4 shrink-0 text-muted-foreground/80" />
-                <span>{formatDuration(duration)}</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <MapPin className="h-4 w-4 shrink-0 text-muted-foreground/80" />
-                <span>{locationLabel(service.locations[0])}</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <Globe2 className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground/80" />
+
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                {service.title}
+              </h1>
+              {service.description ? (
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {service.description}
+                </p>
+              ) : null}
+            </div>
+
+            <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+              <InfoRow icon={<Clock />}>
+                {durations.length > 1 && step === "time" ? (
+                  <Segmented
+                    size="sm"
+                    aria-label="Duration"
+                    value={String(duration)}
+                    onValueChange={(value) => {
+                      setDuration(Number(value));
+                      resetSelection();
+                    }}
+                    options={durations.map((value) => ({
+                      value: String(value),
+                      label: formatDuration(value),
+                    }))}
+                  />
+                ) : (
+                  formatDuration(duration)
+                )}
+              </InfoRow>
+              {location ? (
+                <InfoRow icon={locationIcon(location.type)}>{locationLabel(location)}</InfoRow>
+              ) : null}
+              <InfoRow icon={<Globe2 />}>
                 <Select
                   value={timeZone}
                   onValueChange={(value) => {
@@ -579,9 +554,11 @@ export function BookingFlow({
                 >
                   <SelectTrigger
                     aria-label="Timezone"
-                    className="h-7 min-w-0 border-0 bg-transparent px-0 text-[13px] shadow-none focus:ring-0"
+                    className="h-6 w-auto max-w-full gap-1 border-0 bg-transparent px-0 text-muted-foreground shadow-none transition-colors hover:text-foreground"
                   >
-                    <SelectValue />
+                    {/* Labels passed in so they are in the server HTML; Radix only
+                        fills an empty SelectValue after hydration. */}
+                    <SelectValue>{timeZoneLabel(timeZone)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
                     {timeZones.map((zone) => (
@@ -591,18 +568,17 @@ export function BookingFlow({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
+              </InfoRow>
+            </ul>
 
             {service.requiresConfirmation ? (
-              <div className="mt-5 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs leading-5 text-amber-700 dark:text-amber-300">
+              <p className="mt-5 rounded-lg bg-warning-subtle px-3 py-2 text-meta text-warning">
                 Your request will be confirmed after submission.
-              </div>
+              </p>
             ) : null}
 
             {teamHosts.length > 1 && step === "time" ? (
-              <div className="mt-6">
-                <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Provider</Label>
+              <Field label="Provider" htmlFor="provider" className="mt-6">
                 <Select
                   value={providerId ? String(providerId) : "any"}
                   onValueChange={(value) => {
@@ -610,49 +586,25 @@ export function BookingFlow({
                     resetSelection();
                   }}
                 >
-                  <SelectTrigger className="mt-1.5 h-9 w-full bg-background text-[13px]">
-                    <SelectValue />
+                  <SelectTrigger id="provider">
+                    <SelectValue>
+                      {displayHost ? hostName(displayHost) : "Any available provider"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="any">Any available provider</SelectItem>
                     {teamHosts.map((member) => (
                       <SelectItem key={member.id} value={String(member.id)}>
-                        {member.name ?? member.username}
+                        {hostName(member)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            ) : null}
-
-            {durations.length > 1 && step === "time" ? (
-              <div className="mt-5">
-                <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Duration</Label>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {durations.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => {
-                        setDuration(value);
-                        resetSelection();
-                      }}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-xs font-medium transition",
-                        duration === value
-                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                          : "border-border bg-background hover:border-primary/40 hover:text-primary",
-                      )}
-                    >
-                      {formatDuration(value)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              </Field>
             ) : null}
           </aside>
 
-          <section className="min-w-0 p-6">
+          <section className="min-w-0 p-5 sm:p-6">
             {step === "details" && selectedSlot ? (
               <BookingForm
                 slug={slug}
@@ -660,6 +612,7 @@ export function BookingFlow({
                 service={service}
                 duration={duration}
                 timeZone={timeZone}
+                hour12={hour12}
                 slot={selectedSlot}
                 preferredHostId={providerId ?? undefined}
                 rescheduleUid={rescheduleUid}
@@ -678,85 +631,86 @@ export function BookingFlow({
                 {conflictNotice ? (
                   <div
                     role="alert"
-                    className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
+                    className="mb-5 rounded-lg bg-warning-subtle px-4 py-3 text-warning"
                   >
-                    <p className="font-semibold">That time was just taken</p>
-                    <p className="mt-0.5 text-[13px]">
-                      Someone booked it while you were filling in your details. Your answers are
-                      saved — just pick another time.
+                    <p className="text-sm font-medium">That time was just taken</p>
+                    <p className="mt-0.5 text-meta">
+                      Someone booked it while you were filling in your details. Your answers
+                      are saved, so just pick another time.
                     </p>
                   </div>
                 ) : null}
-                <h2 className="text-lg font-semibold tracking-tight">Select a date &amp; time</h2>
-                <p className="mt-0.5 text-[13px] text-muted-foreground">
-                  Times are shown in your selected timezone.
-                </p>
+                <h2 className="text-base font-semibold tracking-tight text-foreground">
+                  Select a date &amp; time
+                </h2>
 
-                <div className="mt-5 grid gap-6 md:grid-cols-[minmax(272px,1fr)_188px]">
+                <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_13rem] md:gap-8">
                   <div>
                     <div className="flex items-center justify-between">
-                      <h3 className="text-[13px] font-semibold" suppressHydrationWarning>
+                      <h3
+                        className="text-sm font-medium tabular-nums text-foreground"
+                        suppressHydrationWarning
+                      >
                         {viewDate.toLocaleDateString(undefined, {
                           month: "long",
                           year: "numeric",
                         })}
                       </h3>
-                      <div className="flex gap-0.5">
+                      <div className="-mr-1.5 flex gap-1">
                         <Button
                           type="button"
                           variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full"
+                          size="icon-sm"
                           disabled={!canGoBack}
                           onClick={() => changeMonth(-1)}
                           aria-label="Previous month"
                         >
-                          <ChevronLeft className="h-4 w-4" />
+                          <ChevronLeft />
                         </Button>
                         <Button
                           type="button"
                           variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full"
+                          size="icon-sm"
                           onClick={() => changeMonth(1)}
                           aria-label="Next month"
                         >
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight />
                         </Button>
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-7 gap-1 text-center">
+                    <div className="mt-3 grid grid-cols-7 text-center">
                       {weekdays.map((weekday) => (
                         <div
                           key={weekday}
-                          className="py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70"
+                          className="pb-2 text-xs font-medium text-muted-foreground"
                         >
-                          {weekday.slice(0, 1)}
+                          {weekday}
                         </div>
                       ))}
                     </div>
-                    {loading && Object.keys(slots).length === 0 ? (
-                      <div className="grid grid-cols-7 gap-1">
+                    {firstLoad ? (
+                      <div className="grid grid-cols-7 gap-y-1">
                         {Array.from({ length: 35 }, (_, index) => (
-                          <Skeleton key={index} className="aspect-square rounded-full" />
+                          <Skeleton key={index} className="mx-auto size-10 rounded-full sm:size-11" />
                         ))}
                       </div>
                     ) : null}
-                    <div className={cn("grid grid-cols-7 gap-1", loading && Object.keys(slots).length === 0 && "hidden")}>
+                    <div className={cn("grid grid-cols-7 gap-y-1", firstLoad && "hidden")}>
                       {calendarDays.map((date, index) => {
                         if (!date) return <div key={`empty-${index}`} />;
                         const key = dayKey(date);
                         const available = (slots[key]?.length ?? 0) > 0;
                         const past = key < today;
                         const selected = key === selectedDay;
+                        const bookable = available && !past;
 
                         return (
                           <button
                             key={key}
                             type="button"
-                            data-testid={available && !past ? "day-available" : undefined}
-                            disabled={!available || past || loading}
+                            data-testid={bookable ? "day-available" : undefined}
+                            disabled={!bookable || loading}
                             aria-label={date.toLocaleDateString(undefined, {
                               weekday: "long",
                               month: "long",
@@ -768,19 +722,20 @@ export function BookingFlow({
                               setSelectedSlot(null);
                             }}
                             className={cn(
-                              "relative aspect-square rounded-full text-[13px] font-medium transition",
-                              selected &&
-                                "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
-                              !selected &&
-                                available &&
-                                !past &&
-                                "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground",
-                              (!available || past) && "cursor-default text-muted-foreground/35",
+                              "relative mx-auto flex size-10 items-center justify-center rounded-full text-sm tabular-nums transition-colors disabled:cursor-default sm:size-11",
+                              selected
+                                ? "bg-primary font-semibold text-primary-foreground"
+                                : bookable
+                                  ? "bg-accent font-semibold text-accent-foreground hover:ring-1 hover:ring-inset hover:ring-primary"
+                                  : "text-muted-foreground/60",
                             )}
                           >
                             {date.getDate()}
-                            {available && !past && !selected ? (
-                              <span className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary" />
+                            {key === today ? (
+                              <span
+                                className="absolute bottom-1.5 size-1 rounded-full bg-current"
+                                aria-hidden
+                              />
                             ) : null}
                           </button>
                         );
@@ -788,22 +743,19 @@ export function BookingFlow({
                     </div>
 
                     {loading ? (
-                      <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <p className="mt-4 flex items-center justify-center gap-2 text-meta text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin" />
                         Loading availability…
-                      </div>
+                      </p>
                     ) : null}
 
                     {!loading && !slotError && nextAvailable ? (
-                      <div className="mt-4 rounded-xl border border-dashed border-border/80 bg-muted/30 px-4 py-3 text-center">
-                        <p className="text-xs text-muted-foreground">
-                          No availability this month.
-                        </p>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border bg-muted/40 px-4 py-3">
+                        <p className="text-sm text-muted-foreground">No availability this month.</p>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="mt-2"
                           onClick={() => {
                             const key = `${nextAvailable.month.getFullYear()}-${nextAvailable.month.getMonth()}`;
                             setViewDate(nextAvailable.month);
@@ -816,68 +768,54 @@ export function BookingFlow({
                             month: "short",
                             day: "numeric",
                           })}
-                          <ChevronRight className="h-3.5 w-3.5" />
+                          <ChevronRight />
                         </Button>
                       </div>
                     ) : null}
                   </div>
 
-                  <div className="min-w-0 border-t pt-5 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                    <div className="flex min-h-8 items-center justify-between gap-2">
-                      {/* The date and the 12h/24h toggle share a narrow column;
-                          without nowrap the label breaks after the weekday. */}
-                      <div className="flex items-center gap-2 text-[13px] font-semibold">
-                        <Calendar className="h-4 w-4 shrink-0 text-muted-foreground/80" />
-                        <span className="whitespace-nowrap">
-                          {selectedDay
-                            ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString(undefined, {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "Select a date"}
-                        </span>
-                      </div>
-                      <div
-                        className="flex shrink-0 overflow-hidden rounded-md border border-border/80 text-[11px] font-semibold"
-                        role="group"
+                  <div className="min-w-0 border-t pt-5 md:border-t-0 md:pt-0">
+                    <div className="flex h-8 items-center justify-between gap-3">
+                      {/* The date shares a narrow column with the 12h/24h
+                          toggle; without nowrap it breaks after the weekday. */}
+                      <p className="whitespace-nowrap text-sm font-medium text-foreground">
+                        {selectedDay
+                          ? new Date(`${selectedDay}T12:00:00`).toLocaleDateString(undefined, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "Select a date"}
+                      </p>
+                      <Segmented
+                        size="sm"
                         aria-label="Time format"
-                      >
-                        <button
-                          type="button"
-                          aria-pressed={hour12}
-                          onClick={() => setHour12(true)}
-                          className={cn(
-                            "px-1.5 py-0.5 transition",
-                            hour12 ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                          )}
-                        >
-                          12h
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={!hour12}
-                          onClick={() => setHour12(false)}
-                          className={cn(
-                            "px-1.5 py-0.5 transition",
-                            !hour12 ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                          )}
-                        >
-                          24h
-                        </button>
-                      </div>
+                        value={hour12 ? "12h" : "24h"}
+                        onValueChange={(value) => setHour12(value === "12h")}
+                        options={[
+                          { value: "12h", label: "12h" },
+                          { value: "24h", label: "24h" },
+                        ]}
+                      />
                     </div>
 
-                    <div className="mt-3 max-h-[344px] space-y-1.5 overflow-y-auto pr-1">
+                    {/* The list scrolls on wider screens. Its negative margins
+                        keep focus rings unclipped and the scrollbar in the gap,
+                        so the buttons stay flush with the header above. */}
+                    <div className="mt-3 md:-mx-1 md:-mr-3 md:max-h-80 md:overflow-y-auto md:px-1 md:pr-3">
                       {loading ? (
-                        Array.from({ length: 6 }, (_, index) => (
-                          <Skeleton key={index} className="h-10 w-full rounded-lg" />
-                        ))
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-1">
+                          {Array.from({ length: 6 }, (_, index) => (
+                            <Skeleton key={index} className="h-10 rounded-lg" />
+                          ))}
+                        </div>
                       ) : slotError ? (
-                        <div className="rounded-lg border border-dashed p-4 text-sm">
-                          <AlertTriangle className="h-5 w-5 text-amber-500" />
-                          <p className="mt-2 font-medium">Couldn’t load times</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{slotError}</p>
+                        <div className="flex flex-col items-center px-2 py-8 text-center">
+                          <AlertTriangle className="size-5 text-warning" />
+                          <p className="mt-2 text-sm font-medium text-foreground">
+                            Couldn’t load times
+                          </p>
+                          <p className="mt-1 text-meta text-muted-foreground">{slotError}</p>
                           <Button
                             type="button"
                             variant="outline"
@@ -885,47 +823,41 @@ export function BookingFlow({
                             className="mt-4"
                             onClick={() => setReloadNonce((value) => value + 1)}
                           >
-                            <RefreshCw className="h-3.5 w-3.5" />
+                            <RefreshCw />
                             Try again
                           </Button>
                         </div>
-                      ) : !selectedDay ? (
-                        <p className="py-10 text-center text-xs leading-5 text-muted-foreground">
-                          Choose an available date to see times.
-                        </p>
-                      ) : daySlots.length === 0 ? (
-                        <p className="py-10 text-center text-xs text-muted-foreground">
-                          No times available on this date.
+                      ) : !selectedDay || daySlots.length === 0 ? (
+                        <p className="px-2 py-10 text-center text-meta text-muted-foreground">
+                          {!monthHasTimes
+                            ? "No times available this month."
+                            : !selectedDay
+                              ? "Choose an available date to see times."
+                              : "No times available on this date."}
                         </p>
                       ) : (
-                        daySlots.map((slot) => {
-                          const label = new Date(slot).toLocaleTimeString(undefined, {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12,
-                            timeZone,
-                          });
-                          // One click goes to the form.
-                          //
-                          // This used to arm the slot and split the row into
-                          // the time plus a Next button. Two taps for every
-                          // booking, to guard against a mistake that costs
-                          // nothing: the next screen is a form you have to fill
-                          // in, so nobody books by accident. Worse, the button
-                          // you then wanted appeared exactly where your finger
-                          // had just been and pushed the rest of the list down.
-                          return (
+                        <div className="grid grid-cols-3 gap-2 py-1 sm:grid-cols-4 md:grid-cols-1">
+                          {daySlots.map((slot) => (
+                            // One click goes to the form. Arming the slot first
+                            // and confirming with a Next button cost a second tap
+                            // on every booking to guard against a mistake the
+                            // form that follows already catches.
                             <button
                               key={slot}
                               type="button"
                               data-testid="slot"
                               onClick={() => chooseSlot(slot)}
-                              className="w-full rounded-lg border border-input bg-background py-2.5 text-[13px] font-semibold text-foreground transition hover:border-primary hover:bg-primary hover:text-primary-foreground active:scale-[0.99]"
+                              className={cn(
+                                "flex h-10 items-center justify-center rounded-lg border text-sm font-medium tabular-nums transition-colors",
+                                slot === selectedSlot
+                                  ? "border-primary bg-accent text-accent-foreground"
+                                  : "border-input bg-background text-foreground shadow-xs hover:border-primary hover:text-primary",
+                              )}
                             >
-                              {label}
+                              {formatTime(slot, timeZone, hour12)}
                             </button>
-                          );
-                        })
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -945,6 +877,7 @@ function BookingForm({
   service,
   duration,
   timeZone,
+  hour12,
   slot,
   preferredHostId,
   rescheduleUid,
@@ -963,6 +896,7 @@ function BookingForm({
   service: ServiceView;
   duration: number;
   timeZone: string;
+  hour12: boolean;
   slot: string;
   preferredHostId?: number;
   rescheduleUid?: string;
@@ -1068,96 +1002,107 @@ function BookingForm({
     formAction(formData);
   }
 
+  const end = new Date(new Date(slot).getTime() + duration * 60_000);
+
   return (
-    <div className="max-w-2xl">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to date and time
-      </button>
+    <div className="max-w-xl">
+      <h2 className="text-base font-semibold tracking-tight text-foreground">
+        Enter your details
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        We’ll send the confirmation and calendar invite to your email.
+      </p>
 
-      {/* The slot summary and provider both live in the sidebar, which stays
-          visible on this step (and stacks directly above the form on mobile).
-          Duplicating them here only pushed the form further down the page. */}
-
-      <div className="mt-5">
-        <h2 className="text-lg font-semibold tracking-tight">Enter your details</h2>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          We’ll send the confirmation and calendar invite to your email.
-        </p>
+      <div className="mt-5 flex items-center gap-3 rounded-lg border bg-muted/40 py-3 pl-4 pr-3">
+        <CalendarDays className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            {new Date(slot).toLocaleDateString(undefined, {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              timeZone,
+            })}
+          </p>
+          <p className="text-meta tabular-nums text-muted-foreground">
+            {formatTime(slot, timeZone, hour12)} – {formatTime(end, timeZone, hour12)}
+            {" · "}
+            {timeZoneLabel(timeZone)}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onBack}
+          aria-label="Change date and time"
+        >
+          Change
+        </Button>
       </div>
 
-      <form
-        action={submit}
-        className="mt-5 grid grid-cols-2 gap-x-3 gap-y-4"
-        noValidate
-      >
-        <div
-          aria-hidden="true"
-          className="absolute left-[-9999px] top-[-9999px] col-span-2 h-0 w-0 overflow-hidden"
-        >
+      <form action={submit} className="mt-6 grid grid-cols-2 gap-x-3 gap-y-5" noValidate>
+        <div aria-hidden="true" className="sr-only">
           <label htmlFor="company">Company</label>
           <input id="company" name="company" tabIndex={-1} autoComplete="off" />
         </div>
 
         <div className={widthOf("name") === "half" ? "col-span-2 sm:col-span-1" : "col-span-2"}>
-        <FormField label="Your name" htmlFor="name" required error={errors.name}>
-          <Input
-            id="name"
-            autoComplete="name"
-            autoFocus
-            aria-invalid={Boolean(errors.name)}
-            value={String(values.name ?? "")}
-            onChange={(event) => setValue("name", event.target.value)}
-          />
-        </FormField>
+          <FormField label="Your name" htmlFor="name" required error={errors.name}>
+            <Input
+              id="name"
+              autoComplete="name"
+              autoFocus
+              aria-invalid={Boolean(errors.name)}
+              value={String(values.name ?? "")}
+              onChange={(event) => setValue("name", event.target.value)}
+            />
+          </FormField>
         </div>
 
         <div className={widthOf("email") === "half" ? "col-span-2 sm:col-span-1" : "col-span-2"}>
-        <FormField label="Email address" htmlFor="email" required error={errors.email}>
-          <Input
-            id="email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            aria-invalid={Boolean(errors.email)}
-            value={String(values.email ?? "")}
-            onChange={(event) => setValue("email", event.target.value)}
-          />
-        </FormField>
+          <FormField label="Email address" htmlFor="email" required error={errors.email}>
+            <Input
+              id="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              aria-invalid={Boolean(errors.email)}
+              value={String(values.email ?? "")}
+              onChange={(event) => setValue("email", event.target.value)}
+            />
+          </FormField>
         </div>
 
         {!service.disableGuests ? (
           <div className="col-span-2">
-          <FormField
-            label="Invite guests"
-            htmlFor="guests"
-            hint="Optional — separate multiple addresses with commas"
-            error={errors.guests}
-          >
-            <div className="relative">
-              <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Textarea
-                id="guests"
-                rows={2}
-                className="pl-9"
-                placeholder="guest@example.com"
-                value={guestEmails}
-                onChange={(event) => {
-                  setGuestEmails(event.target.value);
-                  setErrors((current) => {
-                    if (!current.guests) return current;
-                    const next = { ...current };
-                    delete next.guests;
-                    return next;
-                  });
-                }}
-              />
-            </div>
-          </FormField>
+            <FormField
+              label="Invite guests"
+              htmlFor="guests"
+              hint="Optional. Separate addresses with commas."
+              error={errors.guests}
+            >
+              <div className="relative">
+                <Users className="absolute left-3 top-2.5 size-4 text-muted-foreground" aria-hidden />
+                <Textarea
+                  id="guests"
+                  rows={2}
+                  className="min-h-0 pl-9"
+                  placeholder="guest@example.com"
+                  value={guestEmails}
+                  onChange={(event) => {
+                    setGuestEmails(event.target.value);
+                    setErrors((current) => {
+                      if (!current.guests) return current;
+                      const next = { ...current };
+                      delete next.guests;
+                      return next;
+                    });
+                  }}
+                />
+              </div>
+            </FormField>
           </div>
         ) : null}
 
@@ -1177,10 +1122,10 @@ function BookingForm({
         ))}
 
         {spamProtection ? (
-          <div className="col-span-2 space-y-1.5">
+          <div className="col-span-2 grid gap-1.5">
             <AltchaWidget onChange={setAltcha} />
             {errors.altcha ? (
-              <p className="text-xs text-destructive">{errors.altcha}</p>
+              <p className="text-meta text-destructive">{errors.altcha}</p>
             ) : null}
           </div>
         ) : null}
@@ -1188,56 +1133,52 @@ function BookingForm({
         {state?.error && !state.conflict ? (
           <div
             role="alert"
-            className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            className="col-span-2 rounded-lg bg-destructive-subtle px-4 py-3 text-sm text-destructive"
           >
             {state.error}
           </div>
         ) : null}
 
-        <Button
-          type="submit"
-          data-testid="confirm-booking"
-          size="lg"
-          className="col-span-2 w-full rounded-xl"
-          disabled={pending}
-        >
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : service.requiresConfirmation ? (
-            <UserRound className="h-4 w-4" />
-          ) : (
-            <Check className="h-4 w-4" />
-          )}
-          {pending
-            ? "Scheduling…"
-            : service.requiresConfirmation
-              ? "Request booking"
-              : "Confirm booking"}
-        </Button>
+        <div className="col-span-2 mt-1 grid gap-3">
+          <Button
+            type="submit"
+            data-testid="confirm-booking"
+            size="lg"
+            className="w-full"
+            loading={pending}
+          >
+            {pending ? null : service.requiresConfirmation ? <UserRound /> : <Check />}
+            {pending
+              ? "Scheduling…"
+              : service.requiresConfirmation
+                ? "Request booking"
+                : "Confirm booking"}
+          </Button>
 
-        <p className="col-span-2 text-center text-xs leading-5 text-muted-foreground">
-          By continuing, you agree to receive emails about this booking
-          {legalLinks.length > 0 ? (
-            <>
-              {" "}
-              and accept our{" "}
-              {legalLinks.map((link, index) => (
-                <span key={link.label}>
-                  {index > 0 ? (index === legalLinks.length - 1 ? " and " : ", ") : null}
-                  <a
-                    href={link.href}
-                    target={link.external ? "_blank" : undefined}
-                    rel={link.external ? "noopener noreferrer" : undefined}
-                    className="font-medium text-foreground underline-offset-2 hover:underline"
-                  >
-                    {link.label}
-                  </a>
-                </span>
-              ))}
-            </>
-          ) : null}
-          .
-        </p>
+          <p className="text-center text-xs leading-5 text-muted-foreground">
+            By continuing, you agree to receive emails about this booking
+            {legalLinks.length > 0 ? (
+              <>
+                {" "}
+                and accept our{" "}
+                {legalLinks.map((link, index) => (
+                  <span key={link.label}>
+                    {index > 0 ? (index === legalLinks.length - 1 ? " and " : ", ") : null}
+                    <a
+                      href={link.href}
+                      target={link.external ? "_blank" : undefined}
+                      rel={link.external ? "noopener noreferrer" : undefined}
+                      className="font-medium text-foreground underline-offset-2 hover:underline"
+                    >
+                      {link.label}
+                    </a>
+                  </span>
+                ))}
+              </>
+            ) : null}
+            .
+          </p>
+        </div>
       </form>
     </div>
   );
@@ -1298,10 +1239,7 @@ function PhoneField({
             push(national, next);
           }}
         >
-          <SelectTrigger
-            aria-label="Country dialling code"
-            className="h-9 w-[5.75rem] shrink-0 bg-background text-sm"
-          >
+          <SelectTrigger aria-label="Country dialling code" className="w-24 shrink-0 tabular-nums">
             <SelectValue>+{countryFor(country).dial}</SelectValue>
           </SelectTrigger>
           <SelectContent className="max-h-72">
@@ -1358,37 +1296,35 @@ function CustomField({
   if (field.type === "checkbox") {
     const checked = value === true;
     return (
-      <div>
+      <div className="grid gap-1.5">
         <label
           className={cn(
-            "flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition",
-            checked
-              ? "border-primary bg-primary/[0.06]"
-              : "border-border hover:border-primary/40",
+            "flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm text-foreground transition-colors",
+            checked ? "border-primary bg-accent" : "hover:border-primary/50",
           )}
         >
           <input
             type="checkbox"
-            className="sr-only"
+            className="peer sr-only"
             checked={checked}
             onChange={(event) => onChange(event.target.checked)}
           />
           <span
             className={cn(
-              "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
+              "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border shadow-xs peer-focus-visible:ring-4 peer-focus-visible:ring-ring/25",
               checked
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-input bg-background",
             )}
           >
-            {checked ? <Check className="h-3.5 w-3.5" /> : null}
+            {checked ? <Check className="size-3" strokeWidth={3} /> : null}
           </span>
           <span>
             {field.label}
-            {field.required ? " *" : ""}
+            {field.required ? <RequiredMark /> : null}
           </span>
         </label>
-        {error ? <p className="mt-1.5 text-xs text-destructive">{error}</p> : null}
+        {error ? <p className="text-meta text-destructive">{error}</p> : null}
       </div>
     );
   }
@@ -1414,7 +1350,7 @@ function CustomField({
       {field.type === "textarea" ? (
         <Textarea
           id={field.name}
-          rows={4}
+          rows={3}
           aria-invalid={Boolean(error)}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
@@ -1425,7 +1361,7 @@ function CustomField({
           aria-invalid={Boolean(error)}
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(fieldClassName, "h-9 px-3")}
         >
           <option value="">Choose…</option>
           {(field.options ?? []).map((option) => (
@@ -1446,6 +1382,15 @@ function CustomField({
   );
 }
 
+function RequiredMark() {
+  return (
+    <span className="text-muted-foreground" aria-hidden>
+      {" *"}
+    </span>
+  );
+}
+
+/** Field with the booking form's required marker and inline error. */
 function FormField({
   label,
   htmlFor,
@@ -1462,14 +1407,18 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>
-        {label}
-        {required ? " *" : ""}
-      </Label>
+    <Field
+      label={
+        <>
+          {label}
+          {required ? <RequiredMark /> : null}
+        </>
+      }
+      htmlFor={htmlFor}
+      hint={error ? undefined : hint}
+    >
       {children}
-      {hint && !error ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-    </div>
+      {error ? <p className="text-meta text-destructive">{error}</p> : null}
+    </Field>
   );
 }

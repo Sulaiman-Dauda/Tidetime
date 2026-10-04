@@ -4,7 +4,7 @@ import { getCompanySettings } from "@/server/company-settings";
 import { CookieBanner } from "./cookie-banner";
 
 /**
- * Public footer + cookie notice driven by the company's Legal Contents
+ * Public footer and cookie notice driven by the company's Legal Contents
  * settings. Renders nothing extra when no legal links are configured.
  */
 export async function PublicLegal() {
@@ -31,7 +31,10 @@ export async function PublicLegal() {
   return (
     <>
       {links.length > 0 ? (
-        <nav className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 pb-10 text-xs text-muted-foreground">
+        <nav
+          aria-label="Legal"
+          className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 pb-10 text-xs text-muted-foreground"
+        >
           {links.map((l) =>
             l.external ? (
               <a

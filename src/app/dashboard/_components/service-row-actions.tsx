@@ -11,7 +11,7 @@ import {
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,12 +37,8 @@ import {
 } from "../services/actions";
 
 /**
- * Row actions for a service.
- *
- * These used to be five bare icon buttons in a row — including an unguarded
- * delete as the first one — which gave no clue what any of them did. Everything
- * secondary now lives behind one overflow menu with written labels, and delete
- * is separated at the bottom in destructive styling.
+ * Row actions for a service: one overflow menu with written labels, delete
+ * last and in destructive styling.
  *
  * The confirm dialogs are siblings of the menu rather than children: a Radix
  * menu unmounts its items on close, which would take a nested dialog with it.
@@ -80,12 +76,11 @@ export function ServiceRowActions({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            size="icon-sm"
             disabled={pending}
             aria-label={`More actions for ${title}`}
           >
-            <MoreHorizontal className="h-4 w-4" />
+            <MoreHorizontal />
           </Button>
         </DropdownMenuTrigger>
 
@@ -94,14 +89,14 @@ export function ServiceRowActions({
             disabled={!canMoveUp || pending}
             onSelect={() => run(reorderServicesAction, { direction: "up" })}
           >
-            <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
+            <ArrowUp />
             Move up
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={!canMoveDown || pending}
             onSelect={() => run(reorderServicesAction, { direction: "down" })}
           >
-            <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <ArrowDown />
             Move down
           </DropdownMenuItem>
 
@@ -111,7 +106,7 @@ export function ServiceRowActions({
             disabled={pending}
             onSelect={() => run(duplicateServiceAction, {})}
           >
-            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+            <Copy />
             Duplicate
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -125,9 +120,9 @@ export function ServiceRowActions({
             }}
           >
             {hidden ? (
-              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+              <Eye />
             ) : (
-              <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+              <EyeOff />
             )}
             {hidden ? "Show on booking page" : "Hide from booking page"}
           </DropdownMenuItem>
@@ -136,10 +131,10 @@ export function ServiceRowActions({
 
           <DropdownMenuItem
             disabled={pending}
-            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+            className="text-destructive focus:bg-destructive-subtle focus:text-destructive [&_svg]:text-destructive"
             onSelect={() => setConfirm("delete")}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 />
             Delete service
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -175,7 +170,7 @@ export function ServiceRowActions({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+              className={buttonVariants({ variant: "destructive" })}
               disabled={pending}
               onClick={() => run(deleteServiceAction, {})}
             >

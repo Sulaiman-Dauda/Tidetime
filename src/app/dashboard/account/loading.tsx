@@ -1,16 +1,14 @@
-import { FormCardSkeleton } from "@/components/skeletons";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormCardSkeleton, PageHeaderSkeleton } from "@/components/skeletons";
 
 export default function Loading() {
   return (
-    <div className="animate-fade-in space-y-8">
-      <div>
-        <Skeleton className="h-6 w-24" />
-        <Skeleton className="h-4 w-64 mt-0.5" />
+    <div className="space-y-6">
+      <PageHeaderSkeleton />
+      <div className="space-y-8">
+        <FormCardSkeleton />
+        <FormCardSkeleton />
+        <FormCardSkeleton />
       </div>
-      <FormCardSkeleton />
-      <FormCardSkeleton />
-      <FormCardSkeleton />
     </div>
   );
 }

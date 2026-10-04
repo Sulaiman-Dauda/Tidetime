@@ -24,6 +24,13 @@ test.describe("provider access boundaries", () => {
     await expect(navigation.getByText("Settings", { exact: true })).toHaveCount(0);
   });
 
+  test("is not offered service creation on the overview", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // Members cannot create services; the button used to end on an error.
+    await expect(page.getByText("New service", { exact: true })).toHaveCount(0);
+  });
+
   test("can view an assigned service but cannot edit it", async ({ page }) => {
     await page.goto("/dashboard/services");
     const content = page.locator("main");

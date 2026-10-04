@@ -5,10 +5,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn(
-        "rounded-2xl border border-border/60 bg-card text-card-foreground shadow-sm",
-        className,
-      )}
+      className={cn("rounded-xl border bg-card text-card-foreground shadow-xs", className)}
       {...props}
     />
   ),
@@ -17,7 +14,7 @@ Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex flex-col space-y-1 p-5", className)} {...props} />
+    <div ref={ref} className={cn("flex flex-col gap-1 p-5", className)} {...props} />
   ),
 );
 CardHeader.displayName = "CardHeader";
@@ -26,7 +23,7 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("font-semibold leading-none tracking-tight", className)}
+      className={cn("text-base font-semibold leading-6 tracking-tight", className)}
       {...props}
     />
   ),
@@ -47,4 +44,19 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 CardContent.displayName = "CardContent";
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent };
+/** Tinted strip along the bottom of a card, for its primary action (Save). */
+const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "flex items-center justify-end gap-2 rounded-b-xl border-t bg-muted/50 px-5 py-3",
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+CardFooter.displayName = "CardFooter";
+
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

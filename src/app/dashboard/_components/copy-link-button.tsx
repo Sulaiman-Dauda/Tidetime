@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Link2 } from "lucide-react";
 
+/** The company booking link: click to copy, arrow to open it in a new tab. */
 export function CopyLinkButton({ url, label }: { url: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -17,32 +18,34 @@ export function CopyLinkButton({ url, label }: { url: string; label: string }) {
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex h-8 min-w-0 items-center rounded-lg border bg-background shadow-xs">
       <button
         type="button"
         onClick={copy}
         title={copied ? "Copied" : `Copy ${label}`}
-        className="group flex h-8 min-w-0 items-center gap-2 rounded-full border border-border/60 bg-card px-2.5 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground sm:px-3"
+        className="flex h-full min-w-0 items-center gap-2 rounded-l-lg px-2.5 text-meta text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         {copied ? (
-          <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <Check className="size-3.5 shrink-0 text-success" />
         ) : (
-          <Copy className="h-3.5 w-3.5 shrink-0" />
+          <Link2 className="size-3.5 shrink-0" />
         )}
         {/* The URL is long; on phones the icon alone carries the action. */}
-        <span className="hidden truncate font-mono sm:inline sm:max-w-[36vw] lg:max-w-none">
-          {label}
+        <span className="hidden truncate sm:inline sm:max-w-64 lg:max-w-80">
+          {copied ? "Link copied" : label}
         </span>
         <span className="sr-only sm:hidden">Copy booking link</span>
       </button>
+      <span className="h-4 w-px shrink-0 bg-border" aria-hidden />
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
         title="Open booking page"
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        className="flex size-8 shrink-0 items-center justify-center rounded-r-lg text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
       >
-        <ExternalLink className="h-3.5 w-3.5" />
+        <ExternalLink className="size-3.5" />
+        <span className="sr-only">Open booking page</span>
       </a>
     </div>
   );

@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarX2, ExternalLink, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarX2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "../_components/page-header";
 import {
   Select,
   SelectContent,
@@ -38,7 +41,7 @@ interface Props {
   year: number;
   month: number;
   events: CalendarEvent[];
-  /** the month had more events than the query limit — some are not shown */
+  /** the month had more events than the query limit, so some are not shown */
   truncated: boolean;
   timeZone: string;
   hour12: boolean;
@@ -66,8 +69,8 @@ function monthKey(year: number, month: number): string {
 }
 
 /**
- * Month grid of day keys. Cells are plain "YYYY-MM-DD" strings — the same
- * vocabulary events are bucketed in — so no browser-local Date conversion can
+ * Month grid of day keys. Cells are plain "YYYY-MM-DD" strings, the same
+ * vocabulary events are bucketed in, so no browser-local Date conversion can
  * shift a booking onto the wrong cell.
  */
 function monthMatrix(year: number, month: number, weekStart: number): (string | null)[][] {
@@ -118,7 +121,7 @@ export function CalendarView({
   }
 
   /**
-   * Month cells are ~110px wide, and a full "10:00 AM" left almost nothing for
+   * Month cells are under 100px wide, and a full "10:00 AM" left almost nothing for
    * the title. Drop a zero minute and the space before the meridiem, the way
    * every other month grid does: "9am", "9:45am".
    */
@@ -185,7 +188,7 @@ export function CalendarView({
     return map;
   }, [events, timeZone]);
 
-  // "Today" in the profile timezone — the browser's clock must not decide
+  // "Today" in the profile timezone: the browser's clock must not decide
   // which cell gets the highlight.
   const todayKey = dayKeyInTz(new Date(), timeZone);
   const defaultSelected = useMemo(() => {
@@ -219,23 +222,21 @@ export function CalendarView({
       })
     : null;
 
+  const cells = rows.flat();
+  const lastRowStart = cells.length - 7;
+
   return (
-    <div className="animate-fade-in space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            A month-at-a-glance view — drag a booking to reschedule, or drag (or tap +) on a day to
-            add one.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {teamMembers.length > 1 ? (
+    <div className="space-y-6">
+      <PageHeader
+        title="Calendar"
+        description="Drag a booking to another day to reschedule it, or use + on a day to add one."
+        action={
+          teamMembers.length > 1 ? (
             <Select
               value={filterHostId === null ? "all" : String(filterHostId)}
               onValueChange={(value) => setFilterHostId(value === "all" ? null : Number(value))}
             >
-              <SelectTrigger aria-label="Filter by provider" className="h-8 w-auto min-w-[8.5rem] gap-2 text-sm">
+              <SelectTrigger aria-label="Filter by provider" className="h-8 w-auto min-w-36 text-meta">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -247,47 +248,69 @@ export function CalendarView({
                 ))}
               </SelectContent>
             </Select>
-          ) : null}
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/dashboard/calendar?month=${thisMonth}` as Route}>Today</Link>
-          </Button>
-          <div className="flex items-center rounded-xl border bg-card shadow-sm">
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-r-none">
-              <Link href={`/dashboard/calendar?month=${prev}` as Route} aria-label="Previous month">
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <span className="w-28 text-center text-sm font-medium tabular-nums sm:w-36">{monthLabel}</span>
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-l-none">
-              <Link href={`/dashboard/calendar?month=${next}` as Route} aria-label="Next month">
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       {truncated ? (
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
-          This month has more bookings than the calendar can display — some are hidden. Use the
+        <p
+          role="status"
+          className="rounded-lg border border-warning/20 bg-warning-subtle px-4 py-3 text-sm text-warning"
+        >
+          This month has more bookings than the calendar can show, so some are hidden. Use the
           provider filter or the Bookings page to see everything.
-        </div>
+        </p>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px] lg:items-start">
-        {/* Month grid — sticky on desktop so it stays in view while a busy day's
-            bookings scroll in the rail. Offset clears the sticky top bar (h-14). */}
-        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card lg:sticky lg:top-[72px] lg:self-start">
-          <div className="grid grid-cols-7 border-b border-border/50 bg-muted/30 text-center text-xs font-semibold text-foreground/60">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start">
+        {/* Sticky beside the day rail, so the month stays in view while a busy
+            day's bookings scroll. */}
+        <Card className="xl:sticky xl:top-6">
+          <div className="flex h-14 items-center justify-between gap-3 border-b px-4">
+            <h2 className="text-base font-semibold tracking-tight">{monthLabel}</h2>
+            <div className="flex items-center">
+              <Button
+                asChild
+                variant="outline"
+                size="icon-sm"
+                className="rounded-r-none focus-visible:z-10"
+              >
+                <Link href={`/dashboard/calendar?month=${prev}` as Route} aria-label="Previous month">
+                  <ChevronLeft />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="-ml-px rounded-none focus-visible:z-10"
+              >
+                <Link href={`/dashboard/calendar?month=${thisMonth}` as Route}>Today</Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="icon-sm"
+                className="-ml-px rounded-l-none focus-visible:z-10"
+              >
+                <Link href={`/dashboard/calendar?month=${next}` as Route} aria-label="Next month">
+                  <ChevronRight />
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 border-b bg-muted/50 text-xs font-medium text-muted-foreground">
             {weekdays.map((d) => (
-              <div key={d} className="py-2.5">
+              <div key={d} className="py-2 text-center sm:px-3 sm:text-left">
                 {d}
               </div>
             ))}
           </div>
           <div className="grid grid-cols-7">
-            {rows.flat().map((key, i) => {
-              if (!key) return <div key={i} className="min-h-[104px] border-b border-r border-border/50 bg-muted/10" />;
+            {cells.map((key, i) => {
+              const edges = cn((i + 1) % 7 !== 0 && "border-r", i < lastRowStart && "border-b");
+              if (!key) return <div key={i} className={cn("min-h-14 bg-muted/40 sm:min-h-28", edges)} />;
               const dayEvents = byDay.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selected;
@@ -329,20 +352,22 @@ export function CalendarView({
                     setDropKey(null);
                   }}
                   className={cn(
-                    "group relative min-h-[104px] cursor-pointer border-b border-r border-border/50 p-1.5 text-left align-top transition-all last:border-r-0 hover:bg-primary/8",
-                    isSelected && "bg-primary/12 ring-1 ring-inset ring-primary/20",
-                    isDropTarget && "bg-primary/15 ring-2 ring-inset ring-primary/50",
+                    "group min-h-14 cursor-pointer p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:min-h-28 sm:p-1.5",
+                    edges,
+                    isSelected ? "bg-accent/50" : "hover:bg-muted/40",
+                    isDropTarget && "bg-accent ring-2 ring-inset ring-primary/40",
                     pending && "opacity-60",
-                    (i + 1) % 7 === 0 && "border-r-0",
                   )}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-center sm:justify-between">
                     <span
                       className={cn(
-                        "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
+                        "inline-flex size-6 items-center justify-center rounded-full text-meta font-medium tabular-nums",
                         isToday
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-foreground/70 group-hover:text-foreground",
+                          ? "bg-primary text-primary-foreground"
+                          : isSelected
+                            ? "font-semibold text-accent-foreground"
+                            : "text-muted-foreground group-hover:text-foreground",
                       )}
                     >
                       {Number(key.slice(-2))}
@@ -354,12 +379,29 @@ export function CalendarView({
                         openCreate(key);
                       }}
                       aria-label={`Add booking on ${key}`}
-                      className="flex h-5 w-5 items-center justify-center rounded-md text-foreground/40 opacity-0 transition-all hover:bg-primary/15 hover:text-primary focus:opacity-100 group-hover:opacity-100"
+                      className="hidden size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 outline-none transition-[color,background-color,opacity] hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/40 group-hover:opacity-100 sm:flex"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Plus className="size-4" />
                     </button>
                   </div>
-                  <div className="mt-1 space-y-1">
+
+                  {/* Phones get dots: a 50px cell has no room for a readable chip,
+                      and tapping the day lists its bookings below. */}
+                  {dayEvents.length > 0 ? (
+                    <div className="mt-1 flex justify-center gap-0.5 sm:hidden" aria-hidden>
+                      {dayEvents.slice(0, 3).map((e) => (
+                        <span
+                          key={e.uid}
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            e.status === "pending" ? "bg-warning" : "bg-primary",
+                          )}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-1 hidden space-y-0.5 sm:block">
                     {dayEvents.slice(0, 3).map((e) => (
                       <div
                         key={e.uid}
@@ -374,17 +416,17 @@ export function CalendarView({
                           setDropKey(null);
                         }}
                         className={cn(
-                          "cursor-grab truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight active:cursor-grabbing",
-                          dragUid === e.uid && "opacity-40",
+                          "cursor-grab truncate rounded-md px-1.5 text-xs font-medium leading-5 active:cursor-grabbing",
                           e.status === "pending"
-                            ? "bg-amber-500/20 text-amber-800 dark:bg-amber-500/25 dark:text-amber-200"
-                            : "bg-primary/20 text-foreground dark:bg-primary/25 dark:text-foreground",
+                            ? "bg-warning-subtle text-warning"
+                            : "bg-accent text-accent-foreground",
+                          dragUid === e.uid && "opacity-40",
                         )}
-                        title={`${timeInTz(e.start)} ${e.title}${e.hostName ? ` · ${e.hostName}` : ""} — drag to another day to reschedule`}
+                        title={`${timeInTz(e.start)} ${e.title}${e.hostName ? ` · ${e.hostName}` : ""}\nDrag to another day to reschedule`}
                       >
-                        <span className="tabular-nums opacity-70">{compactTimeInTz(e.start)}</span>{" "}
+                        <span className="font-normal tabular-nums opacity-80">{compactTimeInTz(e.start)}</span>{" "}
                         {e.title}
-                        {e.hostName ? <span className="opacity-60"> · {e.hostName}</span> : null}
+                        {e.hostName ? <span className="font-normal opacity-80"> · {e.hostName}</span> : null}
                       </div>
                     ))}
                     {dayEvents.length > 3 ? (
@@ -394,7 +436,7 @@ export function CalendarView({
                           ev.stopPropagation();
                           setSelected(key);
                         }}
-                        className="w-full rounded px-1.5 text-left text-[11px] font-semibold text-primary/80 hover:text-primary"
+                        className="w-full rounded-md px-1.5 text-left text-xs font-medium leading-5 text-muted-foreground transition-colors hover:text-foreground"
                       >
                         +{dayEvents.length - 3} more
                       </button>
@@ -404,18 +446,19 @@ export function CalendarView({
               );
             })}
           </div>
-          <div className="flex items-center gap-4 border-t border-border/50 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+
+          <div className="flex items-center gap-4 border-t px-4 py-2.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-primary/60" aria-hidden />
+              <span className="size-2 rounded-full bg-primary" aria-hidden />
               Confirmed
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-amber-500/70" aria-hidden />
+              <span className="size-2 rounded-full bg-warning" aria-hidden />
               Awaiting approval
             </span>
-            {/* This is the viewer's display zone, not a schedule's zone — the
-                bare "Times in UTC" read as a contradiction next to a schedule
-                set in Europe/London. Say whose it is, and where to change it. */}
+            {/* The viewer's display zone, not a schedule's zone. A bare "Times
+                in UTC" read as a contradiction next to a schedule set in
+                Europe/London, so say whose it is and where to change it. */}
             <Link
               href={"/dashboard/account" as Route}
               className="ml-auto hidden transition-colors hover:text-foreground sm:block"
@@ -424,87 +467,74 @@ export function CalendarView({
               Your time zone · {timeZone.replace(/_/g, " ")}
             </Link>
           </div>
-        </div>
+        </Card>
 
-        {/* Day detail rail */}
-        <aside className="rounded-2xl border border-border/60 bg-card p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold">{selectedLabel ?? "Select a day"}</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+        <Card className="overflow-hidden">
+          <div className="flex h-14 items-center justify-between gap-3 border-b px-4">
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">{selectedLabel ?? "Select a day"}</h2>
+              <p className="text-meta text-muted-foreground tabular-nums">
                 {selectedEvents.length === 0
-                  ? "No meetings"
-                  : `${selectedEvents.length} meeting${selectedEvents.length === 1 ? "" : "s"}`}
+                  ? "No bookings"
+                  : `${selectedEvents.length} booking${selectedEvents.length === 1 ? "" : "s"}`}
               </p>
             </div>
             {selected ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 shrink-0 gap-1 px-2 text-xs"
-                onClick={() => openCreate(selected)}
-              >
-                <Plus className="h-3.5 w-3.5" />
+              <Button size="sm" variant="outline" onClick={() => openCreate(selected)}>
+                <Plus />
                 New
               </Button>
             ) : null}
           </div>
 
-          <div className="mt-4 space-y-2">
-            {selectedEvents.length === 0 ? (
-              <div className="flex flex-col items-center rounded-xl border border-dashed border-border/60 py-10 text-center">
-                <CalendarX2 className="h-6 w-6 text-foreground/25" />
-                <p className="mt-2 text-xs text-foreground/40">Nothing scheduled.</p>
-              </div>
-            ) : (
-              selectedEvents.map((e) => (
-                <Link
-                  key={e.uid}
-                  href={`/dashboard/bookings/${e.uid}` as Route}
-                  className="group block rounded-lg border border-border/50 bg-card p-3 transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium leading-tight">{e.title}</p>
-                    {e.status === "pending" ? (
-                      <Badge variant="secondary" className="shrink-0 text-[10px] gap-1">
-                        <Clock className="h-2.5 w-2.5" />
-                        Pending
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {timeInTz(e.start)} – {timeInTz(e.end)}
-                    </span>
-                    {e.attendee ? (
-                      <span className="flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5" />
-                        {e.attendee}
-                        {e.hostName ? <span className="text-muted-foreground/70">with {e.hostName}</span> : null}
-                      </span>
-                    ) : null}
-                    {e.location ? (
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5" />
-                        {e.location}
-                      </span>
-                    ) : null}
-                  </div>
-                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                    Open details <ExternalLink className="h-3 w-3" />
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </aside>
+          {selectedEvents.length === 0 ? (
+            <EmptyState bare icon={CalendarX2} title="Nothing scheduled" className="py-10" />
+          ) : (
+            <ul className="divide-y">
+              {selectedEvents.map((e) => (
+                <li key={e.uid}>
+                  <Link
+                    href={`/dashboard/bookings/${e.uid}` as Route}
+                    className="block px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 truncate text-sm font-medium">{e.title}</p>
+                      {e.status === "pending" ? <Badge variant="pending">Pending</Badge> : null}
+                    </div>
+                    <div className="mt-1.5 space-y-1 text-meta text-muted-foreground">
+                      <p className="flex items-center gap-2 tabular-nums">
+                        <Clock className="size-3.5 shrink-0" />
+                        {timeInTz(e.start)} – {timeInTz(e.end)}
+                      </p>
+                      {e.attendee ? (
+                        <p className="flex items-center gap-2">
+                          <User className="size-3.5 shrink-0" />
+                          <span className="truncate">
+                            {e.attendee}
+                            {e.hostName ? ` with ${e.hostName}` : null}
+                          </span>
+                        </p>
+                      ) : null}
+                      {e.location ? (
+                        <p className="flex items-center gap-2">
+                          <MapPin className="size-3.5 shrink-0" />
+                          <span className="truncate">{e.location}</span>
+                        </p>
+                      ) : null}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
 
       <QuickBookingDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         date={createDate}
+        locale={locale}
         services={services}
         providers={teamMembers}
       />

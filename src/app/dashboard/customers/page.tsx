@@ -2,14 +2,23 @@ import Link from "next/link";
 import type { Route } from "next";
 import { requirePermission } from "@/lib/guard";
 import { listCustomers, type CustomerSort } from "@/server/customers";
-import { resolveLocale } from "@/lib/format";
+import { initials, resolveLocale } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { FilterSelect } from "@/components/ui/filter-select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "../_components/page-header";
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Search, Users } from "lucide-react";
 
 export const metadata = { title: "Customers" };
 
@@ -50,7 +59,7 @@ export default async function CustomersPage({
     month: "short",
     day: "numeric",
   });
-  const formatDate = (d: Date | null) => (d ? dateFmt.format(new Date(d)) : "—");
+  const formatDate = (d: Date | null) => (d ? dateFmt.format(new Date(d)) : "None");
 
   const queryFor = (overrides: Record<string, string | undefined>) => {
     const next = new URLSearchParams();
@@ -62,7 +71,7 @@ export default async function CustomersPage({
   };
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Customers"
         description="Everyone who has booked with you, de-duplicated by email."
@@ -70,118 +79,154 @@ export default async function CustomersPage({
           total > 0 ? (
             <Button asChild size="sm" variant="outline">
               <a href="/api/customers/export" download>
-                <Download className="h-4 w-4" /> Export CSV
+                <Download /> Export CSV
               </a>
             </Button>
           ) : undefined
         }
       />
 
-      <form className="flex flex-wrap items-center gap-2">
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Search name, email or phone…"
-          className="flex h-9 w-full max-w-sm rounded-xl border border-input bg-card px-3 py-1 text-sm transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-        />
-        <FilterSelect
-          name="sort"
-          ariaLabel="Sort customers"
-          defaultValue={sort}
-          className="h-9 rounded-xl text-sm"
-          options={SORTS.map((s) => ({ value: s.value, label: s.label }))}
-        />
-        <Button type="submit" size="sm" variant="outline" className="h-9">
-          Apply
-        </Button>
-      </form>
-
-      {customers.length === 0 ? (
-        <EmptyState
-          brand
-          title={q ? "No matching customers" : "No customers yet"}
-          description={
-            q
-              ? "Try a different search term."
-              : "Customers appear here automatically once people book with you."
-          }
-        />
-      ) : (
-        <>
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground/70">
-                    <th className="px-5 py-4 font-medium">Name</th>
-                    <th className="px-5 py-4 font-medium">Contact</th>
-                    <th className="px-5 py-4 font-medium">Bookings</th>
-                    <th className="px-5 py-4 font-medium">Last appointment</th>
-                    <th className="px-5 py-4 font-medium">Since</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((c) => (
-                    <tr key={c.id} className="group border-b border-border/40 transition-colors last:border-0 hover:bg-secondary/30">
-                      <td className="px-5 py-4 font-medium">
-                        <Link
-                          href={`/dashboard/customers/${c.id}` as Route}
-                          className="hover:underline"
-                        >
-                          {c.name}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-4 text-muted-foreground">
-                        <a href={`mailto:${c.email}`} className="block hover:text-foreground hover:underline">
-                          {c.email}
-                        </a>
-                        {c.phoneNumber ? (
-                          <a href={`tel:${c.phoneNumber}`} className="block text-xs hover:text-foreground hover:underline">
-                            {c.phoneNumber}
-                          </a>
-                        ) : null}
-                      </td>
-                      <td className="px-5 py-4">
-                        <Badge variant="secondary">{c.bookingsCount}</Badge>
-                      </td>
-                      <td className="px-5 py-4 text-muted-foreground">{formatDate(c.lastBookingAt)}</td>
-                      <td className="px-5 py-4 text-muted-foreground">{formatDate(c.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <form className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-72">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Search name, email or phone…"
+                aria-label="Search customers"
+                className="h-8 pl-8 text-meta"
+              />
             </div>
-          </Card>
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between text-[13px] text-muted-foreground">
-              <span>
-                Page {page} of {totalPages} · {total} customer{total === 1 ? "" : "s"}
-              </span>
-              <div className="flex gap-2">
-                <Button asChild={page > 1} size="sm" variant="outline" disabled={page <= 1}>
-                  {page > 1 ? (
-                    <Link href={queryFor({ page: String(page - 1) }) as Route}>
-                      <ChevronLeft className="h-3.5 w-3.5" /> Previous
-                    </Link>
-                  ) : (
-                    <span><ChevronLeft className="h-3.5 w-3.5" /> Previous</span>
-                  )}
-                </Button>
-                <Button asChild={page < totalPages} size="sm" variant="outline" disabled={page >= totalPages}>
-                  {page < totalPages ? (
-                    <Link href={queryFor({ page: String(page + 1) }) as Route}>
-                      Next <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
-                  ) : (
-                    <span>Next <ChevronRight className="h-3.5 w-3.5" /></span>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <FilterSelect
+              name="sort"
+              ariaLabel="Sort customers"
+              defaultValue={sort}
+              options={SORTS.map((s) => ({ value: s.value, label: s.label }))}
+            />
+            <Button type="submit" size="sm" variant="outline">
+              Apply
+            </Button>
+          </form>
+          {total > 0 ? (
+            <p className="text-meta text-muted-foreground tabular-nums">
+              {total} customer{total === 1 ? "" : "s"}
+            </p>
           ) : null}
-        </>
-      )}
+        </div>
+
+        {customers.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title={q ? "No matching customers" : "No customers yet"}
+            description={
+              q
+                ? "Try a different search term."
+                : "Customers appear here automatically once people book with you."
+            }
+            action={
+              q ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/dashboard/customers">Clear search</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="hidden md:table-cell">Phone</TableHead>
+                  <TableHead className="text-right">Bookings</TableHead>
+                  <TableHead className="hidden sm:table-cell">Last booking</TableHead>
+                  <TableHead className="hidden lg:table-cell">Customer since</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="py-2.5">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="size-8">
+                          <AvatarFallback>{initials(c.name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 max-w-44 sm:max-w-xs">
+                          <Link
+                            href={`/dashboard/customers/${c.id}` as Route}
+                            className="block truncate rounded-sm font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+                          >
+                            {c.name}
+                          </Link>
+                          <a
+                            href={`mailto:${c.email}`}
+                            className="block truncate text-meta text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            {c.email}
+                          </a>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-muted-foreground tabular-nums md:table-cell">
+                      {c.phoneNumber ? (
+                        <a href={`tel:${c.phoneNumber}`} className="hover:text-foreground hover:underline">
+                          {c.phoneNumber}
+                        </a>
+                      ) : (
+                        "None"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{c.bookingsCount}</TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-muted-foreground tabular-nums sm:table-cell">
+                      {formatDate(c.lastBookingAt)}
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-muted-foreground tabular-nums lg:table-cell">
+                      {formatDate(c.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {totalPages > 1 ? (
+              <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-meta text-muted-foreground">
+                <span className="tabular-nums">
+                  Page {page} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <Button asChild={page > 1} size="sm" variant="outline" disabled={page <= 1}>
+                    {page > 1 ? (
+                      <Link href={queryFor({ page: String(page - 1) }) as Route}>
+                        <ChevronLeft /> Previous
+                      </Link>
+                    ) : (
+                      <span>
+                        <ChevronLeft /> Previous
+                      </span>
+                    )}
+                  </Button>
+                  <Button asChild={page < totalPages} size="sm" variant="outline" disabled={page >= totalPages}>
+                    {page < totalPages ? (
+                      <Link href={queryFor({ page: String(page + 1) }) as Route}>
+                        Next <ChevronRight />
+                      </Link>
+                    ) : (
+                      <span>
+                        Next <ChevronRight />
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

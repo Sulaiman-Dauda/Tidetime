@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,8 +22,12 @@ export function DeleteCustomerButton({ id, name }: { id: number; name: string })
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-          <Trash2 className="h-3.5 w-3.5" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive hover:bg-destructive-subtle hover:text-destructive"
+        >
+          <Trash2 />
           Delete customer
         </Button>
       </AlertDialogTrigger>
@@ -47,7 +51,7 @@ export function DeleteCustomerButton({ id, name }: { id: number; name: string })
             <input type="hidden" name="id" value={id} />
             <AlertDialogAction
               type="submit"
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+              className={buttonVariants({ variant: "destructive", className: "w-full sm:w-auto" })}
               disabled={pending}
             >
               {pending ? "Deleting…" : "Delete customer"}

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { AlertTriangle } from "lucide-react";
 import { getTeamService, getTeamHosts } from "@/server/teams-public";
 import { getBookingByUid } from "@/server/bookings";
 import { getCompanySettings } from "@/server/company-settings";
@@ -9,7 +8,7 @@ import type { FieldValues } from "@/lib/booking-fields";
 import { formatDuration } from "@/lib/format";
 import { BookingFlow, type BookingPrefill, type LegalLink } from "../../../_components/booking-flow";
 import { PublicLegal } from "../../../_components/public-legal";
-import { CompanyBrandHeader } from "../../../_components/company-brand-header";
+import { BookingUnavailable } from "../../../_components/booking-unavailable";
 
 interface Props {
   params: Promise<{ team: string; slug: string }>;
@@ -71,7 +70,7 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
 
   // On reschedule, prefill the booker's existing details so they don't re-enter
   // them. Only trust the stored booking when it belongs to this same service and
-  // is still active — otherwise the reschedule would be rejected anyway.
+  // is still active, since the reschedule would be rejected otherwise.
   let prefill: BookingPrefill | undefined;
   if (reschedule) {
     const existing = await getBookingByUid(reschedule);
@@ -95,29 +94,11 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
     }
   }
 
-  if (disabled) {
-    return (
-      <main className="min-h-screen bg-grid">
-        <CompanyBrandHeader />
-        <div className="mx-auto max-w-lg px-4 py-24 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
-            <AlertTriangle className="h-6 w-6 text-amber-600" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight">Booking temporarily unavailable</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Online booking is currently disabled while we make some improvements.
-            Please check back soon or contact us directly.
-          </p>
-        </div>
-        <PublicLegal />
-      </main>
-    );
-  }
+  if (disabled) return <BookingUnavailable />;
 
   return (
-    <main className="min-h-screen bg-grid">
-      {/* Accent bar only — the sidebar below carries the logo and company name. */}
-      <CompanyBrandHeader accentOnly />
+    <main className="flex min-h-screen flex-col bg-canvas">
+      {/* No page header: the booking card carries the company brand itself. */}
       <BookingFlow
         slug={slug}
         teamSlug={teamRow.slug}
@@ -136,8 +117,6 @@ export default async function TeamBookingPage({ params, searchParams }: Props) {
         }}
         // Teams rarely carry their own logo in the single-company model, so
         // fall back to the company profile logo from Settings → General.
-        // Without this the sidebar showed initials while the page header
-        // showed the real logo.
         company={{
           name: teamRow.name,
           logoUrl: teamRow.logoUrl || settings.profile.logoUrl || null,

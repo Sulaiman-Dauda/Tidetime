@@ -3,11 +3,11 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -16,6 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { initials } from "@/lib/format";
 import { can, canAssignRole } from "@/lib/rbac";
@@ -40,7 +46,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, UserPlus, Upload, Loader2, Check, Copy, Link2, Send, Crown } from "lucide-react";
+import { Trash2, UserPlus, Upload, Check, Copy, Link2, Send, Crown, MoreHorizontal } from "lucide-react";
 
 interface Member {
   membershipId: number;
@@ -50,6 +56,7 @@ interface Member {
   email: string;
   position: string | null;
   avatarUrl: string | null;
+  isSelf: boolean;
 }
 
 interface PendingInvite {
@@ -63,6 +70,8 @@ interface PendingInvite {
 }
 
 const ASSIGNABLE: MembershipRole[] = ["admin", "scheduler", "member"];
+
+const destructiveAction = buttonVariants({ variant: "destructive" });
 
 export function TeamMembers({
   teamId,
@@ -146,119 +155,149 @@ export function TeamMembers({
 
   return (
     <div className="space-y-6">
-      <Card className="p-5">
-        <h2 className="text-sm font-semibold">Members</h2>
-        <div className="mt-4 space-y-2">
-          {members.map((m) => (
-            <div key={m.membershipId} className="flex items-center justify-between gap-3 rounded-md border p-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar className="h-9 w-9 shrink-0">
-                  {m.avatarUrl ? <AvatarImage src={m.avatarUrl} alt="" /> : null}
-                  <AvatarFallback className="text-xs">{initials(m.name ?? m.email)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {m.name ?? m.email}
-                    {m.position ? (
-                      <span className="font-normal text-muted-foreground"> · {m.position}</span>
-                    ) : null}
+      {canInvite ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Invite a member</h2>
+            </CardTitle>
+            <CardDescription>They get an email with a link to create their account.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form action={invite} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <input type="hidden" name="teamId" value={teamId} />
+              <input type="hidden" name="role" value={inviteRole} />
+              <Field label="Email" htmlFor="invite-email" className="flex-1">
+                <Input id="invite-email" name="email" type="email" placeholder="person@company.com" required />
+              </Field>
+              <Field label="Role" htmlFor="invite-role" className="sm:w-40">
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as MembershipRole)}>
+                  <SelectTrigger id="invite-role" className="capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableRoles.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Button type="submit" loading={inviting}>
+                {inviting ? null : <UserPlus />}
+                Invite
+              </Button>
+            </form>
+
+            {inviteLink ? (
+              <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
+                <div className="space-y-1">
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <Link2 className="size-4 text-muted-foreground" />
+                    Invitation link
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">{m.email}</p>
+                  <p className="text-meta text-muted-foreground">
+                    We emailed this link, but email delivery isn&apos;t guaranteed on every setup. Share it
+                    with the invitee directly, as they need it to create their account.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={inviteLink}
+                    aria-label="Invitation link"
+                    className="h-8 flex-1 font-mono text-meta"
+                  />
+                  <Button type="button" size="sm" variant="outline" onClick={copyInviteLink}>
+                    {linkCopied ? <Check className="text-success" /> : <Copy />}
+                    {linkCopied ? "Copied" : "Copy"}
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {!m.accepted ? <Badge variant="secondary">Pending</Badge> : null}
-                {canManageRoles && m.role !== "owner" && canAssignRole(viewerRole, m.role) ? (
-                  <RoleSelect
-                    teamId={teamId}
-                    membershipId={m.membershipId}
-                    current={m.role}
-                    options={assignableRoles}
-                    onDone={() => router.refresh()}
-                  />
-                ) : (
-                  <Badge variant="outline" className="capitalize">
-                    {m.role}
-                  </Badge>
-                )}
-                {viewerRole === "owner" && m.role !== "owner" && m.accepted ? (
-                  <TransferOwnershipButton
-                    teamId={teamId}
-                    membershipId={m.membershipId}
-                    memberName={m.name ?? m.email}
-                    onDone={() => router.refresh()}
-                  />
-                ) : null}
-                {canRemove && m.role !== "owner" && canAssignRole(viewerRole, m.role) ? (
-                  <RemoveButton teamId={teamId} membershipId={m.membershipId} onDone={() => router.refresh()} />
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {canInvite ? (
-        <Card className="p-5">
-          <h2 className="text-sm font-semibold">Invite a member</h2>
-          <form action={invite} className="mt-4 flex flex-wrap items-end gap-3">
-            <input type="hidden" name="teamId" value={teamId} />
-            <input type="hidden" name="role" value={inviteRole} />
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor="invite-email">Email</Label>
-              <Input id="invite-email" name="email" type="email" placeholder="person@company.com" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Role</Label>
-              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as MembershipRole)}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableRoles.map((r) => (
-                    <SelectItem key={r} value={r} className="capitalize">
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" disabled={inviting}>
-              {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              Invite
-            </Button>
-          </form>
-
-          {inviteLink ? (
-            <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.04] p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-                <Link2 className="h-3.5 w-3.5 text-primary" />
-                Invitation link
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                We emailed this link, but email delivery isn&apos;t guaranteed on every setup. Share it
-                directly with the invitee — they need it to create their account.
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <Input readOnly value={inviteLink} className="h-8 flex-1 font-mono text-xs" />
-                <Button type="button" size="sm" variant="outline" className="h-8 shrink-0 gap-1.5" onClick={copyInviteLink}>
-                  {linkCopied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
-                  {linkCopied ? "Copied" : "Copy"}
-                </Button>
-              </div>
-            </div>
-          ) : null}
+            ) : null}
+          </CardContent>
         </Card>
       ) : null}
 
+      <Card>
+        <CardHeader className="flex-row items-baseline gap-2 border-b py-4">
+          <CardTitle>
+            <h2>Members</h2>
+          </CardTitle>
+          <span className="text-sm tabular-nums text-muted-foreground">{members.length}</span>
+        </CardHeader>
+        <ul className="divide-y">
+          {members.map((m) => {
+            const editable = m.role !== "owner" && canAssignRole(viewerRole, m.role);
+            const showTransfer = viewerRole === "owner" && m.role !== "owner" && m.accepted;
+            const showRemove = canRemove && editable;
+            return (
+              <li
+                key={m.membershipId}
+                className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:gap-4"
+              >
+                <MemberIdentity member={m} />
+                <div className="flex items-center gap-3 pl-11 sm:gap-4 sm:pl-0">
+                  <div className="sm:w-20">
+                    {m.accepted ? (
+                      <Badge variant="success" dot>
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="pending" dot>
+                        Pending
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="w-32">
+                    {canManageRoles && editable ? (
+                      <RoleSelect
+                        teamId={teamId}
+                        membershipId={m.membershipId}
+                        memberName={m.name ?? m.email}
+                        current={m.role}
+                        options={assignableRoles}
+                      />
+                    ) : (
+                      <span className="flex h-8 items-center border border-transparent px-3 text-sm capitalize text-muted-foreground">
+                        {m.role}
+                      </span>
+                    )}
+                  </div>
+                  <div className="ml-auto flex w-8 justify-end sm:ml-0">
+                    {showTransfer || showRemove ? (
+                      <MemberActions
+                        teamId={teamId}
+                        membershipId={m.membershipId}
+                        memberName={m.name ?? m.email}
+                        canTransfer={showTransfer}
+                        canRemove={showRemove}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
       {canInvite && pendingInvites.length > 0 ? (
-        <Card className="p-5">
-          <h2 className="text-sm font-semibold">Pending invitations</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Invited people who haven&apos;t created an account yet. Copy a link to share it directly,
-            or revoke it to free up the email address for a fresh invite.
-          </p>
-          <div className="mt-4 space-y-2">
+        <Card>
+          <CardHeader className="border-b py-4">
+            <div className="flex items-baseline gap-2">
+              <CardTitle>
+                <h2>Pending invitations</h2>
+              </CardTitle>
+              <span className="text-sm tabular-nums text-muted-foreground">{pendingInvites.length}</span>
+            </div>
+            <CardDescription>
+              People invited who haven&apos;t created an account yet. Copy a link to share it directly,
+              or revoke it to free up the email address for a fresh invite.
+            </CardDescription>
+          </CardHeader>
+          <ul className="divide-y">
             {pendingInvites.map((inv) => (
               <InviteRow
                 key={inv.id}
@@ -268,39 +307,71 @@ export function TeamMembers({
                 onCopy={() => copyPendingLink(inv.url, inv.id)}
               />
             ))}
-          </div>
+          </ul>
         </Card>
       ) : null}
 
       {canInvite ? (
-        <Card className="p-5">
-          <h2 className="text-sm font-semibold">Bulk import</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Paste CSV with columns: <code>email,name,role</code>. Existing accounts join the team
-            immediately; unknown emails are reported so you can invite them individually.
-          </p>
-          <form action={runImport} className="mt-3 space-y-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Bulk import</h2>
+            </CardTitle>
+            <CardDescription>
+              Paste CSV with the columns <code className="font-mono text-meta">email,name,role</code>.
+              Existing accounts join the team straight away; unknown emails are reported so you can
+              invite them individually.
+            </CardDescription>
+          </CardHeader>
+          <form action={runImport}>
             <input type="hidden" name="teamId" value={teamId} />
-            <Textarea
-              name="csv"
-              rows={5}
-              placeholder={"email,name,role\njane@acme.co,Jane,member"}
-              required
-            />
-            <Button type="submit" variant="outline" disabled={importing}>
-              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Import
-            </Button>
+            <CardContent className="space-y-3">
+              <Textarea
+                name="csv"
+                rows={5}
+                aria-label="CSV to import"
+                className="font-mono text-meta"
+                placeholder={"email,name,role\njane@acme.co,Jane,member"}
+                required
+              />
+              {importState?.errors && importState.errors.length > 0 ? (
+                <ul className="space-y-0.5 text-meta text-destructive">
+                  {importState.errors.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" variant="outline" loading={importing}>
+                {importing ? null : <Upload />}
+                Import
+              </Button>
+            </CardFooter>
           </form>
-          {importState?.errors && importState.errors.length > 0 ? (
-            <ul className="mt-3 space-y-0.5 text-xs text-destructive">
-              {importState.errors.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
-          ) : null}
         </Card>
       ) : null}
+    </div>
+  );
+}
+
+function MemberIdentity({ member: m }: { member: Member }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <Avatar className="size-8">
+        {m.avatarUrl ? <AvatarImage src={m.avatarUrl} alt="" /> : null}
+        <AvatarFallback>{initials(m.name ?? m.email)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-medium">{m.name ?? m.email}</p>
+          {m.isSelf ? <Badge variant="secondary">You</Badge> : null}
+        </div>
+        <p className="truncate text-meta text-muted-foreground">
+          {m.position ? `${m.position} · ` : ""}
+          {m.email}
+        </p>
+      </div>
     </div>
   );
 }
@@ -308,27 +379,28 @@ export function TeamMembers({
 function RoleSelect({
   teamId,
   membershipId,
+  memberName,
   current,
   options,
-  onDone,
 }: {
   teamId: number;
   membershipId: number;
+  memberName: string;
   current: MembershipRole;
   options: MembershipRole[];
-  onDone: () => void;
 }) {
+  const router = useRouter();
   const { toast } = useToast();
   const [state, action] = useActionState<TeamState, FormData>(changeMemberRoleAction, null);
 
   useEffect(() => {
     if (state?.ok) {
       toast({ title: "Role updated" });
-      onDone();
+      router.refresh();
     } else if (state?.error) {
       toast({ title: "Couldn't update role", description: state.error, variant: "destructive" });
     }
-  }, [state, toast, onDone]);
+  }, [state, toast, router]);
 
   return (
     <form action={action}>
@@ -344,7 +416,7 @@ function RoleSelect({
           action(fd);
         }}
       >
-        <SelectTrigger className="h-8 w-36 capitalize">
+        <SelectTrigger className="h-8 capitalize" aria-label={`Role for ${memberName}`}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -359,112 +431,132 @@ function RoleSelect({
   );
 }
 
-function RemoveButton({
-  teamId,
-  membershipId,
-  onDone,
-}: {
-  teamId: number;
-  membershipId: number;
-  onDone: () => void;
-}) {
-  const { toast } = useToast();
-  const [state, action, pending] = useActionState<TeamState, FormData>(removeMemberAction, null);
-
-  useEffect(() => {
-    if (state?.ok) {
-      toast({ title: "Member removed" });
-      onDone();
-    } else if (state?.error) {
-      toast({ title: "Couldn't remove member", description: state.error, variant: "destructive" });
-    }
-  }, [state, toast, onDone]);
-
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={pending} aria-label="Remove member">
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Remove this member?</AlertDialogTitle>
-          <AlertDialogDescription>
-            They lose access to the dashboard and are unassigned from all services. Their past
-            bookings are kept.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <form action={action}>
-            <input type="hidden" name="teamId" value={teamId} />
-            <input type="hidden" name="membershipId" value={membershipId} />
-            <AlertDialogAction
-              type="submit"
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
-              disabled={pending}
-            >
-              Remove member
-            </AlertDialogAction>
-          </form>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function TransferOwnershipButton({
+/** Row menu for transferring ownership and removing a member. Each item opens
+ *  its own confirmation; the menu is non-modal so the dialog can take focus. */
+function MemberActions({
   teamId,
   membershipId,
   memberName,
-  onDone,
+  canTransfer,
+  canRemove,
 }: {
   teamId: number;
   membershipId: number;
   memberName: string;
-  onDone: () => void;
+  canTransfer: boolean;
+  canRemove: boolean;
 }) {
+  const router = useRouter();
   const { toast } = useToast();
-  const [state, action, pending] = useActionState<TeamState, FormData>(transferOwnershipAction, null);
+  const [confirm, setConfirm] = useState<"transfer" | "remove" | null>(null);
+  const [removeState, remove, removing] = useActionState<TeamState, FormData>(removeMemberAction, null);
+  const [transferState, transfer, transferring] = useActionState<TeamState, FormData>(
+    transferOwnershipAction,
+    null,
+  );
 
   useEffect(() => {
-    if (state?.ok) {
-      toast({ title: "Ownership transferred", description: "You are now an admin of this company." });
-      onDone();
-    } else if (state?.error) {
-      toast({ title: "Couldn't transfer ownership", description: state.error, variant: "destructive" });
+    if (removeState?.ok) {
+      toast({ title: "Member removed" });
+      router.refresh();
+    } else if (removeState?.error) {
+      toast({ title: "Couldn't remove member", description: removeState.error, variant: "destructive" });
     }
-  }, [state, toast, onDone]);
+  }, [removeState, toast, router]);
+
+  useEffect(() => {
+    if (transferState?.ok) {
+      toast({ title: "Ownership transferred", description: "You are now an admin of this company." });
+      router.refresh();
+    } else if (transferState?.error) {
+      toast({ title: "Couldn't transfer ownership", description: transferState.error, variant: "destructive" });
+    }
+  }, [transferState, toast, router]);
+
+  const confirmOpenChange = (which: "transfer" | "remove") => (open: boolean) =>
+    setConfirm(open ? which : null);
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={pending} aria-label="Transfer ownership" title="Transfer ownership">
-          <Crown className="h-4 w-4" />
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Make {memberName} the owner?</AlertDialogTitle>
-          <AlertDialogDescription>
-            They become the company owner and you become an admin. Only the new owner can transfer
-            ownership back.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <form action={action}>
-            <input type="hidden" name="teamId" value={teamId} />
-            <input type="hidden" name="membershipId" value={membershipId} />
-            <AlertDialogAction type="submit" disabled={pending}>
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={removing || transferring}
+            aria-label={`Actions for ${memberName}`}
+          >
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canTransfer ? (
+            <DropdownMenuItem onSelect={() => setConfirm("transfer")}>
+              <Crown />
               Transfer ownership
-            </AlertDialogAction>
-          </form>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            </DropdownMenuItem>
+          ) : null}
+          {canRemove ? (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive [&_svg]:text-destructive"
+              onSelect={() => setConfirm("remove")}
+            >
+              <Trash2 />
+              Remove member
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={confirm === "transfer"} onOpenChange={confirmOpenChange("transfer")}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make {memberName} the owner?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They become the company owner and you become an admin. Only the new owner can transfer
+              ownership back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <form action={transfer}>
+              <input type="hidden" name="teamId" value={teamId} />
+              <input type="hidden" name="membershipId" value={membershipId} />
+              <AlertDialogAction type="submit" disabled={transferring}>
+                Transfer ownership
+              </AlertDialogAction>
+            </form>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirm === "remove"} onOpenChange={confirmOpenChange("remove")}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {memberName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They lose access to the dashboard and are unassigned from all services. Their past
+              bookings are kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <form action={remove}>
+              <input type="hidden" name="teamId" value={teamId} />
+              <input type="hidden" name="membershipId" value={membershipId} />
+              <AlertDialogAction type="submit" className={destructiveAction} disabled={removing}>
+                Remove member
+              </AlertDialogAction>
+            </form>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
+}
+
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 /** One pending invitation with its own action state, so resending or revoking
@@ -504,29 +596,31 @@ function InviteRow({
   }, [resendState, toast, router]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-sm font-medium">{inv.email}</p>
-          <Badge variant="outline" className="capitalize">{inv.role}</Badge>
+          <Badge variant="outline" className="capitalize">
+            {inv.role}
+          </Badge>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           {inv.invitedBy ? `Invited by ${inv.invitedBy} · ` : ""}
-          {new Date(inv.invitedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-          {" · expires "}
-          {new Date(inv.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          {formatShortDate(inv.invitedAt)}
+          {" · Expires "}
+          {formatShortDate(inv.expiresAt)}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5" onClick={onCopy}>
-          {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Link2 className="h-3.5 w-3.5" />}
+        <Button type="button" size="sm" variant="outline" onClick={onCopy}>
+          {copied ? <Check className="text-success" /> : <Link2 />}
           {copied ? "Copied" : "Copy link"}
         </Button>
         <form action={resend}>
           <input type="hidden" name="inviteId" value={inv.id} />
           <input type="hidden" name="teamId" value={teamId} />
-          <Button type="submit" size="sm" variant="outline" className="h-8 gap-1.5" disabled={resending}>
-            <Send className="h-3.5 w-3.5" />
+          <Button type="submit" size="sm" variant="outline" loading={resending}>
+            {resending ? null : <Send />}
             {resending ? "Sending…" : "Resend"}
           </Button>
         </form>
@@ -536,10 +630,10 @@ function InviteRow({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 gap-1.5 text-destructive hover:text-destructive"
+              className="text-destructive hover:text-destructive"
               disabled={revoking}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 />
               Revoke
             </Button>
           </AlertDialogTrigger>
@@ -556,11 +650,7 @@ function InviteRow({
               <form action={revoke}>
                 <input type="hidden" name="inviteId" value={inv.id} />
                 <input type="hidden" name="teamId" value={teamId} />
-                <AlertDialogAction
-                  type="submit"
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
-                  disabled={revoking}
-                >
+                <AlertDialogAction type="submit" className={destructiveAction} disabled={revoking}>
                   Revoke
                 </AlertDialogAction>
               </form>
@@ -568,6 +658,6 @@ function InviteRow({
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </div>
+    </li>
   );
 }

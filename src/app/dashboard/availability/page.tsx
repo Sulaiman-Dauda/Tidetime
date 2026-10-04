@@ -55,19 +55,17 @@ export default async function AvailabilityPage({ searchParams }: Props) {
     all[0];
 
   if (!active) {
-    // No schedule at all (legacy data) — the provider is offering zero public
+    // No schedule at all (legacy data): the provider is offering zero public
     // slots. Surface that instead of rendering a broken editor.
     return (
-      <div className="animate-fade-in space-y-8">
+      <div className="space-y-6">
         <PageHeader title="Availability" description="Set the hours people can book you." />
         <EmptyState
           brand
           title={editingOther ? `${target.name ?? target.username} has no schedule` : "No schedule yet"}
-          description="Without a schedule there are no bookable hours. Create one to set working hours — it starts with weekdays 9:00–17:00."
+          description="Without a schedule there are no bookable hours. Create one to set working hours. It starts with weekdays 9:00 to 17:00."
+          action={<CreateScheduleButton targetUserId={editingOther ? target.id : undefined} />}
         />
-        <div className="flex justify-center">
-          <CreateScheduleButton targetUserId={editingOther ? target.id : undefined} />
-        </div>
       </div>
     );
   }
@@ -102,18 +100,16 @@ export default async function AvailabilityPage({ searchParams }: Props) {
   const overrides = Array.from(overridesMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
   return (
-    <div className="space-y-8">
-      <AvailabilityEditor
-        schedule={{ id: active.id, name: active.name, timeZone: active.timeZone ?? target.timeZone }}
-        schedules={all.map((s) => ({ id: s.id, name: s.name, isDefault: s.id === target.defaultScheduleId }))}
-        initialWeekly={weekly}
-        initialOverrides={overrides}
-        weekStart={user.weekStart}
-        targetUserId={editingOther ? target.id : undefined}
-        targetName={editingOther ? target.name ?? target.username : undefined}
-        members={members.map((m) => ({ id: m.id, name: m.name ?? m.username }))}
-        viewerId={user.id}
-      />
-    </div>
+    <AvailabilityEditor
+      schedule={{ id: active.id, name: active.name, timeZone: active.timeZone ?? target.timeZone }}
+      schedules={all.map((s) => ({ id: s.id, name: s.name, isDefault: s.id === target.defaultScheduleId }))}
+      initialWeekly={weekly}
+      initialOverrides={overrides}
+      weekStart={user.weekStart}
+      targetUserId={editingOther ? target.id : undefined}
+      targetName={editingOther ? target.name ?? target.username : undefined}
+      members={members.map((m) => ({ id: m.id, name: m.name ?? m.username }))}
+      viewerId={user.id}
+    />
   );
 }

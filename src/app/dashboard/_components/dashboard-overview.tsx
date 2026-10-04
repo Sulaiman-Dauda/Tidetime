@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Clock, Copy, Check, ArrowRight, User, UserRound, Sparkles, MapPin, Video } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
+import { CalendarDays, Check, ChevronRight, Copy, ExternalLink, Inbox } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
+import { initials } from "@/lib/format";
+import { addDaysToKey, formatDateKey } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import { NewServiceButton } from "./new-service-button";
-import { CountUp } from "./count-up";
 
 interface OverviewEvent {
   uid: string;
@@ -17,13 +21,12 @@ interface OverviewEvent {
   /** set only in team-wide views so owners can tell whose meeting it is */
   hostName: string | null;
   location: string | null;
-  meetingUrl: string | null;
 }
 
 export interface OverviewData {
   upcoming: number;
   pending: number;
-  /** true total for today — the list below may be capped */
+  /** true total for today; the list below may be capped */
   todayCount: number;
   today: OverviewEvent[];
   thisWeek: OverviewEvent[];
@@ -31,17 +34,25 @@ export interface OverviewData {
   nextUpcoming: OverviewEvent | null;
 }
 
+interface DaySection {
+  key: string;
+  /** "Today", "Tomorrow" or "Next up" in front of the date */
+  lead: string | null;
+  date: string;
+  note: string | null;
+  events: OverviewEvent[];
+}
+
 export function DashboardOverview({
-  greeting,
-  todayLabel,
+  todayKey,
   timeZone,
   hour12,
   locale,
   bookingUrl,
   data,
 }: {
-  greeting: string;
-  todayLabel: string;
+  /** "YYYY-MM-DD" in the viewer's zone, from the server so hydration agrees */
+  todayKey: string;
   timeZone: string;
   hour12: boolean;
   locale: string;
@@ -51,21 +62,11 @@ export function DashboardOverview({
   const [copied, setCopied] = useState(false);
 
   function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString(locale, {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12,
-      timeZone,
-    });
+    return new Date(iso).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit", hour12, timeZone });
   }
 
   function formatDay(iso: string): string {
-    return new Date(iso).toLocaleDateString(locale, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      timeZone,
-    });
+    return new Date(iso).toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", timeZone });
   }
 
   async function copyLink() {
@@ -74,216 +75,219 @@ export function DashboardOverview({
       await navigator.clipboard.writeText(bookingUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* noop */ }
+    } catch {
+      /* clipboard unavailable */
+    }
   }
 
-  const displayUrl = bookingUrl?.replace(/^https?:\/\//, "") ?? "";
-  // The card is a quarter of the row; a full URL truncates to the host, which
-  // is the least useful half. Show the path — that is what identifies the page.
-  const displayPath = displayUrl.slice(displayUrl.indexOf("/")) || displayUrl;
-  const quiet = data.today.length === 0 && data.thisWeek.length === 0;
+  const tomorrowKey = addDaysToKey(todayKey, 1);
+  const sections: DaySection[] = [];
+  if (data.today.length > 0) {
+    sections.push({
+      key: todayKey,
+      lead: "Today",
+      date: formatDay(data.today[0].startTime),
+      note: data.todayCount > data.today.length ? `Showing ${data.today.length} of ${data.todayCount}` : null,
+      events: data.today,
+    });
+  }
+  for (const event of data.thisWeek) {
+    const key = formatDateKey(new Date(event.startTime), timeZone);
+    const last = sections[sections.length - 1];
+    if (last && last.key === key) {
+      last.events.push(event);
+      continue;
+    }
+    sections.push({
+      key,
+      lead: key === tomorrowKey ? "Tomorrow" : null,
+      date: formatDay(event.startTime),
+      note: null,
+      events: [event],
+    });
+  }
+  const quiet = sections.length === 0;
+  if (quiet && data.nextUpcoming) {
+    sections.push({
+      key: "next",
+      lead: "Next up",
+      date: formatDay(data.nextUpcoming.startTime),
+      note: null,
+      events: [data.nextUpcoming],
+    });
+  }
+  const showProvider = sections.some((section) => section.events.some((event) => event.hostName !== null));
+
+  const stats = [
+    { label: "Today", value: data.todayCount, href: "/dashboard/calendar", attention: false },
+    { label: "Upcoming", value: data.upcoming, href: "/dashboard/bookings?tab=upcoming", attention: false },
+    { label: "Pending", value: data.pending, href: "/dashboard/bookings?tab=pending", attention: data.pending > 0 },
+  ];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{greeting}</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{todayLabel}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <NewServiceButton size="sm" />
-        </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        {stats.map((stat) => (
+          <Link
+            key={stat.label}
+            href={stat.href as Route}
+            className="rounded-xl outline-none focus-visible:ring-4 focus-visible:ring-ring/25"
+          >
+            <Card className="h-full p-4 transition-colors hover:bg-muted/40 sm:p-5">
+              <p className="flex items-center gap-1.5 text-meta text-muted-foreground">
+                {stat.attention ? <span className="size-1.5 rounded-full bg-warning" aria-hidden /> : null}
+                {stat.label}
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                {stat.value}
+              </p>
+            </Card>
+          </Link>
+        ))}
       </div>
 
-      {/* Quick actions */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Link
-          href="/dashboard/calendar"
-          className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Calendar className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="tabular-stat text-xl font-semibold"><CountUp value={data.todayCount} /></p>
-            <p className="text-xs text-muted-foreground">Today</p>
-          </div>
-        </Link>
+      <div className={cn("grid gap-6", bookingUrl && "lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start")}>
+        <Card className="overflow-hidden">
+          <CardHeader className="flex-row items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle>Schedule</CardTitle>
+              <CardDescription>Confirmed bookings over the next 7 days.</CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="-mr-2">
+              <Link href="/dashboard/bookings">View all</Link>
+            </Button>
+          </CardHeader>
 
-        <Link
-          href="/dashboard/bookings?tab=upcoming"
-          className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Clock className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="tabular-stat text-xl font-semibold"><CountUp value={data.upcoming} /></p>
-            <p className="text-xs text-muted-foreground">Upcoming</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/dashboard/bookings?tab=pending"
-          className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-            <UserRound className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="tabular-stat text-xl font-semibold"><CountUp value={data.pending} /></p>
-            <p className="text-xs text-muted-foreground">Pending</p>
-          </div>
-        </Link>
+          {sections.length > 0 ? (
+            <div className="divide-y border-t">
+              {quiet ? (
+                <p className="px-4 py-3 text-meta text-muted-foreground sm:px-5">
+                  Nothing scheduled in the next 7 days.
+                </p>
+              ) : null}
+              {sections.map((section) => (
+                <section key={section.key} aria-labelledby={`overview-${section.key}`}>
+                  <h3
+                    id={`overview-${section.key}`}
+                    className="flex items-center gap-1.5 border-b bg-muted/40 px-4 py-2 text-meta font-medium text-muted-foreground sm:px-5"
+                  >
+                    {section.lead ? (
+                      <>
+                        <span className="text-foreground">{section.lead}</span>
+                        <span aria-hidden>·</span>
+                      </>
+                    ) : null}
+                    <span className="truncate">{section.date}</span>
+                    {section.note ? <span className="ml-auto shrink-0 font-normal">{section.note}</span> : null}
+                  </h3>
+                  <div className="divide-y">
+                    {section.events.map((event) => (
+                      <EventRow
+                        key={event.uid}
+                        event={event}
+                        formatTime={formatTime}
+                        showProvider={showProvider}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : data.pending > 0 ? (
+            <EmptyState
+              bare
+              icon={Inbox}
+              title="Nothing confirmed yet"
+              description={`${data.pending} booking request${data.pending === 1 ? " is" : "s are"} waiting for your decision.`}
+              action={
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/dashboard/bookings?tab=pending">Review requests</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              bare
+              icon={CalendarDays}
+              title="No upcoming bookings"
+              description="Share your booking page to start receiving meetings."
+            />
+          )}
+        </Card>
 
         {bookingUrl ? (
-          <button
-            onClick={copyLink}
-            title={displayUrl}
-            className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
-          >
-            <span
-              className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors",
-                copied ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
-              )}
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{copied ? "Copied!" : "Share link"}</p>
-              <p className="truncate font-mono text-xs text-muted-foreground">{displayPath}</p>
-            </div>
-          </button>
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle>Booking page</CardTitle>
+              <CardDescription>Share this link so customers can book a time.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex h-9 items-center rounded-lg border bg-muted/40 px-3" title={bookingUrl}>
+                <span className="truncate text-meta text-foreground">
+                  {bookingUrl.replace(/^https?:\/\//, "")}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={copyLink}>
+                  {copied ? <Check className="text-success" /> : <Copy />}
+                  {copied ? "Copied" : "Copy link"}
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <a href={bookingUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink />
+                    Open page
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : null}
       </div>
-
-      {/* Today's events */}
-      {data.today.length > 0 && (
-        <EventList
-          heading={data.todayCount > data.today.length ? `Today · showing ${data.today.length} of ${data.todayCount}` : "Today"}
-          events={data.today}
-          formatTime={formatTime}
-        />
-      )}
-
-      {/* This week */}
-      {data.thisWeek.length > 0 && (
-        <EventList
-          heading="This week"
-          events={data.thisWeek}
-          formatTime={formatTime}
-          formatDay={formatDay}
-        />
-      )}
-
-      {/* Quiet week with something further out */}
-      {quiet && data.nextUpcoming && (
-        <Link
-          href={`/dashboard/bookings/${data.nextUpcoming.uid}` as Route}
-          className="group flex items-center gap-3 rounded-2xl border border-dashed border-border/60 p-4 transition-all hover:border-primary/30"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Calendar className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Nothing scheduled this week</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Next up: {data.nextUpcoming.title} · {formatDay(data.nextUpcoming.startTime)} at{" "}
-              {formatTime(data.nextUpcoming.startTime)}
-            </p>
-          </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-        </Link>
-      )}
-
-      {/* Empty state — genuinely nothing on the books */}
-      {quiet && !data.nextUpcoming && data.pending === 0 && (
-        <div className="rounded-2xl border border-dashed border-border/60 py-12 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Sparkles className="h-5 w-5 text-primary" />
-          </div>
-          <p className="text-sm font-medium text-foreground">No bookings yet</p>
-          <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
-            Share your booking link or create a service to start receiving meetings.
-          </p>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            {bookingUrl ? (
-              <button
-                onClick={copyLink}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary/30 hover:text-primary"
-              >
-                <Copy className="h-3 w-3" />
-                {copied ? "Copied!" : "Copy link"}
-              </button>
-            ) : null}
-            <NewServiceButton size="sm" />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function EventList({
-  heading,
-  events,
+function EventRow({
+  event,
   formatTime,
-  formatDay,
+  showProvider,
 }: {
-  heading: string;
-  events: OverviewEvent[];
+  event: OverviewEvent;
   formatTime: (iso: string) => string;
-  formatDay?: (iso: string) => string;
+  showProvider: boolean;
 }) {
   return (
-    <div>
-      <h2 className="mb-3 text-base font-semibold tracking-tight text-foreground">{heading}</h2>
-      <div className="space-y-2">
-        {events.map((event) => (
-          <Link
-            key={event.uid}
-            href={`/dashboard/bookings/${event.uid}` as Route}
-            className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 transition-all hover:border-primary/30 hover:shadow-sm group"
-          >
-            {formatDay ? (
-              <span className="text-xs font-medium w-24 shrink-0 text-muted-foreground">
-                {formatDay(event.startTime)}
-              </span>
-            ) : null}
-            {/* w-16 clipped 12-hour times like "10:00 AM" onto a second line,
-                so rows in the same list had different heights. */}
-            <span className="w-20 shrink-0 whitespace-nowrap text-sm font-medium tabular-nums text-muted-foreground">
-              {formatTime(event.startTime)}
-            </span>
-            <div className="h-8 w-px shrink-0 bg-border/60" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">
-                {event.title}
-                {event.hostName ? (
-                  <span className="font-normal text-muted-foreground"> · {event.hostName}</span>
-                ) : null}
-              </p>
-              <p className="mt-0.5 flex items-center gap-2.5 text-xs text-muted-foreground">
-                {event.attendeeName && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {event.attendeeName}
-                  </span>
-                )}
-                {event.location && (
-                  <span className="flex min-w-0 items-center gap-1">
-                    {event.meetingUrl ? <Video className="h-3 w-3 shrink-0" /> : <MapPin className="h-3 w-3 shrink-0" />}
-                    <span className="truncate">{event.location}</span>
-                  </span>
-                )}
-              </p>
-            </div>
-            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          </Link>
-        ))}
+    <Link
+      href={`/dashboard/bookings/${event.uid}` as Route}
+      className="flex items-center gap-4 px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 sm:px-5"
+    >
+      <div className="w-20 shrink-0 whitespace-nowrap tabular-nums">
+        <p className="text-sm font-medium text-foreground">{formatTime(event.startTime)}</p>
+        <p className="text-meta text-muted-foreground">{formatTime(event.endTime)}</p>
       </div>
-    </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
+        <p className="truncate text-meta text-muted-foreground">
+          {event.attendeeName ?? "No attendee"}
+          {event.location ? <span className="max-sm:hidden"> · {event.location}</span> : null}
+          {event.hostName ? <span className="md:hidden"> · with {event.hostName}</span> : null}
+        </p>
+      </div>
+      {showProvider ? (
+        <div className="hidden w-36 shrink-0 items-center gap-2 md:flex">
+          {event.hostName ? (
+            <>
+              <Avatar className="h-6 w-6">
+                <AvatarFallback>{initials(event.hostName)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate text-meta text-muted-foreground">{event.hostName}</span>
+            </>
+          ) : (
+            <span className="text-meta text-muted-foreground">Unassigned</span>
+          )}
+        </div>
+      ) : null}
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+    </Link>
   );
 }

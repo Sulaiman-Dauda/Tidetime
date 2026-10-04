@@ -1,20 +1,35 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or } from "drizzle-orm";
+import {
+  CalendarDays,
+  CalendarX2,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  Inbox,
+  Search,
+  SearchX,
+  type LucideIcon,
+} from "lucide-react";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, memberships, services, teams, users } from "@/db/schema";
-import { can } from "@/lib/rbac";
+import { can, canAny } from "@/lib/rbac";
 import type { MembershipRole } from "@/db/schema";
-import { formatRange } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { initials, resolveLocale } from "@/lib/format";
+import { addDaysToKey, formatDateKey } from "@/lib/time";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { PageHeader } from "../_components/page-header";
+import { Input } from "@/components/ui/input";
+import { SegmentedLinks } from "@/components/ui/segmented";
 import { EmptyState } from "@/components/empty-state";
-import { CancelBookingButton, AcceptButton, DeclineButton } from "./_components/booking-actions";
-import { CalendarClock, ChevronLeft, ChevronRight, Clock, MapPin, User, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { PageHeader } from "../_components/page-header";
+import { AcceptButton, BookingRowMenu, DeclineButton } from "./_components/booking-actions";
+import { BookingStatusBadge } from "./_components/booking-status-badge";
 
 type Filter = "upcoming" | "pending" | "past" | "cancelled";
 
@@ -50,7 +65,7 @@ async function loadBookings(
 ): Promise<LoadResult> {
   const now = new Date();
 
-  // Scope by team members, not the service's team — bookings whose service was
+  // Scope by team members, not the service's team: bookings whose service was
   // deleted must not vanish for team-wide viewers.
   const teamWide = can(role, "booking.all.view");
   const memberRows = await db
@@ -162,6 +177,7 @@ async function loadBookings(
   };
 }
 
+
 interface Props {
   searchParams: Promise<{ tab?: string; q?: string; service?: string; host?: string; page?: string }>;
 }
@@ -173,6 +189,52 @@ const FILTER_LABELS: Record<Filter, string> = {
   past: "Past",
   cancelled: "Cancelled",
 };
+
+const EMPTY: Record<Filter, { icon: LucideIcon; description: string }> = {
+  upcoming: { icon: CalendarDays, description: "Share your booking page to start receiving meetings." },
+  pending: { icon: Inbox, description: "Requests that need your approval will appear here." },
+  past: { icon: History, description: "Meetings that have taken place will appear here." },
+  cancelled: { icon: CalendarX2, description: "Cancelled and declined bookings will appear here." },
+};
+
+interface DayGroup {
+  key: string;
+  /** "Today", "Tomorrow" or "Yesterday" when it applies */
+  relative: string | null;
+  date: string;
+  rows: BookingRowData[];
+}
+
+/** Rows arrive sorted by start time, so consecutive rows on the same local day form a group. */
+function groupByDay(rows: BookingRowData[], timeZone: string, locale: string): DayGroup[] {
+  const todayKey = formatDateKey(new Date(), timeZone);
+  const relative: Record<string, string> = {
+    [todayKey]: "Today",
+    [addDaysToKey(todayKey, 1)]: "Tomorrow",
+    [addDaysToKey(todayKey, -1)]: "Yesterday",
+  };
+  const sameYear = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", day: "numeric", month: "long" });
+  const otherYear = new Intl.DateTimeFormat(locale, {
+    timeZone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const groups: DayGroup[] = [];
+  for (const row of rows) {
+    const key = formatDateKey(row.startTime, timeZone);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.rows.push(row);
+      continue;
+    }
+    const format = key.slice(0, 4) === todayKey.slice(0, 4) ? sameYear : otherYear;
+    groups.push({ key, relative: relative[key] ?? null, date: format.format(row.startTime), rows: [row] });
+  }
+  return groups;
+}
 
 export default async function BookingsPage({ searchParams }: Props) {
   const { user, role, teamId } = await requireAnyPermission([
@@ -194,9 +256,25 @@ export default async function BookingsPage({ searchParams }: Props) {
     { q, serviceId, hostId, page },
   );
   const canManage = can(role, "booking.all.manage") || can(role, "booking.own.manage");
+  const showProvider = can(role, "booking.all.view");
+  // Same check as the services page itself, so members get "My services" and a
+  // role that cannot open the page is not sent to one that refuses it.
+  const canOpenServices = canAny(role, [
+    "service.catalog.view",
+    "service.catalog.manage",
+    "service.assigned.view",
+  ]);
+  const filtered = Boolean(q || serviceId || hostId);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hour12 = user.timeFormat === 12;
-  const locale = user.locale;
+  const locale = resolveLocale(user.locale);
+  const timeFormat = new Intl.DateTimeFormat(locale, {
+    timeZone: user.timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: user.timeFormat === 12,
+  });
+  const groups = groupByDay(rows, user.timeZone, locale);
+  const empty = EMPTY[active];
 
   const queryFor = (overrides: Record<string, string | undefined>) => {
     const next = new URLSearchParams();
@@ -208,131 +286,166 @@ export default async function BookingsPage({ searchParams }: Props) {
   };
 
   return (
-    <div className="animate-fade-in space-y-8">
-      <PageHeader
-        title="Bookings"
-        description="Upcoming, pending, and historical meetings."
-      />
+    <div className="space-y-6">
+      <PageHeader title="Bookings" description="Upcoming, pending and past meetings." />
 
-      <Tabs value={active}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <TabsList className="flex-wrap">
-            {FILTERS.map((f) => (
-              <TabsTrigger key={f} value={f} asChild>
-                <Link href={queryFor({ tab: f, page: undefined }) as Route}>{FILTER_LABELS[f]}</Link>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <SegmentedLinks
+          aria-label="Booking status"
+          className="self-start lg:self-auto"
+          items={FILTERS.map((f) => ({
+            href: queryFor({ tab: f, page: undefined }),
+            label: FILTER_LABELS[f],
+            active: f === active,
+          }))}
+        />
 
-          {/* Search + filters — GET form so results are linkable */}
-          <form className="flex flex-wrap items-center gap-2" action="/dashboard/bookings">
-            <input type="hidden" name="tab" value={active} />
-            <input
+        {/* A GET form, so a filtered list is a shareable URL. */}
+        <form className="flex flex-wrap items-center gap-2" action="/dashboard/bookings">
+          <input type="hidden" name="tab" value={active} />
+          <div className="relative w-full sm:w-60">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
               type="search"
               name="q"
               defaultValue={q ?? ""}
-              placeholder="Search name, email or title…"
-              className="h-8 w-52 rounded-lg border border-input bg-card px-2.5 text-[13px] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="Search name, email or title"
+              aria-label="Search bookings"
+              className="h-8 pl-8 text-meta"
             />
-            {serviceOptions.length > 1 ? (
-              <FilterSelect
-                name="service"
-                ariaLabel="Filter by service"
-                defaultValue={params.service || "all"}
-                options={[
-                  { value: "all", label: "All services" },
-                  ...serviceOptions.map((s) => ({ value: String(s.id), label: s.title })),
-                ]}
-              />
-            ) : null}
-            {providerOptions.length > 1 ? (
-              <FilterSelect
-                name="host"
-                ariaLabel="Filter by provider"
-                defaultValue={params.host || "all"}
-                options={[
-                  { value: "all", label: "All providers" },
-                  ...providerOptions.map((p) => ({ value: String(p.id), label: p.name })),
-                ]}
-              />
-            ) : null}
-            <Button type="submit" size="sm" variant="outline" className="h-8">
-              Apply
+          </div>
+          {serviceOptions.length > 1 ? (
+            <FilterSelect
+              name="service"
+              ariaLabel="Filter by service"
+              defaultValue={params.service || "all"}
+              options={[
+                { value: "all", label: "All services" },
+                ...serviceOptions.map((s) => ({ value: String(s.id), label: s.title })),
+              ]}
+            />
+          ) : null}
+          {providerOptions.length > 1 ? (
+            <FilterSelect
+              name="host"
+              ariaLabel="Filter by provider"
+              defaultValue={params.host || "all"}
+              options={[
+                { value: "all", label: "All providers" },
+                ...providerOptions.map((p) => ({ value: String(p.id), label: p.name })),
+              ]}
+            />
+          ) : null}
+          <Button type="submit" size="sm" variant="outline">
+            Apply
+          </Button>
+          {filtered ? (
+            <Button asChild size="sm" variant="ghost">
+              <Link href={`/dashboard/bookings?tab=${active}` as Route}>Clear</Link>
             </Button>
-          </form>
-        </div>
+          ) : null}
+        </form>
+      </div>
 
-        <TabsContent value={active} className="mt-6">
-          {rows.length === 0 ? (
-            <EmptyState
-              brand
-              title={q || serviceId || hostId ? "No matching bookings" : `No ${active} bookings`}
-              description={
-                q || serviceId || hostId
-                  ? "Try different search terms or clear the filters."
-                  : active === "upcoming"
-                    ? "Share your booking link to start receiving meetings."
-                    : "Nothing to show here yet."
-              }
-              action={
-                q || serviceId || hostId ? (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/dashboard/bookings?tab=${active}` as Route}>Clear filters</Link>
-                  </Button>
-                ) : active === "upcoming" ? (
-                  <Button asChild size="sm">
-                    <Link href="/dashboard/services">Manage services</Link>
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <>
-              <div className="divide-y divide-border rounded-2xl border border-border/60 bg-card">
-                {rows.map((b, i) => (
-                  <BookingRow
-                    key={b.uid}
-                    booking={b}
-                    filter={active}
-                    userTz={user.timeZone}
-                    hour12={hour12}
-                    locale={locale}
-                    canManage={canManage}
-                    index={i}
-                  />
-                ))}
-              </div>
-              {totalPages > 1 ? (
-                <div className="mt-4 flex items-center justify-between text-[13px] text-muted-foreground">
-                  <span>
-                    Page {page} of {totalPages} · {total} booking{total === 1 ? "" : "s"}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button asChild={page > 1} size="sm" variant="outline" disabled={page <= 1}>
-                      {page > 1 ? (
-                        <Link href={queryFor({ page: String(page - 1) }) as Route}>
-                          <ChevronLeft className="h-3.5 w-3.5" /> Previous
-                        </Link>
-                      ) : (
-                        <span><ChevronLeft className="h-3.5 w-3.5" /> Previous</span>
-                      )}
-                    </Button>
-                    <Button asChild={page < totalPages} size="sm" variant="outline" disabled={page >= totalPages}>
-                      {page < totalPages ? (
-                        <Link href={queryFor({ page: String(page + 1) }) as Route}>
-                          Next <ChevronRight className="h-3.5 w-3.5" />
-                        </Link>
-                      ) : (
-                        <span>Next <ChevronRight className="h-3.5 w-3.5" /></span>
-                      )}
-                    </Button>
-                  </div>
+      {rows.length === 0 ? (
+        filtered ? (
+          <EmptyState
+            icon={SearchX}
+            title="No matching bookings"
+            description="Try different search terms or clear the filters."
+            action={
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/dashboard/bookings?tab=${active}` as Route}>Clear filters</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={empty.icon}
+            title={`No ${active} bookings`}
+            description={empty.description}
+            action={
+              active === "upcoming" && canOpenServices ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/dashboard/services">Manage services</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        )
+      ) : (
+        <div className="space-y-4">
+          <Card className="divide-y overflow-hidden">
+            {groups.map((group) => (
+              <section key={group.key} aria-labelledby={`day-${group.key}`}>
+                <h2
+                  id={`day-${group.key}`}
+                  className="flex items-center gap-1.5 border-b bg-muted/40 px-4 py-2 text-meta font-medium text-muted-foreground sm:px-5"
+                >
+                  {group.relative ? (
+                    <>
+                      <span className="text-foreground">{group.relative}</span>
+                      <span aria-hidden>·</span>
+                    </>
+                  ) : null}
+                  {group.date}
+                </h2>
+                <div className="divide-y">
+                  {group.rows.map((booking) => (
+                    <BookingRow
+                      key={booking.uid}
+                      booking={booking}
+                      filter={active}
+                      timeFormat={timeFormat}
+                      canManage={canManage}
+                      showProvider={showProvider}
+                    />
+                  ))}
                 </div>
-              ) : null}
-            </>
-          )}
-        </TabsContent>
-      </Tabs>
+              </section>
+            ))}
+          </Card>
+
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-meta tabular-nums text-muted-foreground">
+                Page {page} of {totalPages} · {total} booking{total === 1 ? "" : "s"}
+              </p>
+              <div className="flex gap-2">
+                {page > 1 ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={queryFor({ page: String(page - 1) }) as Route}>
+                      <ChevronLeft />
+                      Previous
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" disabled>
+                    <ChevronLeft />
+                    Previous
+                  </Button>
+                )}
+                {page < totalPages ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={queryFor({ page: String(page + 1) }) as Route}>
+                      Next
+                      <ChevronRight />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" disabled>
+                    Next
+                    <ChevronRight />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -340,120 +453,102 @@ export default async function BookingsPage({ searchParams }: Props) {
 function BookingRow({
   booking,
   filter,
-  userTz,
-  hour12,
-  locale,
+  timeFormat,
   canManage,
-  index,
+  showProvider,
 }: {
   booking: BookingRowData;
   filter: Filter;
-  userTz: string;
-  hour12: boolean;
-  locale: string;
+  timeFormat: Intl.DateTimeFormat;
   canManage: boolean;
-  index: number;
+  showProvider: boolean;
 }) {
-  const when = formatRange(booking.startTime, booking.endTime, userTz, hour12, locale);
-  const expired = filter === "pending" && booking.endTime.getTime() < Date.now();
-  const attendeeSummary =
-    booking.attendeeNames.length <= 1
-      ? booking.attendeeNames[0]
-      : `${booking.attendeeNames[0]} + ${booking.attendeeNames.length - 1} guest${booking.attendeeNames.length - 1 === 1 ? "" : "s"}`;
+  const expired = booking.status === "pending" && booking.endTime.getTime() < Date.now();
+  const [primary, ...guests] = booking.attendeeNames;
+  const attendee = primary
+    ? guests.length > 0
+      ? `${primary} + ${guests.length} guest${guests.length === 1 ? "" : "s"}`
+      : primary
+    : "No attendee";
+
+  const location = booking.location ? (
+    booking.meetingUrl ? (
+      <a
+        href={booking.meetingUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative z-10 hover:text-foreground hover:underline"
+      >
+        {booking.location}
+      </a>
+    ) : (
+      booking.location
+    )
+  ) : null;
 
   return (
-    <div
-      className="tt-rise group relative flex flex-col gap-3 px-5 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between"
-      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-    >
-      {/* Stretched link: the whole row navigates to the booking. Inner
-          interactive elements (meeting link, actions) sit above it via z-10. */}
+    <div className="group relative flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 sm:flex-nowrap sm:px-5">
+      {/* Stretched link: the whole row opens the booking. Controls inside the
+          row (meeting link, actions) sit above it. */}
       <Link
-        href={`/dashboard/bookings/${booking.uid}`}
+        href={`/dashboard/bookings/${booking.uid}` as Route}
         aria-label={`Open booking: ${booking.title}`}
-        className="absolute inset-0 z-0 rounded-[inherit] focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute inset-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-foreground group-hover:underline">
-            {booking.title}
-            {booking.hostName ? (
-              <span className="font-normal text-muted-foreground"> · {booking.hostName}</span>
-            ) : null}
-          </span>
-          {booking.status === "pending" && (
-            <Badge variant="pending" className="gap-1">
-              <Clock className="h-2.5 w-2.5" /> Pending
-            </Badge>
-          )}
-          {expired && (
-            <Badge variant="outline" className="gap-1 text-muted-foreground">
-              Time has passed
-            </Badge>
-          )}
-          {booking.status === "cancelled" && (
-            <Badge variant="destructive" className="gap-1">
-              <X className="h-2.5 w-2.5" />
-              Cancelled
-            </Badge>
-          )}
-          {booking.status === "rejected" && (
-            <Badge variant="destructive" className="gap-1">
-              <X className="h-2.5 w-2.5" />
-              Rejected
-            </Badge>
-          )}
-        </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            {when}
-          </span>
-          {attendeeSummary && (
-            <span className="inline-flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5" />
-              {attendeeSummary}
-            </span>
-          )}
-          {booking.location && (
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />
-              {booking.meetingUrl ? (
-                <a
-                  href={booking.meetingUrl}
-                  className="relative z-10 hover:text-foreground hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {booking.location}
-                </a>
-              ) : (
-                booking.location
-              )}
-            </span>
-          )}
-        </div>
+
+      <div className="w-20 shrink-0 whitespace-nowrap tabular-nums">
+        <p className="text-sm font-medium text-foreground">{timeFormat.format(booking.startTime)}</p>
+        <p className="text-meta text-muted-foreground">{timeFormat.format(booking.endTime)}</p>
       </div>
 
-      {canManage && filter === "pending" && (
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
-          <DeclineButton uid={booking.uid} />
-          <AcceptButton uid={booking.uid} />
-        </div>
-      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{booking.title}</p>
+        <p className="truncate text-meta text-muted-foreground">
+          {attendee}
+          {location ? <span className="max-sm:hidden"> · {location}</span> : null}
+          {booking.hostName ? <span className="md:hidden"> · with {booking.hostName}</span> : null}
+        </p>
+        {/* On phones the location leaves the line above. A meeting link gets a
+            line of its own so a long name cannot truncate it out of reach. */}
+        {booking.meetingUrl && location ? (
+          <p className="truncate text-meta text-muted-foreground sm:hidden">{location}</p>
+        ) : null}
+      </div>
 
-      {canManage && filter === "upcoming" && (
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
-          {booking.rescheduleHref ? (
-            <Button asChild size="sm" variant="outline" className="h-8 gap-1.5">
-              <Link href={booking.rescheduleHref as Route}>
-                <CalendarClock className="h-3.5 w-3.5" />
-                Reschedule
-              </Link>
-            </Button>
-          ) : null}
-          <CancelBookingButton uid={booking.uid} />
+      {showProvider ? (
+        <div className="hidden w-40 shrink-0 items-center gap-2 md:flex">
+          {booking.hostName ? (
+            <>
+              <Avatar className="h-6 w-6">
+                <AvatarFallback>{initials(booking.hostName)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate text-meta text-muted-foreground">{booking.hostName}</span>
+            </>
+          ) : (
+            <span className="text-meta text-muted-foreground">Unassigned</span>
+          )}
         </div>
+      ) : null}
+
+      {/* Confirmed is the norm, so phones drop that badge to save room. */}
+      <div className={cn("flex shrink-0 sm:w-24", booking.status === "accepted" && "max-sm:hidden")}>
+        <BookingStatusBadge status={booking.status} expired={expired} />
+      </div>
+
+      {canManage && filter === "pending" ? (
+        <div className="relative z-10 flex shrink-0 items-center gap-2 max-sm:basis-full max-sm:pl-24">
+          <DeclineButton uid={booking.uid} variant="ghost" />
+          <AcceptButton uid={booking.uid} variant="outline" />
+        </div>
+      ) : canManage && filter === "upcoming" ? (
+        <div className="relative z-10 shrink-0">
+          <BookingRowMenu uid={booking.uid} title={booking.title} rescheduleHref={booking.rescheduleHref} />
+        </div>
+      ) : (
+        // Same width as the row menu button, so columns line up across tabs.
+        <span className="flex w-8 shrink-0 justify-center" aria-hidden>
+          <ChevronRight className="size-4 text-muted-foreground/60 transition-colors group-hover:text-muted-foreground" />
+        </span>
       )}
     </div>
   );

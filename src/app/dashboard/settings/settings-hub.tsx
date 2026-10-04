@@ -2,16 +2,24 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { CompanySettings } from "@/lib/company-settings";
-import { DIALLING_COUNTRIES, normalizeDiallingCountry } from "@/lib/phone";
+import { DIALLING_COUNTRIES, countryFor, normalizeDiallingCountry } from "@/lib/phone";
 import { CompanyLogoUpload } from "./company-logo-upload";
 import {
   updateCompanyLegalAction,
@@ -25,34 +33,10 @@ import {
   type DomainState,
 } from "./domain-actions";
 
-function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs text-muted-foreground">{children}</p>;
-}
-
-function Field({
-  label,
-  htmlFor,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  hint?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {hint && <Hint>{hint}</Hint>}
-    </div>
-  );
-}
-
 function SaveButton({ label = "Save changes" }: { label?: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" loading={pending}>
       {pending ? "Saving…" : label}
     </Button>
   );
@@ -82,7 +66,7 @@ export function SettingsHub({
     /* Ordered by how often they are touched. Domain is a one-time DNS chore,
        so it goes last; Brand is what an owner opens Settings to change. */
     <Tabs defaultValue="general" className="space-y-6">
-      <TabsList className="flex-wrap">
+      <TabsList>
         <TabsTrigger value="general">Brand</TabsTrigger>
         <TabsTrigger value="booking">Booking</TabsTrigger>
         <TabsTrigger value="legal">Legal</TabsTrigger>
@@ -107,84 +91,279 @@ export function SettingsHub({
 
 /* --------------------------------- General -------------------------------- */
 
+/** The native colour picker only takes #rrggbb; the field also accepts #rgb. */
+function pickerHex(value: string): string | null {
+  const v = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(v)) return v;
+  if (/^#[0-9a-f]{3}$/.test(v)) return `#${v.slice(1).split("").map((c) => c + c).join("")}`;
+  return null;
+}
+
 function GeneralSection({ profile }: { profile: CompanySettings["profile"] }) {
   const [state, action] = useActionState<CompanySettingsState, FormData>(
     updateCompanyProfileAction,
     null,
   );
-  const [logoUrl, setLogoUrl] = useState(profile.logoUrl);
+  const [brandColor, setBrandColor] = useState(profile.brandColor);
+  const [phoneCountry, setPhoneCountry] = useState(() => normalizeDiallingCountry(profile.phoneCountry));
   useSavedToast(state, "brand settings");
   return (
-    <Card className="p-6">
-      <form action={action} className="space-y-5">
-        <div>
-          <h2 className="text-sm font-semibold">Brand & company</h2>
-          <p className="text-xs text-muted-foreground">What customers see on the public booking pages.</p>
-        </div>
-        <Field
-          label="Company name"
-          htmlFor="name"
-          hint="Company name will be displayed everywhere on the system (required)."
-        >
+    <form action={action}>
+      <FormSection
+        title="Brand"
+        description="What customers see when they book with you."
+      >
+        <Field label="Company name" htmlFor="name" hint="Shown to customers on your public booking pages.">
           <Input id="name" name="name" defaultValue={profile.name} required />
         </Field>
-        <Field
-          label="Company logo"
-          htmlFor="logoUrl"
-          hint="Upload an image (under 1 MB) or paste a URL. Shown on the public booking page."
-        >
-          <div className="space-y-2">
-            <CompanyLogoUpload value={logoUrl} onChange={setLogoUrl} />
-            <Input
-              id="logoUrl"
-              name="logoUrl"
-              type="text"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
-            />
-          </div>
+        <Field label="Company logo">
+          <CompanyLogoUpload defaultValue={profile.logoUrl} />
         </Field>
         <Field
           label="Brand colour"
           htmlFor="brandColor"
-          hint="Applied across the app so it uses your branding. Hex value, e.g. #4f46e5."
+          hint="Used for buttons, links and highlights on your public booking, confirmation and legal pages. A colour that would be hard to read is adjusted so links stay legible, and dark mode uses a lighter shade. The dashboard keeps Tidetime's own colours."
         >
-          <div className="flex items-center gap-2">
+          <div className="relative sm:max-w-60">
             <input
               type="color"
               aria-label="Pick brand colour"
-              defaultValue={profile.brandColor}
-              onChange={(e) => {
-                const t = document.getElementById("brandColor") as HTMLInputElement | null;
-                if (t) t.value = e.target.value;
-              }}
-              className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-transparent p-1"
+              value={pickerHex(brandColor) ?? pickerHex(profile.brandColor) ?? "#000000"}
+              onChange={(e) => setBrandColor(e.target.value)}
+              className="absolute left-2 top-1/2 size-5 -translate-y-1/2 cursor-pointer appearance-none overflow-hidden rounded border-0 bg-transparent p-0 ring-1 ring-inset ring-border [&::-moz-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0"
             />
-            <Input id="brandColor" name="brandColor" defaultValue={profile.brandColor} className="font-mono" />
+            <Input
+              id="brandColor"
+              name="brandColor"
+              value={brandColor}
+              onChange={(e) => setBrandColor(e.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+              className="pl-9 font-mono"
+            />
           </div>
         </Field>
+      </FormSection>
+      <FormSection
+        title="Booking form"
+        description="Defaults for the fields customers fill in when they book."
+        footer={<SaveButton />}
+      >
         <Field
           label="Default phone country"
           htmlFor="phoneCountry"
-          hint="Preselected in phone fields on the booking form, so most customers never touch the country picker. They can still change it."
+          hint="Preselected in phone fields on the booking form. Customers can still change it."
         >
-          <select
-            id="phoneCountry"
-            name="phoneCountry"
-            defaultValue={normalizeDiallingCountry(profile.phoneCountry)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {DIALLING_COUNTRIES.map((country) => (
-              <option key={country.code} value={country.code}>
-                {country.name} (+{country.dial})
-              </option>
-            ))}
-          </select>
+          {/* Posted through our own hidden input: React resets the form after each
+              save, which sends Radix's hidden native select back to the value the
+              page loaded with, so a later save would quietly post the old country. */}
+          <input type="hidden" name="phoneCountry" value={phoneCountry} />
+          <Select value={phoneCountry} onValueChange={setPhoneCountry}>
+            <SelectTrigger id="phoneCountry" className="sm:max-w-sm">
+              {/* Label passed in so it is in the server HTML; Radix only fills an
+                  empty SelectValue after hydration, which flashes a blank field. */}
+              <SelectValue>
+                {countryFor(phoneCountry).name} (+{countryFor(phoneCountry).dial})
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {DIALLING_COUNTRIES.map((country) => (
+                <SelectItem key={country.code} value={country.code}>
+                  {country.name} (+{country.dial})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
-        <SaveButton />
-      </form>
-    </Card>
+      </FormSection>
+    </form>
+  );
+}
+
+/* -------------------------------- Booking --------------------------------- */
+
+function SwitchRow({
+  name,
+  defaultChecked,
+  title,
+  description,
+}: {
+  name: string;
+  defaultChecked: boolean;
+  title: string;
+  description: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-6 px-5 py-4">
+      <span className="space-y-0.5">
+        <span className="block text-sm font-medium text-foreground">{title}</span>
+        <span className="block text-meta text-muted-foreground">{description}</span>
+      </span>
+      <Switch name={name} defaultChecked={defaultChecked} className="mt-0.5" />
+    </label>
+  );
+}
+
+function BookingSection({ booking }: { booking: CompanySettings["booking"] }) {
+  const [state, action] = useActionState<CompanySettingsState, FormData>(
+    updateCompanyBookingAction,
+    null,
+  );
+  useSavedToast(state, "booking defaults");
+  return (
+    <form action={action}>
+      <FormSection
+        title="Public booking"
+        description="Control how your public booking page behaves."
+        contentClassName="gap-0 divide-y p-0"
+        footer={<SaveButton />}
+      >
+        <SwitchRow
+          name="bookingDisabled"
+          defaultChecked={booking.bookingDisabled}
+          title="Disable public bookings"
+          description="Your booking page shows a maintenance message and no one can book."
+        />
+        <SwitchRow
+          name="spamProtectionEnabled"
+          defaultChecked={booking.spamProtectionEnabled}
+          title="Spam protection (ALTCHA)"
+          description="Adds a privacy-friendly proof-of-work check to the booking form. No third-party services and no tracking, but automated spam bookings become costly to send."
+        />
+      </FormSection>
+    </form>
+  );
+}
+
+/* ------------------------------ Legal contents ---------------------------- */
+
+function DisplaySwitch({ name, defaultChecked, label }: { name: string; defaultChecked: boolean; label: string }) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-meta text-muted-foreground">
+      Display
+      <Switch name={name} defaultChecked={defaultChecked} aria-label={label} />
+    </label>
+  );
+}
+
+function LegalSection({ legal }: { legal: CompanySettings["legal"] }) {
+  const [state, action] = useActionState<CompanySettingsState, FormData>(
+    updateCompanyLegalAction,
+    null,
+  );
+  useSavedToast(state, "legal settings");
+  return (
+    <form action={action}>
+      <FormSection
+        title="Policies"
+        description="Shown on your public booking pages when switched on and filled in."
+      >
+        <Field
+          label="Cookie notice"
+          htmlFor="cookieNoticeContent"
+          aside={
+            <DisplaySwitch
+              name="cookieNoticeEnabled"
+              defaultChecked={legal.cookieNoticeEnabled}
+              label="Display cookie notice"
+            />
+          }
+        >
+          <Textarea
+            id="cookieNoticeContent"
+            name="cookieNoticeContent"
+            defaultValue={legal.cookieNoticeContent}
+            rows={3}
+            placeholder="Cookie notice content."
+          />
+        </Field>
+        <Field
+          label="Terms and conditions"
+          htmlFor="termsContent"
+          aside={
+            <DisplaySwitch
+              name="termsEnabled"
+              defaultChecked={legal.termsEnabled}
+              label="Display terms and conditions"
+            />
+          }
+        >
+          <Textarea
+            id="termsContent"
+            name="termsContent"
+            defaultValue={legal.termsContent}
+            rows={5}
+            placeholder="Terms and conditions content."
+          />
+        </Field>
+        <Field
+          label="Privacy policy"
+          htmlFor="privacyContent"
+          aside={
+            <DisplaySwitch
+              name="privacyEnabled"
+              defaultChecked={legal.privacyEnabled}
+              label="Display privacy policy"
+            />
+          }
+        >
+          <Textarea
+            id="privacyContent"
+            name="privacyContent"
+            defaultValue={legal.privacyContent}
+            rows={5}
+            placeholder="Privacy policy content."
+          />
+        </Field>
+      </FormSection>
+      <FormSection
+        title="Links"
+        description="Optional links to pages you host elsewhere, shown in the footer of your booking pages."
+        contentClassName="sm:grid-cols-2"
+      >
+        <Field label="Legal notice URL" htmlFor="legalNoticeUrl">
+          <Input
+            id="legalNoticeUrl"
+            name="legalNoticeUrl"
+            type="url"
+            defaultValue={legal.legalNoticeUrl}
+            placeholder="https://…"
+          />
+        </Field>
+        <Field label="Imprint URL" htmlFor="imprintUrl">
+          <Input
+            id="imprintUrl"
+            name="imprintUrl"
+            type="url"
+            defaultValue={legal.imprintUrl}
+            placeholder="https://…"
+          />
+        </Field>
+      </FormSection>
+      <FormSection
+        title="Data retention"
+        description="Remove old booking data automatically."
+        footer={<SaveButton />}
+      >
+        <Field
+          label="Delete bookings after"
+          htmlFor="dataRetentionDays"
+          hint="Bookings, with the customer details they hold, are deleted this many days after they end. Set to 0 to keep them."
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              id="dataRetentionDays"
+              name="dataRetentionDays"
+              type="number"
+              min={0}
+              defaultValue={legal.dataRetentionDays}
+              className="w-28 tabular-nums"
+            />
+            <span className="text-sm text-muted-foreground">days</span>
+          </div>
+        </Field>
+      </FormSection>
+    </form>
   );
 }
 
@@ -241,34 +420,20 @@ function DomainSection({ customDomain }: { customDomain: string | null }) {
   const saved = state?.ok ? state.domain ?? null : customDomain;
 
   return (
-    <Card className="p-6">
-      <form action={action} className="space-y-5">
-        <div>
-          <h2 className="text-sm font-semibold">Custom domain</h2>
-          <p className="text-xs text-muted-foreground">
-            Serve your booking pages from your own domain over HTTPS. The certificate is obtained and renewed
-            automatically — no certificate files or server changes needed.
-          </p>
-        </div>
-        <Field
-          label="Domain"
-          htmlFor="domain"
-          hint={
-            <>
-              {/* Two steps set on one line read as a wall of text. */}
-              <ol className="ml-4 list-decimal space-y-1">
-                <li>Create a DNS A record for the domain pointing at this server&apos;s IP.</li>
-                <li>
-                  Save, then use <span className="font-medium text-foreground">Check status</span>.
-                </li>
-              </ol>
-              <p className="mt-2">
-                Booking links, emails, and calendar redirects switch to the domain automatically.
-                Leave the field empty to remove it.
-              </p>
-            </>
-          }
-        >
+    <form action={action}>
+      <FormSection
+        title="Custom domain"
+        description="Serve your booking pages from your own domain over HTTPS. The certificate is issued and renewed automatically, with no certificate files or server changes."
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={checkStatus} loading={checking} disabled={!saved}>
+              {checking ? "Checking…" : "Check status"}
+            </Button>
+            <SaveButton />
+          </>
+        }
+      >
+        <Field label="Domain" htmlFor="domain">
           <Input
             id="domain"
             name="domain"
@@ -276,128 +441,33 @@ function DomainSection({ customDomain }: { customDomain: string | null }) {
             placeholder="calendar.example.com"
             autoComplete="off"
           />
+          <div className="space-y-2 text-meta text-muted-foreground">
+            {/* Two steps set on one line read as a wall of text. */}
+            <ol className="ml-4 list-decimal space-y-1">
+              <li>Create a DNS A record for the domain pointing at this server&apos;s IP.</li>
+              <li>
+                Save, then use <span className="font-medium text-foreground">Check status</span>.
+              </li>
+            </ol>
+            <p>
+              Booking links, emails and calendar redirects switch to the domain automatically.
+              Leave the field empty to remove it.
+            </p>
+          </div>
         </Field>
-        {saved && liveStatus !== null && (
-          <p className={`text-xs ${liveStatus ? "text-emerald-600" : "text-muted-foreground"}`}>
-            {liveStatus
-              ? `✓ https://${saved} is live.`
-              : `https://${saved} isn't answering yet — DNS may still be propagating.`}
-          </p>
-        )}
-        <div className="flex items-center gap-2">
-          <SaveButton />
-          <Button type="button" variant="outline" onClick={checkStatus} disabled={checking || !saved}>
-            {checking ? "Checking…" : "Check status"}
-          </Button>
-        </div>
-      </form>
-    </Card>
-  );
-}
-
-/* -------------------------------- Booking --------------------------------- */
-
-function BookingSection({ booking }: { booking: CompanySettings["booking"] }) {
-  const [state, action] = useActionState<CompanySettingsState, FormData>(
-    updateCompanyBookingAction,
-    null,
-  );
-  useSavedToast(state, "booking defaults");
-  return (
-    <Card className="p-6">
-      <form action={action} className="space-y-6">
-        <div>
-          <h2 className="text-sm font-semibold">Booking defaults</h2>
-          <p className="text-xs text-muted-foreground">Control how your public booking page behaves.</p>
-        </div>
-
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
-          <label className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm font-medium">Disable public bookings</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                When enabled, your booking page shows a maintenance message and no one can book.
-              </p>
-            </div>
-            <Switch name="bookingDisabled" defaultChecked={booking.bookingDisabled} />
-          </label>
-          <label className="mt-4 flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm font-medium">Spam protection (ALTCHA)</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Adds a privacy-friendly proof-of-work check to the booking form. No third-party
-                services, no tracking — it just makes automated spam bookings expensive.
-              </p>
-            </div>
-            <Switch name="spamProtectionEnabled" defaultChecked={booking.spamProtectionEnabled} />
-          </label>
-        </div>
-
-        <SaveButton />
-      </form>
-    </Card>
-  );
-}
-
-/* ------------------------------ Legal contents ---------------------------- */
-
-function LegalSection({ legal }: { legal: CompanySettings["legal"] }) {
-  const [state, action] = useActionState<CompanySettingsState, FormData>(
-    updateCompanyLegalAction,
-    null,
-  );
-  useSavedToast(state, "legal settings");
-  return (
-    <Card className="p-6">
-      <form action={action} className="space-y-6">
-        <div>
-          <h2 className="text-sm font-semibold">Legal contents</h2>
-          <p className="text-xs text-muted-foreground">Shown on the public booking page for compliance.</p>
-        </div>
-
-        <div className="space-y-3">
-          <label className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium">Display cookie notice</span>
-            <Switch name="cookieNoticeEnabled" defaultChecked={legal.cookieNoticeEnabled} />
-          </label>
-          <Textarea name="cookieNoticeContent" defaultValue={legal.cookieNoticeContent} rows={3} placeholder="Cookie notice content." />
-        </div>
-
-        <div className="space-y-3">
-          <label className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium">Display terms &amp; conditions</span>
-            <Switch name="termsEnabled" defaultChecked={legal.termsEnabled} />
-          </label>
-          <Textarea name="termsContent" defaultValue={legal.termsContent} rows={4} placeholder="Terms and conditions content." />
-        </div>
-
-        <div className="space-y-3">
-          <label className="flex items-center justify-between gap-4">
-            <span className="text-sm font-medium">Display privacy policy</span>
-            <Switch name="privacyEnabled" defaultChecked={legal.privacyEnabled} />
-          </label>
-          <Textarea name="privacyContent" defaultValue={legal.privacyContent} rows={4} placeholder="Privacy policy content." />
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Legal notice URL" htmlFor="legalNoticeUrl" hint="Link to your legal notice page.">
-            <Input id="legalNoticeUrl" name="legalNoticeUrl" type="url" defaultValue={legal.legalNoticeUrl} placeholder="https://…" />
-          </Field>
-          <Field label="Imprint URL" htmlFor="imprintUrl" hint="Link to your imprint page.">
-            <Input id="imprintUrl" name="imprintUrl" type="url" defaultValue={legal.imprintUrl} placeholder="https://…" />
-          </Field>
-        </div>
-
-        <Field
-          label="Data retention (days)"
-          htmlFor="dataRetentionDays"
-          hint="Days after which customer data is automatically deleted. Set to 0 to disable."
-        >
-          <Input id="dataRetentionDays" name="dataRetentionDays" type="number" min={0} defaultValue={legal.dataRetentionDays} />
-        </Field>
-
-        <SaveButton />
-      </form>
-    </Card>
+        {saved && liveStatus !== null ? (
+          liveStatus ? (
+            <p className="flex items-center gap-1.5 text-meta font-medium text-success">
+              <CheckCircle2 className="size-4" aria-hidden />
+              https://{saved} is live.
+            </p>
+          ) : (
+            <p className="text-meta text-muted-foreground">
+              https://{saved} isn&apos;t answering yet. DNS may still be propagating.
+            </p>
+          )
+        ) : null}
+      </FormSection>
+    </form>
   );
 }

@@ -2,14 +2,15 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { Route } from "next";
+import { CalendarX, ChevronRight, Clock } from "lucide-react";
 import { getPublicTeam, getTeamServices } from "@/server/teams-public";
 import { isBookingDisabled } from "@/server/company-settings";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
-import { initials, formatDuration, formatNextAvailable } from "@/lib/format";
-import { AlertTriangle, Clock, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/empty-state";
+import { formatDuration, formatNextAvailable } from "@/lib/format";
 import { PublicLegal } from "../../_components/public-legal";
 import { CompanyBrandHeader } from "../../_components/company-brand-header";
+import { BookingUnavailable } from "../../_components/booking-unavailable";
 
 export const dynamic = "force-dynamic";
 
@@ -34,80 +35,66 @@ export default async function TeamLandingPage({ params }: Props) {
     isBookingDisabled(),
   ]);
 
-  if (disabled) {
-    return (
-      <main className="min-h-screen bg-grid">
-        <CompanyBrandHeader />
-        <div className="mx-auto max-w-lg px-4 py-24 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
-            <AlertTriangle className="h-6 w-6 text-amber-600" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight">Booking temporarily unavailable</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Online booking is currently disabled while we make some improvements.
-            Please check back soon or contact us directly.
-          </p>
-        </div>
-        <PublicLegal />
-      </main>
-    );
-  }
+  if (disabled) return <BookingUnavailable />;
 
   return (
-    <main className="min-h-screen bg-grid">
+    <main className="flex min-h-screen flex-col bg-canvas">
       <CompanyBrandHeader />
-      <div className="mx-auto max-w-2xl px-4 py-16">
-        <div className="flex flex-col items-center text-center">
-          <Avatar className="h-20 w-20">
-            {team.logoUrl ? <AvatarImage src={team.logoUrl} alt={team.name} /> : null}
-            <AvatarFallback>{initials(team.name)}</AvatarFallback>
-          </Avatar>
-          <h1 className="mt-4 text-2xl font-semibold">{team.name}</h1>
-        </div>
+      <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:py-14">
+        <div className="overflow-hidden rounded-2xl bg-card text-card-foreground shadow-popover">
+          <div className="border-b px-5 py-5 sm:px-6">
+            <h1 className="text-2xl font-semibold tracking-tight">Choose a service</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pick the type of appointment you want. You&apos;ll choose a time on the next screen.
+            </p>
+          </div>
 
-        <div className="mt-10">
-          <h2 className="text-sm font-semibold tracking-tight">Choose a service</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick the type of appointment you want. You&apos;ll choose a time on the next screen.
-          </p>
-        </div>
-
-        <div className="mt-6 space-y-3">
           {events.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">No public services yet.</p>
+            <EmptyState
+              bare
+              icon={CalendarX}
+              title="No services to book yet"
+              description="Please check back soon."
+            />
           ) : (
-            events.map((e) => (
-              <Link key={e.id} href={`/book/${slug}/${e.slug}` as Route} className="group block">
-                <Card className="flex items-center justify-between p-5 transition-colors hover:border-foreground">
-                  <div>
-                    <h2 className="font-medium">{e.title}</h2>
-                    {e.description ? (
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{e.description}</p>
-                    ) : null}
-                    <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" /> {formatDuration(e.length)}
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      {e.nextAvailable ? (
-                        <span className="inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                          Next available {formatNextAvailable(new Date(e.nextAvailable), "UTC")}
+            <ul className="divide-y">
+              {events.map((e) => (
+                <li key={e.id}>
+                  <Link
+                    href={`/book/${slug}/${e.slug}` as Route}
+                    className="group flex items-center gap-4 px-5 py-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:px-6"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-base font-semibold tracking-tight text-foreground">
+                        {e.title}
+                      </h2>
+                      {e.description ? (
+                        <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
+                          {e.description}
+                        </p>
+                      ) : null}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-meta text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5 tabular-nums">
+                          <Clock className="size-3.5" aria-hidden />
+                          {formatDuration(e.length)}
                         </span>
-                      ) : (
-                        <span className="inline-flex rounded-full border border-border/60 bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                          No times in the next 30 days
-                        </span>
-                      )}
+                        {e.nextAvailable ? (
+                          <Badge variant="success" dot className="tabular-nums">
+                            Next available {formatNextAvailable(new Date(e.nextAvailable), "UTC")}
+                          </Badge>
+                        ) : (
+                          <span>No times in the next 30 days</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <span className="ml-4 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all group-hover:border-primary/30 group-hover:text-primary">
-                    Choose time
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </span>
-                </Card>
-              </Link>
-            ))
+                    <ChevronRight
+                      className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                      aria-hidden
+                    />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>

@@ -2,10 +2,11 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Field, FieldHint } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -93,30 +94,36 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
   }, [pwState, toast]);
 
   return (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h2 className="text-base font-semibold">Profile</h2>
-        <div className="mt-5">
-          {/* refresh server-rendered avatars (sidebar/topbar) after an upload */}
-          <AvatarUpload
-            currentUrl={user.avatarUrl}
-            name={user.name ?? user.username}
-            onUploaded={() => router.refresh()}
-          />
-        </div>
-        <form action={profileAction} className="mt-5 space-y-4">
+    <div>
+      <FormSection
+        title="Profile"
+        description="How you appear to teammates and customers, and how dates and times are shown to you."
+        footer={
+          <Button type="submit" form="profile-form" loading={profilePending}>
+            Save changes
+          </Button>
+        }
+      >
+        {/* refresh server-rendered avatars (sidebar/topbar) after an upload */}
+        <AvatarUpload
+          currentUrl={user.avatarUrl}
+          name={user.name ?? user.username}
+          onUploaded={() => router.refresh()}
+        />
+        <form id="profile-form" action={profileAction} className="grid gap-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Name</Label>
+            <Field label="Name" htmlFor="name">
               <Input id="name" name="name" defaultValue={user.name ?? ""} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="username">Username</Label>
+            </Field>
+            <Field label="Username" htmlFor="username">
               <Input id="username" name="username" defaultValue={user.username} required />
-            </div>
+            </Field>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="position">Position</Label>
+          <Field
+            label="Position"
+            htmlFor="position"
+            hint="Your job title, shown with your name and photo on the public booking page."
+          >
             <Input
               id="position"
               name="position"
@@ -124,26 +131,27 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
               placeholder="e.g. Consultant"
               maxLength={128}
             />
-            <p className="text-xs text-muted-foreground">
-              Your job title, shown with your name and photo on the public booking page.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1.5">
-              <Label>Time zone</Label>
-              <SelectField name="timeZone" defaultValue={user.timeZone} options={timeZones.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Date format</Label>
+          </Field>
+          <div className="-mx-5 grid gap-4 border-t px-5 pt-5 sm:grid-cols-2">
+            <Field label="Time zone" htmlFor="timeZone">
               <SelectField
+                id="timeZone"
+                name="timeZone"
+                defaultValue={user.timeZone}
+                options={timeZones.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))}
+              />
+            </Field>
+            <Field label="Date format" htmlFor="locale">
+              <SelectField
+                id="locale"
                 name="locale"
                 defaultValue={LOCALES.some((l) => l.value === user.locale) ? user.locale : "en-US"}
                 options={LOCALES}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Time format</Label>
+            </Field>
+            <Field label="Time format" htmlFor="timeFormat">
               <SelectField
+                id="timeFormat"
                 name="timeFormat"
                 defaultValue={String(user.timeFormat)}
                 options={[
@@ -151,27 +159,36 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
                   { value: "24", label: "24-hour" },
                 ]}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Week starts</Label>
+            </Field>
+            <Field label="Week starts" htmlFor="weekStart">
               <SelectField
+                id="weekStart"
                 name="weekStart"
                 defaultValue={String(user.weekStart)}
                 options={WEEKDAY_SHORT.map((d, i) => ({ value: String(i), label: d }))}
               />
-            </div>
+            </Field>
           </div>
-          <Button type="submit" loading={profilePending}>
-            Save changes
-          </Button>
         </form>
-      </Card>
+      </FormSection>
 
-      <EmailCard currentEmail={user.email} />
+      <EmailSection currentEmail={user.email} />
 
-      <Card className="p-6">
-        <h2 className="text-base font-semibold">{user.hasPassword ? "Change password" : "Set password"}</h2>
+      <FormSection
+        title="Password"
+        description={
+          user.hasPassword
+            ? "Use at least 8 characters. Changing it signs you out on every other device."
+            : "Add a password so you can sign in with your email address. Use at least 8 characters."
+        }
+        footer={
+          <Button type="submit" form="password-form" loading={pwPending}>
+            {user.hasPassword ? "Update password" : "Set password"}
+          </Button>
+        }
+      >
         <form
+          id="password-form"
           action={(formData) => {
             if (formData.get("next") !== formData.get("confirm")) {
               setPwMismatch(true);
@@ -180,48 +197,58 @@ export function SettingsForms({ user, timeZones }: { user: UserView; timeZones: 
             setPwMismatch(false);
             pwAction(formData);
           }}
-          className="mt-5 max-w-sm space-y-4"
+          onChange={() => setPwMismatch(false)}
+          className="grid gap-4 sm:grid-cols-2"
         >
           {user.hasPassword ? (
-            <div className="space-y-1.5">
-              <Label htmlFor="current">Current password</Label>
+            <Field label="Current password" htmlFor="current">
               <Input id="current" name="current" type="password" autoComplete="current-password" />
-            </div>
+            </Field>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor="next">New password</Label>
+          <Field label="New password" htmlFor="next" className="sm:col-start-1">
             <Input id="next" name="next" type="password" autoComplete="new-password" required minLength={8} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm">Confirm new password</Label>
-            <Input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} />
-            {pwMismatch ? <p className="text-xs text-destructive">Passwords don&apos;t match.</p> : null}
-          </div>
-          <Button type="submit" variant="outline" loading={pwPending}>
-            Update password
-          </Button>
+          </Field>
+          <Field label="Confirm new password" htmlFor="confirm">
+            <Input
+              id="confirm"
+              name="confirm"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              aria-invalid={pwMismatch || undefined}
+            />
+            {pwMismatch ? <p className="text-meta text-destructive">Passwords don&apos;t match.</p> : null}
+          </Field>
         </form>
-      </Card>
+      </FormSection>
 
-      <TwoFactorCard enabled={user.totpEnabled} />
+      <TwoFactorSection enabled={user.totpEnabled} />
 
-      <Card className="p-6">
-        <h2 className="text-base font-semibold">Sessions</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          If you signed in on a shared or lost device, sign out everywhere else. This device stays
-          signed in.
-        </p>
-        <form action={sessionsAction} className="mt-4">
-          <Button type="submit" variant="outline" loading={sessionsPending}>
+      <FormSection
+        title="Sessions"
+        description="Sign out of devices you no longer use."
+      >
+        <form
+          action={sessionsAction}
+          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        >
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm font-medium">Other devices</p>
+            <p className="text-meta text-muted-foreground">
+              Signs you out of every other browser and device. This one stays signed in.
+            </p>
+          </div>
+          <Button type="submit" variant="outline" size="sm" loading={sessionsPending}>
             Sign out other devices
           </Button>
         </form>
-      </Card>
+      </FormSection>
     </div>
   );
 }
 
-function EmailCard({ currentEmail }: { currentEmail: string }) {
+function EmailSection({ currentEmail }: { currentEmail: string }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState<SettingsState, FormData>(requestEmailChangeAction, null);
@@ -255,17 +282,28 @@ function EmailCard({ currentEmail }: { currentEmail: string }) {
   }, []);
 
   return (
-    <Card className="p-6">
-      <h2 className="text-base font-semibold">Email</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{currentEmail}</p>
+    <FormSection
+      title="Email"
+      description="The address you sign in with."
+      footer={
+        editing ? (
+          <>
+            <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="email-form" loading={pending}>
+              Send link
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
       {editing ? (
-        <form action={action} className="mt-4 max-w-sm space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="new-email">New email address</Label>
+        <form id="email-form" action={action} className="grid gap-4 sm:grid-cols-2">
+          <Field label="New email address" htmlFor="new-email">
             <Input id="new-email" name="email" type="email" required placeholder="new@company.com" autoFocus />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email-password">Current password</Label>
+          </Field>
+          <Field label="Current password" htmlFor="email-password">
             <Input
               id="email-password"
               name="password"
@@ -273,27 +311,33 @@ function EmailCard({ currentEmail }: { currentEmail: string }) {
               autoComplete="current-password"
               required
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <Button type="submit" loading={pending}>Send link</Button>
-            <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
-          </div>
+          </Field>
+          <FieldHint className="sm:col-span-2">
+            We&apos;ll email a confirmation link to the new address. Nothing changes until you click it.
+          </FieldHint>
         </form>
       ) : (
-        <Button variant="outline" size="sm" className="mt-4" onClick={() => setEditing(true)}>
-          Change email
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm font-medium">Email address</p>
+            <p className="truncate text-meta text-muted-foreground">{currentEmail}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            Change email
+          </Button>
+        </div>
       )}
-      {editing ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          We&apos;ll email a confirmation link to the new address — nothing changes until you click it.
-        </p>
-      ) : null}
-    </Card>
+    </FormSection>
   );
 }
 
-function TwoFactorCard({ enabled }: { enabled: boolean }) {
+/** The account label an authenticator app shows, taken from the otpauth URI. */
+function totpAccountLabel(uri: string) {
+  const match = uri.match(/totp\/([^?]+)/)?.[1];
+  return match ? decodeURIComponent(match) : "Tidetime";
+}
+
+function TwoFactorSection({ enabled }: { enabled: boolean }) {
   const { toast } = useToast();
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
   const [enableState, enableAction, enabling] = useActionState<SettingsState, FormData>(enableTotpAction, null);
@@ -312,46 +356,97 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
     if (disableState?.error) toast({ title: "Couldn't disable 2FA", description: disableState.error, variant: "destructive" });
   }, [disableState, toast]);
 
+  let footer: React.ReactNode;
+  if (enabled) {
+    footer = (
+      <Button type="submit" form="totp-disable-form" variant="outline" loading={disabling}>
+        Turn off
+      </Button>
+    );
+  } else if (setup) {
+    footer = (
+      <>
+        <Button type="button" variant="ghost" onClick={() => setSetup(null)}>
+          Cancel
+        </Button>
+        <Button type="submit" form="totp-enable-form" loading={enabling}>
+          Verify &amp; enable
+        </Button>
+      </>
+    );
+  }
+
   return (
-    <Card className="p-6">
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">Two-factor authentication</h2>
-        {enabled ? <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">On</span> : null}
+    <FormSection
+      title="Two-factor authentication"
+      description="Ask for a 6-digit code from an authenticator app at sign-in."
+      footer={footer}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 space-y-0.5">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Authenticator app</p>
+            {enabled ? (
+              <Badge variant="success" dot>
+                On
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Off</Badge>
+            )}
+          </div>
+          <p className="text-meta text-muted-foreground">
+            {enabled
+              ? "You're asked for a code from your app each time you sign in."
+              : "Google Authenticator, 1Password, Authy or any other authenticator app."}
+          </p>
+        </div>
+        {!enabled && !setup ? (
+          <Button variant="outline" size="sm" onClick={async () => setSetup(await beginTotpSetupAction())}>
+            Set up 2FA
+          </Button>
+        ) : null}
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Protect your account with a 6-digit code from an authenticator app (Google Authenticator,
-        1Password, Authy…) at sign-in.
-      </p>
 
       {enabled ? (
-        <form action={disableAction} className="mt-4 flex max-w-sm items-end gap-2">
-          <div className="flex-1 space-y-1.5">
-            <Label htmlFor="totp-disable">Current code</Label>
+        <form id="totp-disable-form" action={disableAction} className="-mx-5 grid gap-4 border-t px-5 pt-5">
+          <Field
+            label="Current code"
+            htmlFor="totp-disable"
+            hint="Enter a code from your app to turn two-factor authentication off."
+            className="sm:max-w-xs"
+          >
             <Input id="totp-disable" name="code" inputMode="numeric" maxLength={8} placeholder="123456" required />
-          </div>
-          <Button type="submit" variant="outline" loading={disabling}>
-            Turn off
-          </Button>
+          </Field>
         </form>
       ) : setup ? (
-        <div className="mt-4 max-w-md space-y-4">
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm">
-            <p className="font-medium">1. Add this key to your authenticator app</p>
-            <p className="mt-2 select-all break-all rounded bg-background px-2 py-1.5 font-mono text-[13px] tracking-wider">
+        <form id="totp-enable-form" action={enableAction} className="-mx-5 grid gap-5 border-t px-5 pt-5">
+          <input type="hidden" name="secret" value={setup.secret} />
+          <Field
+            label="1. Add this key to your authenticator app"
+            hint={
+              <>
+                Choose &ldquo;enter a setup key&rdquo;, account name &ldquo;{totpAccountLabel(setup.uri)}&rdquo;,
+                time-based.
+              </>
+            }
+          >
+            <p className="select-all break-all rounded-lg border bg-muted/50 px-3 py-2 font-mono text-sm tracking-wider">
               {setup.secret}
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Choose “enter a setup key”, account name “{setup.uri.match(/totp\/([^?]+)/)?.[1] ? decodeURIComponent(setup.uri.match(/totp\/([^?]+)/)![1]) : "Tidetime"}”, time-based.
-            </p>
-          </div>
-          <form action={enableAction} className="space-y-3">
-            <input type="hidden" name="secret" value={setup.secret} />
-            <div className="space-y-1.5">
-              <Label htmlFor="totp-enable">2. Enter the 6-digit code it shows</Label>
-              <Input id="totp-enable" name="code" inputMode="numeric" maxLength={8} placeholder="123456" required autoFocus />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="totp-password">3. Confirm your password</Label>
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="2. Enter the 6-digit code it shows" htmlFor="totp-enable">
+              <Input
+                id="totp-enable"
+                name="code"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder="123456"
+                required
+                autoFocus
+              />
+            </Field>
+            <Field label="3. Confirm your password" htmlFor="totp-password">
               <Input
                 id="totp-password"
                 name="password"
@@ -359,36 +454,28 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
                 autoComplete="current-password"
                 required
               />
-            </div>
-            <Button type="submit" loading={enabling}>Verify &amp; enable</Button>
-          </form>
-          <Button variant="ghost" size="sm" onClick={() => setSetup(null)}>Cancel</Button>
-        </div>
-      ) : (
-        <Button
-          variant="outline"
-          className="mt-4"
-          onClick={async () => setSetup(await beginTotpSetupAction())}
-        >
-          Set up 2FA
-        </Button>
-      )}
-    </Card>
+            </Field>
+          </div>
+        </form>
+      ) : null}
+    </FormSection>
   );
 }
 
 function SelectField({
+  id,
   name,
   defaultValue,
   options,
 }: {
+  id: string;
   name: string;
   defaultValue: string;
   options: { value: string; label: string }[];
 }) {
   return (
     <Select name={name} defaultValue={defaultValue}>
-      <SelectTrigger>
+      <SelectTrigger id={id}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

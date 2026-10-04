@@ -21,7 +21,7 @@ export function CreateScheduleButton({ targetUserId }: { targetUserId?: number }
         })
       }
     >
-      <Plus className="h-4 w-4" /> Create schedule
+      <Plus /> Create schedule
     </Button>
   );
 }

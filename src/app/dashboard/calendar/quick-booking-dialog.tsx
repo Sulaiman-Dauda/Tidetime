@@ -4,12 +4,13 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -35,8 +36,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** YYYY-MM-DD the booking is being created on (host timezone). */
   date: string | null;
+  /** BCP-47 locale for the date in the description, from the viewer's profile */
+  locale?: string;
   services: CalendarService[];
-  /** team roster — managers can book on behalf of a provider; empty otherwise */
+  /** team roster: managers can book on behalf of a provider; empty otherwise */
   providers?: { id: number; name: string }[];
 }
 
@@ -45,7 +48,14 @@ interface Props {
  * or by drag-creating on an empty day. The host picks a service, time, and
  * attendee; the booking is confirmed immediately (manual host booking).
  */
-export function QuickBookingDialog({ open, onOpenChange, date, services, providers = [] }: Props) {
+export function QuickBookingDialog({
+  open,
+  onOpenChange,
+  date,
+  locale,
+  services,
+  providers = [],
+}: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -110,7 +120,7 @@ export function QuickBookingDialog({ open, onOpenChange, date, services, provide
   }
 
   const dateLabel = date
-    ? new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+    ? new Date(`${date}T00:00:00`).toLocaleDateString(locale, {
         weekday: "long",
         month: "long",
         day: "numeric",
@@ -126,121 +136,130 @@ export function QuickBookingDialog({ open, onOpenChange, date, services, provide
         </DialogHeader>
 
         {services.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Create a service first, then you can add bookings from the calendar.
           </p>
         ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Service</Label>
-              <Select value={slug} onValueChange={onSelectService}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a service" />
-                </SelectTrigger>
-                <SelectContent>
-                  {services.map((s) => (
-                    <SelectItem key={s.slug} value={s.slug}>
-                      {s.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {providers.length > 1 ? (
-              <div className="space-y-1.5">
-                <Label>Provider</Label>
-                <Select
-                  value={providerId === null ? "auto" : String(providerId)}
-                  onValueChange={(value) => {
-                    setProviderId(value === "auto" ? null : Number(value));
-                    setConflictWarning(null);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
+          <>
+            <div className="grid gap-4">
+              <Field label="Service" htmlFor="qb-service">
+                <Select value={slug} onValueChange={onSelectService}>
+                  <SelectTrigger id="qb-service">
+                    <SelectValue placeholder="Pick a service" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Auto-assign (least busy)</SelectItem>
-                    {providers.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    {services.map((s) => (
+                      <SelectItem key={s.slug} value={s.slug}>
+                        {s.title}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            ) : null}
+              </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="qb-time">Start time</Label>
-                <Input id="qb-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              {providers.length > 1 ? (
+                <Field label="Provider" htmlFor="qb-provider">
+                  <Select
+                    value={providerId === null ? "auto" : String(providerId)}
+                    onValueChange={(value) => {
+                      setProviderId(value === "auto" ? null : Number(value));
+                      setConflictWarning(null);
+                    }}
+                  >
+                    <SelectTrigger id="qb-provider">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto-assign (least busy)</SelectItem>
+                      {providers.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Start time" htmlFor="qb-time">
+                  <Input
+                    id="qb-time"
+                    type="time"
+                    className="tabular-nums"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                  />
+                </Field>
+                <Field label="Duration (min)" htmlFor="qb-duration">
+                  <Input
+                    id="qb-duration"
+                    type="number"
+                    min={5}
+                    step={5}
+                    className="tabular-nums"
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                  />
+                </Field>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="qb-duration">Duration (min)</Label>
+
+              <Field label="Attendee name" htmlFor="qb-name">
                 <Input
-                  id="qb-duration"
-                  type="number"
-                  min={5}
-                  step={5}
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
+                  id="qb-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Jane Doe"
                 />
-              </div>
+              </Field>
+              <Field label="Attendee email" htmlFor="qb-email">
+                <Input
+                  id="qb-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jane@example.com"
+                />
+              </Field>
+              <Field label="Notes (optional)" htmlFor="qb-notes">
+                <Textarea
+                  id="qb-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Anything the attendee should know"
+                />
+              </Field>
+
+              {conflictWarning ? (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-warning/20 bg-warning-subtle px-3 py-2.5 text-meta text-warning"
+                >
+                  {conflictWarning} Booking anyway creates an overlapping appointment.
+                </p>
+              ) : null}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="qb-name">Attendee name</Label>
-              <Input id="qb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="qb-email">Attendee email</Label>
-              <Input
-                id="qb-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="jane@example.com"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="qb-notes">Notes (optional)</Label>
-              <Textarea
-                id="qb-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                placeholder="Anything the attendee should know"
-              />
-            </div>
-
-            {conflictWarning ? (
-              <div
-                role="alert"
-                className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[13px] text-amber-700 dark:text-amber-300"
-              >
-                {conflictWarning} Booking anyway creates an overlapping appointment.
-              </div>
-            ) : null}
-
-            <div className="flex justify-end gap-2 pt-1">
+            <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
                 Cancel
               </Button>
               {conflictWarning ? (
-                <Button
-                  variant="destructive"
-                  onClick={() => submit(true)}
-                  disabled={pending}
-                >
+                <Button variant="destructive" onClick={() => submit(true)} loading={pending}>
                   {pending ? "Creating…" : "Book anyway"}
                 </Button>
               ) : (
-                <Button onClick={() => submit()} disabled={pending || !slug || !name || !email}>
+                <Button
+                  onClick={() => submit()}
+                  loading={pending}
+                  disabled={!slug || !name || !email}
+                >
                   {pending ? "Creating…" : "Create booking"}
                 </Button>
               )}
-            </div>
-          </div>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

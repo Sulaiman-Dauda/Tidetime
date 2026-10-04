@@ -43,6 +43,25 @@ a stable release. Published releases and their notes are also available on the
 - The date label in the booking page's slot column wrapped after the weekday
   when the rail was narrow.
 - The calendar's month toolbar overflowed the viewport on phones.
+- The brand colour setting only painted a 4px bar across the top of public
+  pages and a dot beside the company name. It now themes the public booking,
+  confirmation and legal pages: buttons, selected dates and slots, links and
+  focus rings, with button text switched between white and near-black for
+  contrast. The dashboard keeps Tidetime's indigo, and the setting's hint now
+  says so. If you set a colour on an earlier version, your public pages take
+  it on after upgrading. On light pages a colour below 3:1 against the page,
+  such as a pale yellow, is deepened just far enough to reach 3:1, and any
+  other colour is used as entered. Dark mode lightens it to at least 62%, and
+  further if it still falls short of 3:1.
+- The booking confirmation page and the dashboard booking detail showed the
+  attendee's phone number twice when the service's form had its own phone
+  question.
+- The confirmation page title read "Your booking · Tidetime · Tidetime".
+- A cancelled booking's confirmation page still linked to the meeting.
+- "New service" on the Overview was shown to schedulers and members, who
+  cannot create services, and clicking it ended on an error. "Manage services"
+  on an empty Bookings tab sent schedulers to a page that turned them away.
+  Both now appear only for roles that can use them.
 
 ### Changed
 
@@ -62,6 +81,19 @@ a stable release. Published releases and their notes are also available on the
   title has room.
 - The calendar's timezone footnote names it as the viewer's own zone and links
   to the profile setting.
+- The interface was rebuilt across every screen. Pages, navigation and
+  behaviour are unchanged. Colours, surfaces, shadows and radii now come from
+  one set of design tokens, and forms, tables, tabs and segmented controls
+  share primitives (`Field`, `FormSection`, `Table`, `Segmented`) instead of
+  per-page styling. The dashboard content sits in an inset panel beside a
+  grouped sidebar, with the account menu at its foot rather than in the top
+  bar. Long forms put each section's help text beside its fields. Decorative motion (the page-enter animation, counting numbers, the
+  confirmation burst) was removed. `CONTRIBUTING.md` describes the primitives.
+- The typeface is now Geist, under the SIL Open Font License (included as
+  `public/fonts/Geist-OFL.txt`). It replaces Satoshi and Clash Display, whose
+  ITF Free Font License v2.0 does not allow redistributing the font files in a
+  repository or an app served from public servers. One variable font file
+  replaces seven static ones.
 
 ## [0.1.2] - 2026-07-25
 

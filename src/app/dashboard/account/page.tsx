@@ -10,10 +10,10 @@ export default async function AccountPage() {
   const timeZones = listTimeZones();
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Profile settings"
-        description="Your personal account — name, sign-in details, preferences and security."
+        description="Your name, sign-in details, preferences and security."
       />
       <SettingsForms
         timeZones={timeZones}

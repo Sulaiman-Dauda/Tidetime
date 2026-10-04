@@ -3,16 +3,16 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { requestPasswordResetAction, type ResetActionResult } from "../actions";
+import { FormAlert } from "../_components/auth-card";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CheckCircle2 } from "lucide-react";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Sending…" : "Send reset link"}
+    <Button type="submit" className="w-full" loading={pending}>
+      Send reset link
     </Button>
   );
 }
@@ -25,24 +25,16 @@ export function ForgotPasswordForm() {
 
   if (state.sent) {
     return (
-      <div className="rounded-md border border-emerald-500/20 bg-emerald-500/8 px-4 py-4 text-sm text-emerald-700 dark:text-emerald-400">
-        <CheckCircle2 className="mb-2 h-5 w-5" />
-        If an account exists for that email, a password reset link is on its way. Check your inbox.
-      </div>
+      <FormAlert tone="success">
+        If an account exists for that email, a reset link is on its way. Check your inbox.
+      </FormAlert>
     );
   }
 
   return (
-    <form action={formAction} className="space-y-5">
-      {state.error && (
-        <p className="rounded-md border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">
-          {state.error}
-        </p>
-      )}
-      <div className="space-y-1.5">
-        <Label htmlFor="email" className="text-[13px] font-medium">
-          Email
-        </Label>
+    <form action={formAction} className="space-y-4">
+      {state.error ? <FormAlert>{state.error}</FormAlert> : null}
+      <Field label="Email" htmlFor="email">
         <Input
           id="email"
           name="email"
@@ -51,8 +43,10 @@ export function ForgotPasswordForm() {
           required
           placeholder="you@example.com"
         />
+      </Field>
+      <div className="pt-1">
+        <SubmitButton />
       </div>
-      <SubmitButton />
     </form>
   );
 }

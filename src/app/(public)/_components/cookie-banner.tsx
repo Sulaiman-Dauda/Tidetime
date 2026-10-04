@@ -28,10 +28,14 @@ export function CookieBanner({ content }: { content: string }) {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">{content}</p>
-        <Button size="sm" onClick={dismiss} className="shrink-0">
+    <div
+      role="region"
+      aria-label="Cookie notice"
+      className="fixed inset-x-4 bottom-4 z-50 rounded-xl bg-popover p-4 text-popover-foreground shadow-popover sm:left-6 sm:right-auto sm:bottom-6 sm:max-w-sm"
+    >
+      <p className="text-sm text-muted-foreground">{content}</p>
+      <div className="mt-3 flex justify-end">
+        <Button size="sm" variant="outline" onClick={dismiss}>
           Got it
         </Button>
       </div>

@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,8 +34,8 @@ export function DeleteScheduleButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
-          <Trash2 className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="sm" className="hover:bg-destructive-subtle hover:text-destructive">
+          <Trash2 />
           Delete schedule
         </Button>
       </AlertDialogTrigger>
@@ -65,7 +65,7 @@ export function DeleteScheduleButton({
             {targetUserId ? <input type="hidden" name="targetUserId" value={targetUserId} /> : null}
             <AlertDialogAction
               type="submit"
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/88"
+              className={buttonVariants({ variant: "destructive" })}
               disabled={pending}
             >
               {pending ? "Deleting…" : "Delete schedule"}

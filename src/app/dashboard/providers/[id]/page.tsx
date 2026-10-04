@@ -4,9 +4,10 @@ import { db } from "@/db";
 import { teams, memberships, users, invites } from "@/db/schema";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { getAppUrl } from "@/server/app-url";
+import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { TeamMembers } from "./members";
 
-export const metadata = { title: "Providers" };
+export const metadata = { title: "Members" };
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -54,7 +55,7 @@ export default async function ProviderDetailPage({ params }: Props) {
     .innerJoin(users, eq(memberships.userId, users.id))
     .where(eq(memberships.teamId, teamId));
 
-  // Pending (unaccepted, unexpired) invitations — with a shareable signup link
+  // Pending (unaccepted, unexpired) invitations, with a shareable signup link
   // so admins aren't blocked when email delivery isn't configured.
   const appUrl = await getAppUrl();
   const pending = await db
@@ -83,13 +84,11 @@ export default async function ProviderDetailPage({ params }: Props) {
   }));
 
   return (
-    <div className="animate-fade-in space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">{team.name}</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Manage the people who can deliver your company services.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Members"
+        description={`Invite people to ${team.name}, set their roles and manage access.`}
+      />
 
       <TeamMembers
         teamId={teamId}
@@ -102,6 +101,7 @@ export default async function ProviderDetailPage({ params }: Props) {
           email: m.email,
           position: m.position,
           avatarUrl: m.avatarUrl,
+          isSelf: m.userId === user.id,
         }))}
         pendingInvites={pendingInvites}
       />

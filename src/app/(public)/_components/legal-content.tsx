@@ -1,4 +1,5 @@
 import { parseLegalText, type LegalSpan } from "@/lib/legal-text";
+import { cn } from "@/lib/utils";
 
 /**
  * Renders the stored Terms/Privacy text as real elements.
@@ -24,7 +25,7 @@ function Spans({ spans }: { spans: LegalSpan[] }) {
           <a
             key={i}
             href={span.href}
-            className="text-foreground underline underline-offset-2 hover:no-underline"
+            className="font-medium text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
             {...(external && { target: "_blank", rel: "noopener noreferrer" })}
           >
             {content}
@@ -39,11 +40,14 @@ export function LegalContent({ content }: { content: string }) {
   const blocks = parseLegalText(content);
 
   return (
-    <div className="mt-6 space-y-4 text-sm leading-relaxed text-muted-foreground">
+    <div className="max-w-prose break-words text-sm leading-6 text-muted-foreground">
       {blocks.map((block, i) => {
+        // Headings sit closer to the text they introduce than to the text above.
+        const gap = i === 0 ? "" : blocks[i - 1].kind === "heading" ? "mt-2" : "mt-4";
+
         if (block.kind === "heading") {
           return (
-            <h2 key={i} className="pt-4 text-base font-semibold text-foreground">
+            <h2 key={i} className={cn("text-base font-semibold text-foreground", i > 0 && "mt-8")}>
               <Spans spans={block.spans} />
             </h2>
           );
@@ -51,9 +55,9 @@ export function LegalContent({ content }: { content: string }) {
 
         if (block.kind === "list") {
           return (
-            <ul key={i} className="list-disc space-y-1.5 pl-5 marker:text-muted-foreground/50">
+            <ul key={i} className={cn("list-disc space-y-1.5 pl-5 marker:text-muted-foreground/60", gap)}>
               {block.items.map((item, j) => (
-                <li key={j}>
+                <li key={j} className="pl-1">
                   <Spans spans={item} />
                 </li>
               ))}
@@ -63,7 +67,7 @@ export function LegalContent({ content }: { content: string }) {
 
         // Newlines inside a paragraph stay as breaks, matching the old output.
         return (
-          <p key={i} className="whitespace-pre-wrap">
+          <p key={i} className={cn("whitespace-pre-wrap", gap)}>
             <Spans spans={block.spans} />
           </p>
         );

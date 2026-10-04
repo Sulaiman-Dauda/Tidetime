@@ -63,22 +63,30 @@ export function AltchaWidget({ onChange }: { onChange: (token: string | null) =>
   }, [solve]);
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+    <div
+      className="flex min-h-9 items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-meta text-muted-foreground"
+      aria-live="polite"
+    >
       {status === "done" ? (
         <>
-          <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span>Verified — you&apos;re human.</span>
+          <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
+          <span>Verified as human</span>
         </>
       ) : status === "error" ? (
         <>
-          <ShieldAlert className="h-4 w-4 text-destructive" />
-          <button type="button" onClick={() => void solve()} className="underline-offset-2 hover:underline">
-            Verification failed — tap to retry
+          <ShieldAlert className="size-4 shrink-0 text-destructive" aria-hidden />
+          <span>Verification failed.</span>
+          <button
+            type="button"
+            onClick={() => void solve()}
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            Try again
           </button>
         </>
       ) : (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
           <span>Verifying you&apos;re human…</span>
         </>
       )}

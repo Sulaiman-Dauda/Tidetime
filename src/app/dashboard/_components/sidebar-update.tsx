@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpCircle, Check, Loader2, Download } from "lucide-react";
+import { ArrowUpCircle, Check, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface UpdateStatus {
   version: string;
@@ -87,62 +88,52 @@ export function SidebarUpdate() {
     }
   }
 
-  // Non-admins get 403 (status stays null) — render nothing.
+  // Non-admins get 403 (status stays null), so they see nothing here.
   if (!status) return null;
 
   if (phase === "done") {
     return (
-      <div className="mx-2 mb-1 flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1.5 text-[11.5px] text-emerald-700 dark:text-emerald-400">
-        <Check className="h-3.5 w-3.5 shrink-0" /> Updated
+      <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg bg-success-subtle px-2.5 py-1.5 text-xs font-medium text-success">
+        <Check className="size-3.5 shrink-0" /> Updated
       </div>
     );
   }
 
   if (!status.updateAvailable) {
-    return (
-      <div className="px-3 pb-1 pt-0.5 text-[10.5px] text-muted-foreground/60">
-        Tidetime <span className="font-medium">v{status.version}</span>
-      </div>
-    );
+    return <div className="px-5 pb-1 text-xs text-muted-foreground">Tidetime v{status.version}</div>;
   }
 
   return (
-    <div className="mx-2 mb-1 rounded-lg border border-brand/25 bg-accent/50 px-2.5 py-2">
-      <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground">
-        <ArrowUpCircle className="h-3.5 w-3.5 shrink-0 text-brand" />
+    <div className="mx-3 mb-1 rounded-lg border bg-background p-3 shadow-xs">
+      <div className="flex items-center gap-1.5 text-meta font-medium text-foreground">
+        <ArrowUpCircle className="size-4 shrink-0 text-primary" />
         Update available
       </div>
       {status.latestVersion ? (
-        <div className="mt-0.5 pl-[19px] text-[10.5px] font-medium text-muted-foreground">
-          v{status.latestVersion}
+        <div className="mt-1 text-xs text-muted-foreground">
+          v{status.version} to v{status.latestVersion}
         </div>
       ) : null}
 
       {phase === "manual" ? (
-        <p className="mt-1.5 text-[10.5px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
           {copied
-            ? "Command copied — run it on your server to update."
+            ? "Update command copied. Run it on your server."
             : "Run the update command on your server."}
         </p>
       ) : (
-        <button
-          type="button"
+        <Button
+          size="sm"
+          className="mt-2.5 w-full"
           onClick={onUpdate}
-          disabled={phase === "updating"}
-          className={`mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 ${
-            phase === "updating" ? "" : "tt-attn"
-          }`}
+          loading={phase === "updating"}
         >
-          {phase === "updating" ? (
+          {phase === "updating" ? "Updating" : (
             <>
-              <Loader2 className="h-3 w-3 animate-spin" /> Updating…
-            </>
-          ) : (
-            <>
-              <Download className="h-3.5 w-3.5" /> Update now
+              <Download /> Update now
             </>
           )}
-        </button>
+        </Button>
       )}
     </div>
   );

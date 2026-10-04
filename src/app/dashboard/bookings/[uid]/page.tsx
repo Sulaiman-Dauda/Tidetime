@@ -1,29 +1,31 @@
 import { and, eq } from "drizzle-orm";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  CalendarCheck,
+  CalendarClock,
+  CalendarX2,
+  CheckCircle2,
+  Clock,
+  Phone,
+  XCircle,
+} from "lucide-react";
 import { requireAnyPermission } from "@/lib/guard";
 import { db } from "@/db";
 import { bookings, attendees, memberships, services, teams } from "@/db/schema";
 import { can } from "@/lib/rbac";
 import { listBookingActivity } from "@/server/activity";
 import type { BookingActivityType } from "@/server/activity";
-import { formatRange, resolveLocale } from "@/lib/format";
+import { formatDuration, initials, resolveLocale } from "@/lib/format";
 import { answersFromResponses } from "@/lib/booking-fields";
 import { formatPhoneDisplay } from "@/lib/phone";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "../../_components/page-header";
 import { AcceptButton, CancelBookingButton, DeclineButton } from "../_components/booking-actions";
-import {
-  ArrowLeft,
-  CalendarCheck,
-  CalendarClock,
-  CalendarX2,
-  CheckCircle2,
-  Clock,
-  MapPin,
-  Phone,
-  User,
-  XCircle,
-} from "lucide-react";
+import { BookingStatusBadge } from "../_components/booking-status-badge";
 
 interface Props {
   params: Promise<{ uid: string }>;
@@ -33,16 +35,16 @@ const ACTIVITY_META: Record<
   BookingActivityType,
   { label: string; icon: typeof Clock; tone: string }
 > = {
-  created: { label: "Booking created", icon: CalendarCheck, tone: "text-emerald-500" },
-  rescheduled: { label: "Rescheduled", icon: CalendarClock, tone: "text-amber-500" },
+  created: { label: "Booking created", icon: CalendarCheck, tone: "text-success" },
+  rescheduled: { label: "Rescheduled", icon: CalendarClock, tone: "text-warning" },
   cancelled: { label: "Cancelled", icon: CalendarX2, tone: "text-destructive" },
-  confirmed: { label: "Confirmed", icon: CheckCircle2, tone: "text-emerald-500" },
+  confirmed: { label: "Confirmed", icon: CheckCircle2, tone: "text-success" },
   rejected: { label: "Declined", icon: XCircle, tone: "text-destructive" },
-  rsvp: { label: "RSVP", icon: CheckCircle2, tone: "text-sky-500" },
+  rsvp: { label: "RSVP", icon: CheckCircle2, tone: "text-info" },
 };
 
-const RSVP_BADGES: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-  accepted: { label: "Attending", variant: "default" },
+const RSVP_BADGES: Record<string, { label: string; variant: "success" | "secondary" | "destructive" }> = {
+  accepted: { label: "Attending", variant: "success" },
   tentative: { label: "Maybe", variant: "secondary" },
   declined: { label: "Declined", variant: "destructive" },
 };
@@ -54,7 +56,7 @@ export default async function BookingDetailPage({ params }: Props) {
   ]);
   const { uid } = await params;
 
-  // Authorize against the host's membership, not the service's team — a
+  // Authorize against the host's membership, not the service's team: a
   // booking whose service was deleted must stay visible to team viewers.
   const [booking] = await db.select().from(bookings).where(eq(bookings.uid, uid)).limit(1);
   if (!booking) notFound();
@@ -72,7 +74,7 @@ export default async function BookingDetailPage({ params }: Props) {
         .limit(1);
       authorized = Boolean(hostMembership);
     }
-    // Removed member but the service belongs to this team — still visible.
+    // Removed member but the service belongs to this team: still visible.
     if (!authorized && booking.serviceId !== null) {
       const [teamService] = await db
         .select({ id: services.id })
@@ -102,170 +104,225 @@ export default async function BookingDetailPage({ params }: Props) {
   const rescheduleHref =
     teamRow && serviceRow ? `/book/${teamRow.slug}/${serviceRow.slug}?reschedule=${booking.uid}` : null;
 
-  const when = formatRange(booking.startTime, booking.endTime, user.timeZone, user.timeFormat === 12, user.locale);
   // Custom-question answers via the shared helper: system name/email fields are
-  // excluded (they already render on the attendee rows above).
+  // excluded (they already render on the attendee rows).
+  const responses = (booking.responses ?? {}) as Record<string, unknown>;
+  // The primary attendee's phone is copied from the form's phone question when
+  // the booking is made. It keeps its call link on the attendee row, so the
+  // matching answer is dropped here rather than shown a second time.
+  const primaryPhone = ats.find((a) => a.isPrimary)?.phoneNumber;
   const answers = serviceRow
-    ? answersFromResponses(serviceRow.bookingFields, (booking.responses ?? {}) as Record<string, unknown>)
-    : Object.entries(booking.responses ?? {})
+    ? answersFromResponses(
+        serviceRow.bookingFields,
+        responses,
+        primaryPhone ? formatPhoneDisplay(primaryPhone) : null,
+      )
+    : Object.entries(responses)
         .filter(([key, value]) => !["name", "email"].includes(key) && typeof value === "string" && value.trim())
         .map(([key, value]) => ({ label: key, value: String(value) }));
   const canCancel = booking.status === "accepted" && booking.endTime.getTime() >= Date.now();
-  const activityTime = new Intl.DateTimeFormat(resolveLocale(user.locale), {
+  const locale = resolveLocale(user.locale);
+  const hour12 = user.timeFormat === 12;
+  const dateLabel = new Intl.DateTimeFormat(locale, {
+    timeZone: user.timeZone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(booking.startTime);
+  const timeFormat = new Intl.DateTimeFormat(locale, {
+    timeZone: user.timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12,
+  });
+  const timeLabel = `${timeFormat.format(booking.startTime)} – ${timeFormat.format(booking.endTime)}`;
+  const minutes = Math.round((booking.endTime.getTime() - booking.startTime.getTime()) / 60_000);
+  const activityTime = new Intl.DateTimeFormat(locale, {
     timeZone: user.timeZone,
     dateStyle: "medium",
     timeStyle: "short",
-    hour12: user.timeFormat === 12,
+    hour12,
   });
+  const expired = booking.status === "pending" && booking.endTime.getTime() < Date.now();
+  const people = [...ats.filter((a) => a.isPrimary), ...ats.filter((a) => !a.isPrimary)];
 
   return (
-    <div className="animate-fade-in space-y-8">
-      <div>
-        <Link
-          href="/dashboard/bookings"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to bookings
-        </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">{booking.title}</h1>
-          {booking.status === "pending" && (
-            <Badge variant="pending">Pending</Badge>
-          )}
-          {booking.status === "accepted" && <Badge>Confirmed</Badge>}
-          {booking.status === "cancelled" && <Badge variant="destructive">Cancelled</Badge>}
-          {booking.status === "rejected" && <Badge variant="destructive">Rejected</Badge>}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        back={{ href: "/dashboard/bookings", label: "Bookings" }}
+        title={booking.title}
+        meta={<BookingStatusBadge status={booking.status} expired={expired} />}
+      />
 
-      <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr]">
-        <section className="space-y-6 rounded-2xl border border-border/60 bg-card p-5">
-          <div>
-            <h2 className="text-sm font-medium text-foreground">Details</h2>
-            <dl className="mt-4 space-y-3 text-[13px]">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-foreground">{when}</span>
-              </div>
-              {booking.location && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  {booking.meetingUrl ? (
-                    <a
-                      href={booking.meetingUrl}
-                      className="text-foreground hover:underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {booking.location}
-                    </a>
-                  ) : (
-                    <span className="text-foreground">{booking.location}</span>
-                  )}
-                </div>
-              )}
-              {ats.map((a) => {
-                const rsvp = a.rsvpStatus ? RSVP_BADGES[a.rsvpStatus] : null;
-                return (
-                  <div key={a.id} className="flex flex-wrap items-center gap-2 text-muted-foreground">
-                    <User className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-foreground">{a.name}</span>
-                    <a href={`mailto:${a.email}`} className="hover:underline">
-                      {a.email}
-                    </a>
-                    {/* Dial the raw E.164; show it grouped for reading. */}
-                    {a.phoneNumber ? (
-                      <a href={`tel:${a.phoneNumber}`} className="flex items-center gap-1 hover:underline">
-                        <Phone className="h-3 w-3" />
-                        {formatPhoneDisplay(a.phoneNumber)}
-                      </a>
-                    ) : null}
-                    {rsvp ? (
-                      <Badge variant={rsvp.variant} className="text-[10px]">{rsvp.label}</Badge>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </dl>
-          </div>
-
-          <div className="border-t border-border/60 pt-5">
-            <h2 className="text-sm font-medium text-foreground">Booking answers</h2>
-            {answers.length === 0 ? (
-              <p className="mt-3 text-xs text-muted-foreground">No extra answers were submitted.</p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <div className="min-w-0 space-y-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>{people.length === 1 ? "Attendee" : "Attendees"}</CardTitle>
+            </CardHeader>
+            {people.length === 0 ? (
+              <p className="px-5 pb-5 text-sm text-muted-foreground">No attendees on this booking.</p>
             ) : (
-              <dl className="mt-4 space-y-3 text-[13px]">
+              <ul className="divide-y border-t">
+                {people.map((a) => {
+                  const rsvp = RSVP_BADGES[a.rsvpStatus];
+                  return (
+                    <li key={a.id} className="flex items-center gap-3 px-5 py-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>{initials(a.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{a.name}</p>
+                        <p className="flex flex-wrap gap-x-3 text-meta text-muted-foreground">
+                          <a href={`mailto:${a.email}`} className="truncate hover:text-foreground hover:underline">
+                            {a.email}
+                          </a>
+                          {/* Dial the raw E.164; show it grouped for reading. */}
+                          {a.phoneNumber ? (
+                            <a
+                              href={`tel:${a.phoneNumber}`}
+                              className="inline-flex items-center gap-1 tabular-nums hover:text-foreground hover:underline"
+                            >
+                              <Phone className="size-3" aria-hidden />
+                              {formatPhoneDisplay(a.phoneNumber)}
+                            </a>
+                          ) : null}
+                        </p>
+                      </div>
+                      {rsvp ? <Badge variant={rsvp.variant}>{rsvp.label}</Badge> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Booking answers</CardTitle>
+            </CardHeader>
+            {answers.length === 0 ? (
+              <p className="px-5 pb-5 text-sm text-muted-foreground">No extra answers were submitted.</p>
+            ) : (
+              <dl className="divide-y border-t">
                 {answers.map((answer) => (
-                  <div key={answer.label} className="grid gap-1 sm:grid-cols-[140px_1fr]">
-                    <dt className="text-muted-foreground">{answer.label}</dt>
-                    <dd className="text-foreground">{answer.value}</dd>
+                  <div key={answer.label} className="grid gap-1 px-5 py-3 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-4">
+                    <dt className="text-sm text-muted-foreground">{answer.label}</dt>
+                    <dd className="whitespace-pre-line break-words text-sm text-foreground">{answer.value}</dd>
                   </div>
                 ))}
               </dl>
             )}
-          </div>
-        </section>
+          </Card>
 
-        <section className="space-y-4 rounded-2xl border border-border/60 bg-card p-5">
-          {booking.status === "pending" ? (
-            <div className="space-y-3 border-b border-border/60 pb-4">
-              <h2 className="text-sm font-medium text-foreground">Actions</h2>
-              <div className="flex flex-wrap gap-2">
-                <DeclineButton uid={booking.uid} />
-                <AcceptButton uid={booking.uid} />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Activity</CardTitle>
+            </CardHeader>
+            {activity.length === 0 ? (
+              <p className="px-5 pb-5 text-sm text-muted-foreground">No activity recorded yet.</p>
+            ) : (
+              <ol className="px-5 pb-5">
+                {activity.map((entry, index) => {
+                  const meta = ACTIVITY_META[entry.type as BookingActivityType] ?? {
+                    label: entry.type,
+                    icon: Clock,
+                    tone: "text-muted-foreground",
+                  };
+                  const Icon = meta.icon;
+                  return (
+                    <li key={entry.id} className="relative flex gap-3 pb-5 last:pb-0">
+                      {index < activity.length - 1 ? (
+                        <span className="absolute bottom-0 left-3 top-7 w-px bg-border" aria-hidden />
+                      ) : null}
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full border bg-card">
+                        <Icon className={cn("size-3.5", meta.tone)} aria-hidden />
+                      </span>
+                      <div className="min-w-0 pt-0.5">
+                        <p className="text-sm font-medium text-foreground">{meta.label}</p>
+                        {entry.message ? (
+                          <p className="text-meta text-muted-foreground">{entry.message}</p>
+                        ) : null}
+                        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                          {activityTime.format(new Date(entry.createdAt))}
+                          {entry.actor ? ` · ${entry.actor}` : ""}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </Card>
+        </div>
+
+        {/* First on phones: the time and the actions are what you open a booking for. */}
+        <aside className="order-first lg:order-none">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <dl className="space-y-3 px-5 pb-5 text-sm">
+              <SummaryRow label="Date">{dateLabel}</SummaryRow>
+              <SummaryRow label="Time">
+                <span className="tabular-nums">{timeLabel}</span>
+              </SummaryRow>
+              <SummaryRow label="Duration">{formatDuration(minutes)}</SummaryRow>
+              {booking.location ? (
+                <SummaryRow label="Location">
+                  {booking.meetingUrl ? (
+                    <a
+                      href={booking.meetingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {booking.location}
+                    </a>
+                  ) : (
+                    booking.location
+                  )}
+                </SummaryRow>
+              ) : null}
+              {booking.cancellationReason ? (
+                <SummaryRow label="Reason">{booking.cancellationReason}</SummaryRow>
+              ) : null}
+            </dl>
+
+            {booking.status === "pending" ? (
+              <div className="space-y-3 border-t p-5">
+                <p className="text-meta text-muted-foreground">This request is waiting for your decision.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <DeclineButton uid={booking.uid} />
+                  <AcceptButton uid={booking.uid} />
+                </div>
               </div>
-            </div>
-          ) : canCancel ? (
-            <div className="space-y-3 border-b border-border/60 pb-4">
-              <h2 className="text-sm font-medium text-foreground">Actions</h2>
-              <div className="flex flex-wrap gap-2">
+            ) : canCancel ? (
+              <div className="grid grid-cols-2 gap-2 border-t p-5">
                 {rescheduleHref ? (
-                  <a
-                    href={rescheduleHref}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[13px] font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <CalendarClock className="h-3.5 w-3.5" />
-                    Reschedule
-                  </a>
+                  <Button asChild size="sm" variant="outline">
+                    <a href={rescheduleHref}>
+                      <CalendarClock />
+                      Reschedule
+                    </a>
+                  </Button>
                 ) : null}
-                <CancelBookingButton uid={booking.uid} />
+                <CancelBookingButton uid={booking.uid} className={rescheduleHref ? undefined : "col-span-2"} />
               </div>
-            </div>
-          ) : null}
-
-          <h2 className="text-sm font-medium text-foreground">Activity</h2>
-          {activity.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No activity recorded yet.</p>
-          ) : (
-            <ol className="space-y-4">
-              {activity.map((entry) => {
-                const meta = ACTIVITY_META[entry.type as BookingActivityType] ?? {
-                  label: entry.type,
-                  icon: Clock,
-                  tone: "text-muted-foreground",
-                };
-                const Icon = meta.icon;
-                return (
-                  <li key={entry.id} className="flex gap-3">
-                    <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${meta.tone}`} />
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-foreground">{meta.label}</p>
-                      {entry.message && (
-                        <p className="text-xs text-muted-foreground">{entry.message}</p>
-                      )}
-                      <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-                        {activityTime.format(new Date(entry.createdAt))}
-                        {entry.actor ? ` · ${entry.actor}` : ""}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </section>
+            ) : null}
+          </Card>
+        </aside>
       </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="break-words text-foreground">{children}</dd>
     </div>
   );
 }

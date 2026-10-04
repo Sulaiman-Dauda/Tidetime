@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { memberships } from "@/db/schema";
 import { PageHeader } from "@/app/dashboard/_components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { Building2 } from "lucide-react";
 
 export const metadata = { title: "Members" };
 
@@ -28,10 +29,10 @@ export default async function MembersIndexPage() {
   if (membership) redirect(`/dashboard/providers/${membership.teamId}`);
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="space-y-6">
       <PageHeader title="Members" description="Invite people and manage company membership." />
       <EmptyState
-        brand
+        icon={Building2}
         title="No company configured"
         description="Complete first-run setup to create your company."
       />
