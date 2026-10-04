@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 const isWebUrl = (value: string) => /^https?:\/\//i.test(value);
+/**
+ * The preview only loads an http(s) URL or an image data URL (uploads arrive as
+ * one). Browsers never run script from an <img>, but anything else typed into
+ * the URL box has no business in an image source.
+ */
+const isPreviewable = (value: string) => isWebUrl(value) || /^data:image\//i.test(value);
 
 /**
  * Company logo field for the Brand form. An upload goes to /api/company/logo,
@@ -58,7 +64,7 @@ export function CompanyLogoUpload({ defaultValue }: { defaultValue: string }) {
       <input type="hidden" name="logoUrl" value={value} />
       <div className="flex items-center gap-4">
         <div className="relative flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-background">
-          {value ? (
+          {isPreviewable(value) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="Company logo" className="size-full object-contain p-2" />
           ) : (
