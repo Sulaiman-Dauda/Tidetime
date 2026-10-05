@@ -6,7 +6,7 @@ Tidetime is open source and runs on your own server. There is no hosted plan, no
 
 ![Screen recording of a visitor booking an Intro Call on Tidetime, choosing the service, picking a date and time, entering their details, seeing the confirmation, and receiving the confirmation email.](docs/media/booking.gif)
 
-![The Tidetime Bookings page in the staff dashboard, listing the new Intro Call booked by Alex Taylor with Reschedule and Cancel actions.](docs/media/admin.png)
+![The Tidetime Bookings page in the staff dashboard, listing the new 10:00 am Intro Call booked by Alex Taylor with Demo Owner, marked Confirmed.](docs/media/admin.png)
 
 ## Features
 
