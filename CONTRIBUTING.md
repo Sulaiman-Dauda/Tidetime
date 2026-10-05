@@ -36,12 +36,13 @@ Useful links:
    npm install
    ```
 
-2. Copy the environment file and generate a local auth secret:
+2. Copy the environment file and edit it for local development:
 
    ```bash
    cp .env.example .env
-   openssl rand -base64 32
    ```
+
+   The example file is set up for production. In `.env`, delete the `NODE_ENV=production` line, set `APP_URL=http://localhost:3100`, and set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/tidetime` (the database started in the next step). The secrets can stay empty in development. To run the jobs worker locally, also set `CRON_SECRET` (generate one with `openssl rand -base64 32`) and `JOBS_TARGET_URL=http://localhost:3100/api/cron`, then run `node --env-file=.env scripts/jobs-worker.mjs`.
 
 3. Start PostgreSQL:
 
@@ -53,7 +54,7 @@ Useful links:
 
    ```bash
    npm run db:migrate
-   npm run db:seed
+   npm run db:seed   # optional; skip it to create your own company at /setup
    ```
 
 5. Start the dev server:
@@ -64,7 +65,7 @@ Useful links:
 
 ## Local quality checks
 
-Run the same checks expected in CI before opening a pull request:
+Run these checks before opening a pull request. CI runs the same steps, and also the booking end-to-end suite (`npm run test:e2e`), which is a required check:
 
 ```bash
 npm run check

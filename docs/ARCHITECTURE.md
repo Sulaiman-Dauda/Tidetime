@@ -50,4 +50,4 @@ The production Docker Compose stack runs four services: PostgreSQL, the standalo
 
 ## Testing
 
-The project uses Vitest for unit tests and Playwright for end-to-end booking tests. `npm run check` runs linting, type-checking, unit tests, and a production build, and is the same set of checks expected in continuous integration.
+The project uses Vitest for unit tests and Playwright for end-to-end booking tests. `npm run check` runs linting, type-checking, unit tests, and a production build, the same steps continuous integration runs. CI also runs the booking end-to-end suite, which is a required check.

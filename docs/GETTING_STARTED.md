@@ -31,7 +31,7 @@ cp .env.example .env
 
 Edit `.env` and set at least these values:
 
-- `APP_URL` is the public URL of the instance, for example `https://book.yourcompany.com`.
+- `APP_URL` is the address of the instance. Use `http://<your-server-ip>` until you attach a domain under **Settings**, **Domain** after first run; the saved domain then replaces `APP_URL` in links.
 - `DATABASE_URL` can stay as the bundled database in the production Compose file.
 - `POSTGRES_PASSWORD` is the password for the bundled PostgreSQL container.
 - `AUTH_SECRET` and `CRON_SECRET` are random values of at least 32 characters each.
@@ -42,7 +42,16 @@ Generate a secret with:
 openssl rand -base64 32
 ```
 
-Then start everything:
+Setting `TIDETIME_IMAGE=ghcr.io/sulaiman-dauda/tidetime:latest` as well is recommended. You then run the published image and update the same way as an install-script setup. Without it, Compose builds the image from source.
+
+Then start everything. With `TIDETIME_IMAGE` set:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Or, to build from source with `TIDETIME_IMAGE` left unset:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
@@ -78,11 +87,16 @@ For working on the code rather than running in production:
 git clone https://github.com/Sulaiman-Dauda/Tidetime.git tidetime
 cd tidetime
 cp .env.example .env
+```
+
+The example file is set up for production, so edit `.env` first. Delete the `NODE_ENV=production` line, set `APP_URL=http://localhost:3100`, and set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/tidetime` (the database `docker compose up -d postgres` starts). The secrets can stay empty in development.
+
+```bash
 npm install
 docker compose up -d postgres
 npm run db:migrate
-npm run db:seed        # optional demo company and service
+npm run db:seed        # optional demo company; skip it to use /setup
 npm run dev
 ```
 
-The dev server runs at `http://localhost:3100`. See the [contributing guide](../CONTRIBUTING.md) for the full workflow and checks.
+The dev server runs at `http://localhost:3100`. With the seed, sign in as `owner@example.com` with the password `password123`; without it, open `/setup`. See the [contributing guide](../CONTRIBUTING.md) for the full workflow and checks.

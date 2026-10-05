@@ -10,12 +10,12 @@ Tidetime is open source and runs on your own server. There is no hosted plan, no
 
 ## Features
 
-- **Services and providers.** Define services with their own duration, location, intake questions, and confirmation message. Assign one or more providers to each service.
-- **Provider assignment.** Customers can choose a provider, or Tidetime assigns the least-busy available one. Bookings are created inside a database transaction so the same slot is never double-booked.
-- **Availability.** Each provider sets their own weekly hours across one or more schedules. Admins can manage team availability, daily booking caps, and group events with multiple seats.
+- **Services and providers.** Define services with their own duration, location, intake questions, and an optional manual-confirmation step. Assign one or more providers to each service.
+- **Provider assignment.** Customers can choose a provider, or Tidetime assigns the least-busy available one. Bookings are created inside a database transaction so two customers cannot take the same slot at once. Staff can still place a manual booking over existing ones from the dashboard calendar.
+- **Availability.** Each provider sets their own weekly hours. A provider can keep several named schedules, but only the one marked default is used for bookings. Admins can manage team availability, daily booking caps, and group events with multiple seats.
 - **Public booking pages.** A clean service list and a step-by-step booking flow, shown in the customer's own time zone.
 - **Booking lifecycle.** Confirm, reschedule, and cancel, with email notifications at each step and attendee RSVP links.
-- **Calendars.** Providers can connect Google Calendar or Microsoft 365 for busy-time conflict checks, and Google Meet links are generated automatically when Google is connected.
+- **Calendars.** Providers can connect Google Calendar or Microsoft 365 for busy-time conflict checks, and Google Meet links are generated automatically for services whose location is Google Meet, when the provider has Google connected.
 - **Email delivery.** Send through any SMTP server or a Microsoft 365 mailbox. Administrators configure both and choose the active one.
 - **Customers.** A directory of everyone who has booked, with per-customer history and CSV export.
 - **Webhooks.** Signed, Zapier-compatible webhooks fire on booking events, with retries and backoff.
@@ -33,12 +33,17 @@ Tidetime is open source and runs on your own server. There is no hosted plan, no
 
 ## Quick start
 
-You need Node.js 20 or newer and a PostgreSQL database.
+You need Node.js 20 or newer and a PostgreSQL database. `docker compose up -d` starts one locally.
 
 ```bash
 git clone https://github.com/Sulaiman-Dauda/Tidetime.git tidetime
 cd tidetime
 cp .env.example .env
+```
+
+The example file is set up for production, so edit `.env` before going on. Delete the `NODE_ENV=production` line, set `APP_URL=http://localhost:3100`, and set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/tidetime` (the database `docker compose up -d` starts). The secrets can stay empty in development.
+
+```bash
 npm ci
 npm run db:migrate
 npm run dev
@@ -46,7 +51,7 @@ npm run dev
 
 Open `http://localhost:3100/setup` to create the company and its owner account. From there, invite teammates under **Members** and assign them to services as providers under **Services**.
 
-To load a demo company with a sample service and provider:
+To try a demo company instead, skip `/setup` and seed the empty database. It creates a sample service with two providers, and you sign in as `owner@example.com` with the password `password123`. Do not run both: the seed adds its own company, and setup is closed once users exist.
 
 ```bash
 npm run db:seed
@@ -59,9 +64,9 @@ Copy `.env.example` to `.env` and fill in the values. The essentials:
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `APP_URL` | Yes | Public URL of the instance, used in links and emails. |
-| `APP_NAME` | No | Display name shown before a company is configured. |
+| `APP_NAME` | No | Product name used in browser titles, the header of every email, and authenticator apps. The company name set in Settings does not replace it there. Defaults to Tidetime. |
 | `DATABASE_URL` | Yes | PostgreSQL connection string. |
-| `AUTH_SECRET` | Yes | Random value of at least 32 characters. Signs sessions and encrypts stored credentials. |
+| `AUTH_SECRET` | Yes | Random value of at least 32 characters. Encrypts stored credentials and two-factor secrets, and signs OAuth state, RSVP links and spam-check tokens. Sessions do not depend on it. |
 | `CRON_SECRET` | Yes | Random value of at least 32 characters. Protects the background jobs endpoint. |
 | `POSTGRES_PASSWORD` | Prod | Password for the bundled PostgreSQL container in the production Compose file. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | No | Enable Google Calendar and Google Meet. |
@@ -82,9 +87,12 @@ Prefer to do it by hand? The production Compose file runs PostgreSQL, the standa
 
 ```bash
 cp .env.example .env
-# Fill APP_URL, DATABASE_URL, POSTGRES_PASSWORD, AUTH_SECRET, and CRON_SECRET.
+# Fill APP_URL, POSTGRES_PASSWORD, AUTH_SECRET, and CRON_SECRET.
+# Compose builds DATABASE_URL itself from POSTGRES_PASSWORD.
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+This builds the image from source. To run the published image instead, which also updates the same way as an installer setup, add `TIDETIME_IMAGE=ghcr.io/sulaiman-dauda/tidetime:latest` to `.env` and start with `docker compose -f docker-compose.prod.yml pull` followed by `docker compose -f docker-compose.prod.yml up -d`.
 
 The app container applies database migrations before it starts. The jobs worker calls the protected cron endpoint on an interval to handle webhook retries and data retention. The application port stays bound to localhost so all remote traffic passes through Caddy, so the instance is reached at `http://<your-server-ip>` (or `https://<your-domain>` once a domain is attached).
 
@@ -94,16 +102,16 @@ For domain setup, backups, Microsoft 365 email, and upgrade notes, see [docs/DEP
 
 Team members are managed under **Members**, each with one of four roles:
 
-- **Owner** (full control, including settings, integrations, and transferring or deleting the instance).
-- **Admin** (everything except deleting the instance, including the service catalog, members, availability, all bookings, and settings).
-- **Scheduler** (a front-desk role for managing all bookings and customers, not bookable, with no access to the catalog, members, or settings).
+- **Owner** (full control, including settings, integrations, and transferring ownership).
+- **Admin** (everything except transferring ownership, including the service catalog, availability, all bookings, and settings; can invite, change, and remove schedulers and members, but not other admins).
+- **Scheduler** (a front-desk role for managing all bookings and customers, with no access to the catalog, members, or settings; not meant to take bookings, but the service editor does not stop you assigning one as a provider, and an assigned scheduler becomes bookable).
 - **Member** (a bookable provider who manages their own availability, bookings, and calendar connection).
 
 A provider is a member assigned to a service. These boundaries are enforced in the server queries and mutations, not only in the interface.
 
 ## Integrations
 
-**Google Calendar and Meet.** Create OAuth credentials in Google Cloud, set the callback to `<APP_URL>/api/google-calendar/callback`, and add the client ID and secret to your environment. Providers then connect their own calendars from the dashboard.
+**Google Calendar and Meet.** Google needs the instance on a custom domain with HTTPS, because it rejects plain-HTTP and IP-address redirect URIs. Once the domain is live (**Settings, Domain**), create Web application OAuth credentials in Google Cloud with the redirect URI `https://<your-domain>/api/google-calendar/callback`, add the client ID and secret to your environment, and restart. Providers then connect their own calendars from the dashboard.
 
 **Microsoft 365.** Register an app in Microsoft Entra and connect it from **Dashboard, Connections**. The same registration covers both mailbox sending and calendar conflict checks. Full steps are in the deployment notes.
 
@@ -112,6 +120,8 @@ A provider is a member assigned to a service. These boundaries are enforced in t
 - `Content-Type: application/json`
 - `X-Tidetime-Signature-256: sha256=<HMAC>`
 - a JSON body of `{ triggerEvent, createdAt, payload }`
+
+Each webhook gets a random signing secret when you add it. The dashboard does not show it yet; read it from the `secret` column of the `webhooks` table to verify the signature.
 
 Targets must be publicly routable HTTP or HTTPS URLs, redirects are not followed, requests time out after ten seconds, and failed deliveries retry with backoff.
 

@@ -1,6 +1,6 @@
 # Integrations
 
-Tidetime connects to a small, deliberate set of services. Credentials are stored encrypted in your own database and are configured either in the dashboard or through environment variables. Nothing is shared with a third party beyond the provider you connect.
+Tidetime connects to a small, deliberate set of services. Credentials you enter in the dashboard, and the OAuth tokens Tidetime stores, are encrypted at rest in your own database. Values in `.env` and webhook signing secrets are stored as plain text. Nothing is shared with a third party beyond the provider you connect.
 
 ## Google Calendar and Google Meet
 
@@ -14,21 +14,22 @@ What it does:
 
 Setup:
 
-1. In Google Cloud, create OAuth credentials and set the callback to `<APP_URL>/api/google-calendar/callback`.
-2. Put the client ID and secret in your environment as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-3. Each provider connects their own Google account from the dashboard.
+1. Put the instance on a custom domain with HTTPS first (see [Custom domain and HTTPS](./ADMIN_GUIDE.md#custom-domain-and-https)). Google rejects plain-HTTP and IP-address redirect URIs.
+2. In Google Cloud, create Web application OAuth credentials with the redirect URI `https://<your-domain>/api/google-calendar/callback`.
+3. Put the client ID and secret in your environment as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and restart.
+4. Each provider connects their own Google account from the dashboard.
 
 ## Microsoft 365 calendar
 
 Connecting Microsoft 365 lets a provider check for conflicts against their Outlook calendar. This connection is read-only: Tidetime reads busy times but does not write events to Microsoft 365.
 
-Setup uses a Microsoft Entra app registration with delegated Microsoft Graph permission. The same registration also covers Microsoft 365 email. Step-by-step instructions are in the [deployment guide](./DEPLOYMENT.md).
+Setup uses a Microsoft Entra app registration with delegated Microsoft Graph permission. The same registration also covers Microsoft 365 email. Step-by-step instructions, including the extra redirect URI and the `Calendars.Read` permission the calendar needs, are in the [deployment guide](./DEPLOYMENT.md#microsoft-365-email).
 
 ## Meeting links
 
 Tidetime can attach a meeting link to a booking without any manual step:
 
-- **Jitsi** is built in. A unique room is created per booking with no account required.
+- **Jitsi** is built in, and a unique room is created per booking. Jitsi links need no setup in Tidetime. They use the public meet.jit.si service, where the person who starts the meeting must sign in with a Google, GitHub or Facebook account.
 - **Google Meet** links are created when the provider has Google Calendar connected and the service uses Google Meet.
 
 Other location types are available too: in person, a phone call the provider makes, a phone number the attendee provides, or a plain link you supply.
@@ -44,10 +45,12 @@ Tidetime sends a signed webhook when a booking is created, rescheduled, or cance
 Add a target URL under **Connections** and pick the events to send. Each delivery includes:
 
 - `Content-Type: application/json`
-- `X-Tidetime-Signature-256: sha256=<HMAC>` when a signing secret is set
+- `X-Tidetime-Signature-256: sha256=<HMAC>`, signed with the webhook's secret
 - a JSON body of `{ triggerEvent, createdAt, payload }`
 
-Delivery is guarded for safety and reliability: targets must be publicly routable HTTP or HTTPS URLs, redirects are not followed, requests time out after ten seconds, and failed deliveries retry with exponential backoff. Verify the signature on your side using the shared secret before trusting a payload.
+Delivery is guarded for safety and reliability: targets must be publicly routable HTTP or HTTPS URLs, redirects are not followed, requests time out after ten seconds, and failed deliveries retry with exponential backoff, up to five attempts in total.
+
+Each webhook gets a random signing secret when you add it. The dashboard does not show it yet; read it from the `secret` column of the `webhooks` table, and verify the signature on your side before trusting a payload.
 
 ## What Tidetime does not integrate with
 

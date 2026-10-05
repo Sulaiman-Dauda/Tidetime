@@ -6,9 +6,9 @@ This guide covers the company-wide settings that owners and admins control: the 
 
 Tidetime runs one company per instance. Team members are managed under **Members**, and each has one of four roles:
 
-- **Owner** has full control, including company settings, integrations, and transferring or deleting the instance.
-- **Admin** can do everything except delete the instance: manage the service catalog, members, everyone's availability, all bookings, and company settings.
-- **Scheduler** is a front-desk role. They view and manage every booking and customer and can book on behalf of customers, but they are not bookable themselves and cannot change the service catalog, members, or settings.
+- **Owner** has full control, including company settings, integrations, and transferring ownership.
+- **Admin** can do everything except transfer ownership: manage the service catalog, everyone's availability, all bookings, and company settings. Admins can invite, change, and remove schedulers and members, but not other admins.
+- **Scheduler** is a front-desk role. They view and manage every booking and customer and can book on behalf of customers, but cannot change the service catalog, members, or settings. Schedulers are not meant to take bookings themselves. The service editor does not stop you assigning one as a provider, though, and a scheduler assigned to a service becomes bookable.
 - **Member** is a regular team member and bookable provider. They take appointments and manage their own availability, bookings, and calendar connection.
 
 A **provider** is a member assigned to a service to take its bookings; owners and admins can be assigned as providers too. These limits are enforced in the server, not only hidden in the interface.
@@ -56,7 +56,7 @@ Serve your booking pages from your own domain over HTTPS with no certificate fil
 2. At your DNS provider, create an A record for that domain pointing at your server's IP address.
 3. Back in Settings, use **Check status**. On the first HTTPS request, the bundled Caddy proxy obtains a Let's Encrypt certificate for the domain and keeps it renewed.
 
-Booking links, emails, and calendar redirects switch to the domain automatically. Leave the field empty to go back to the install address.
+Booking links, emails, and calendar redirects switch to the domain automatically. If Google Calendar or Microsoft 365 is set up, also add the new callback URLs to your Google Cloud and Microsoft Entra app registrations, or connecting through them fails. Leave the field empty to go back to the install address.
 
 ## Spam protection
 
@@ -64,7 +64,7 @@ The public booking form includes a hidden honeypot field and a timing check that
 
 ## Data retention
 
-Under **Settings**, you can set a data retention window in days. Personal data on old bookings is purged automatically after that period. Set it to zero to keep everything. Use this to match your own privacy commitments.
+Under **Settings**, **Legal**, **Data retention**, set **Delete bookings after** to a number of days. Bookings that ended longer ago than that are deleted automatically, with the attendee details and answers they hold. Entries under **Customers** (name, email, phone) are not removed by this; delete those by hand. Set it to zero to keep bookings indefinitely. Use this to match your own privacy commitments.
 
 ## Pausing bookings
 
@@ -76,11 +76,11 @@ Two housekeeping jobs run on a schedule: retrying failed webhook deliveries and 
 
 ## Updates
 
-Tidetime checks GitHub for newer versions and shows admins a banner in the dashboard when the instance is behind, with a link to exactly what changed. The check is cached, so it only queries GitHub occasionally.
+Tidetime checks GitHub for newer releases and, when the instance is behind, shows admins an **Update available** card at the foot of the sidebar with the old and new version numbers. Release notes are on the [GitHub Releases](https://github.com/Sulaiman-Dauda/Tidetime/releases) page. The check is cached for 30 minutes, so it only queries GitHub occasionally. Nothing updates on its own.
 
 How you apply an update depends on whether the optional updater is enabled:
 
-- **Default (recommended for most):** the banner's **Update now** button reveals the one command to run on your server. You stay in full control and nothing on the server has extra privileges.
-- **One-click:** enable the updater service and the button pulls the new image and restarts the stack for you. This requires giving a small helper container access to the Docker socket (host-root-equivalent), so it is off by default. See [enabling one-click updates](./DEPLOYMENT.md) in the deployment guide.
+- **Default (recommended for most):** the card's **Update now** button copies the update command to your clipboard so you can run it on your server. Browsers block this on a plain-HTTP address; use the commands in the [deployment guide](./DEPLOYMENT.md#updates) instead. You stay in full control and nothing on the server has extra privileges.
+- **One-click:** enable the updater service and the button pulls the new image and restarts the stack for you. It does not run `git pull`, and it cannot update an install built from source. This requires giving a small helper container access to the Docker socket (host-root-equivalent), so it is off by default. See [enabling one-click updates](./DEPLOYMENT.md#enabling-one-click-updates-optional) in the deployment guide.
 
-Either way, updates preserve your data — the database and uploaded files live in Docker volumes that survive the restart. As always, back up before upgrading.
+Either way, updates preserve your data. Everything, including uploaded logos and avatars, is stored in PostgreSQL, whose Docker volume survives the restart. As always, back up before upgrading.

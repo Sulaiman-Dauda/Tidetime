@@ -10,12 +10,13 @@ Next.js + Drizzle ORM + PostgreSQL + Tailwind. npm, **Node >= 20**. Package vers
 
 ## Status: LAUNCHED — public, open source, as of 2026-07-25
 
-This shipped this morning. It's public on GitHub and people can read every commit. That means:
+Launched on 2026-07-25. It's public on GitHub and people can read every commit. That means:
 honest commit messages, no half-finished features on `main`, no committed secrets, and a
 `CHANGELOG.md` entry for anything user-facing.
 
 The marketing site and docs live in a **separate** repo, `tidetime-website` — docs are synced
-from this repo's `/docs` folder, so docs changes start here.
+from this repo's `/docs` folder, so docs changes start here. The site picks them up only when it
+next builds.
 
 ## Run it
 
@@ -25,8 +26,13 @@ npm install
 npm run db:migrate
 npm run db:seed           # optional demo data
 npm run dev
-npm run jobs:worker       # background jobs, separate process
+node --env-file=.env scripts/jobs-worker.mjs   # background jobs, separate process
 ```
+
+`.env.example` is set up for production. For local work, delete its `NODE_ENV=production` line
+and point `APP_URL` (`http://localhost:3100`) and `DATABASE_URL` at localhost. The jobs worker
+also needs a 32+ character `CRON_SECRET` and `JOBS_TARGET_URL=http://localhost:3100/api/cron`
+in `.env`; `npm run jobs:worker` does not load `.env` itself.
 
 Useful: `npm run db:studio` (Drizzle Studio), `npm run db:generate` after schema edits.
 `docker-compose.prod.yml` and `docker-compose.updater.yml` are deployment concerns, not local ones.
@@ -47,7 +53,7 @@ what you actually observed — not "the code looks right".
 | Touching | What "verified" means |
 |---|---|
 | Booking flow, availability, public pages | Place a real booking in the browser, then query the DB for the row. `npm run test:e2e` covers the seeded path; a new path needs a spec or a manual run. |
-| Reminders, webhooks, anything queued | `npm run jobs:worker` must be running in a second process. Without it bookings look fine and nothing fires. Confirm the job actually ran. |
+| Webhook retries, data retention, draft cleanup | The jobs worker must be running in a second process. Without it, webhooks still get their first attempt, but retries, retention and draft cleanup never run. There are no reminder emails. Confirm the job actually ran. |
 | Email | Render and read the real email. A template that compiles is not a template that looks right. |
 | Zapier payloads | Payload shape is a public contract — a change is breaking. Capture the actual JSON sent. |
 | Auth, sessions, TOTP | Load the page in a real browser with a real cookie. `curl` doesn't carry the session. |
@@ -70,7 +76,8 @@ Unverified is a normal outcome; unverified reported as done is not.
 
 ## Gotchas
 
-- Two Node processes are needed for full behaviour — the app and `jobs:worker`. Bookings appear
-  to work without the worker until something needs a reminder or a webhook.
+- Two Node processes are needed for full behaviour: the app and the jobs worker. Without the
+  worker, webhooks still get their first attempt, but retries, data retention and draft cleanup
+  never run. There are no reminder emails.
 - Zapier webhooks are part of the product surface; changing payload shape is a breaking change.
 - `db:migrate:runtime` is distinct from `db:migrate` — check which one a deployment path wants.
