@@ -52,4 +52,11 @@ describe("bookingFieldsSchema", () => {
       ]),
     ).toThrow();
   });
+
+  it("keeps a half-width field half width", () => {
+    const [field] = bookingFieldsSchema.parse([
+      { name: "postcode", label: "Postcode", type: "text", required: false, width: "half" },
+    ]);
+    expect(field.width).toBe("half");
+  });
 });

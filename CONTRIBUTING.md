@@ -36,12 +36,13 @@ Useful links:
    npm install
    ```
 
-2. Copy the environment file and generate a local auth secret:
+2. Copy the environment file and edit it for local development:
 
    ```bash
    cp .env.example .env
-   openssl rand -base64 32
    ```
+
+   The example file is set up for production. In `.env`, delete the `NODE_ENV=production` line, set `APP_URL=http://localhost:3100`, and set `DATABASE_URL=postgres://postgres:postgres@localhost:5432/tidetime` (the database started in the next step). The secrets can stay empty in development. To run the jobs worker locally, also set `CRON_SECRET` (generate one with `openssl rand -base64 32`) and `JOBS_TARGET_URL=http://localhost:3100/api/cron`, then run `node --env-file=.env scripts/jobs-worker.mjs`.
 
 3. Start PostgreSQL:
 
@@ -53,7 +54,7 @@ Useful links:
 
    ```bash
    npm run db:migrate
-   npm run db:seed
+   npm run db:seed   # optional; skip it to create your own company at /setup
    ```
 
 5. Start the dev server:
@@ -64,7 +65,7 @@ Useful links:
 
 ## Local quality checks
 
-Run the same checks expected in CI before opening a pull request:
+Run these checks before opening a pull request. CI runs the same steps, and also the booking end-to-end suite (`npm run test:e2e`), which is a required check:
 
 ```bash
 npm run check
@@ -176,18 +177,18 @@ Relevant docs live in [`docs/`](./docs).
 Tidetime is maintained by one person alongside other work. Being honest about
 that is better than leaving you guessing:
 
-- **Issues** — usually looked at within a few days. A bug with clear steps to
+- **Issues**: usually looked at within a few days. A bug with clear steps to
   reproduce gets attention fastest.
-- **Pull requests** — a first response within about a week. Large changes take
+- **Pull requests**: a first response within about a week. Large changes take
   longer, which is why it is worth opening an issue before building one.
-- **Security reports** — prioritised over everything else. Report privately via
+- **Security reports**: prioritised over everything else. Report privately via
   [Security → Report a vulnerability](../../security/advisories/new).
 
 If something has gone quiet for longer, a comment on the thread is welcome.
 
 There is **no CLA and no DCO sign-off**. The bar a PR is held to is written down
-in [`.github/REVIEW_GUIDELINES.md`](./.github/REVIEW_GUIDELINES.md) — worth two
-minutes before you start, so nothing in review is a surprise.
+in [`.github/REVIEW_GUIDELINES.md`](./.github/REVIEW_GUIDELINES.md). Reading it takes
+two minutes and means nothing in review is a surprise.
 
 ## Security issues
 

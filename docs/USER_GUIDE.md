@@ -4,7 +4,7 @@ This guide covers day-to-day use for providers and schedulers: services, availab
 
 ## Services
 
-A service is something customers can book. Create and edit services under **Services**. Each service has:
+A service is something customers can book. Owners and admins create and edit services under **Services**; members see the services they are assigned to under **My services**. Each service has:
 
 - A name, description, and duration. You can offer more than one duration on the same service.
 - A location: in person, a phone call the provider makes, a phone number the attendee provides, a plain link, a Jitsi meeting, or a Google Meet link when Google Calendar is connected.
@@ -15,7 +15,7 @@ A service is something customers can book. Create and edit services under **Serv
 - A daily cap, so a service accepts only so many bookings per calendar day.
 - Group seats, so several people can share one slot for group sessions. Leave this at one for one-on-one bookings.
 
-Services can be hidden or left as drafts while you set them up, and you can order them on the public page.
+New services start as drafts, hidden from the public until you publish them. A draft that is never published is deleted 24 hours after it was created, unless it has bookings. A published service cannot go back to being a draft. To take one off the public pages without deleting it, turn off **Visible on company booking page** in the service editor and save; its public link then returns not found. You can also order services on the public page.
 
 ## Providers and assignment
 
@@ -30,7 +30,7 @@ This keeps work spread across the team without anyone managing a rota by hand.
 
 Set working hours under **Availability**. Availability is built from schedules:
 
-- Each provider can have one or more named schedules, such as "Working hours" or "Evening clinic", and a default schedule.
+- Each provider can have one or more named schedules, such as "Working hours" or "Evening clinic". Only the one marked default is used for bookings.
 - A schedule has weekly rules (for example Monday to Friday, 9 to 5) and can include date-specific overrides.
 - Owners and admins can manage other providers' availability. Providers manage their own.
 
@@ -50,7 +50,7 @@ Open **Bookings** in the dashboard to see upcoming, pending, past, and cancelled
 - Reschedule or cancel a booking. The customer is emailed and the calendar invite is updated.
 - Open a booking to see its details and its activity timeline.
 
-The dashboard **Calendar** shows bookings in a week or day view. You can drag on the calendar to create a manual booking or drag an existing one to reschedule it.
+The dashboard **Calendar** shows bookings in a month grid. Drag a booking to another day to reschedule it (it keeps its time of day), or use **+** on a day to add a manual booking.
 
 ## Attendee responses and calendar files
 
@@ -58,4 +58,4 @@ Confirmation emails include Accept, Decline, and Tentative links so attendees ca
 
 ## Customers
 
-Everyone who books is recorded under **Customers**, de-duplicated by email. Each customer has a history of their bookings, and you can export the directory to CSV. If a customer asks to be removed, you can delete their record.
+Everyone who books is recorded under **Customers**, de-duplicated by email. Each customer has a history of their bookings, and you can export the directory to CSV. If a customer asks to be removed, you can delete their record under **Customers**. This removes them from the directory only; their past bookings keep the details they entered until data retention deletes them.

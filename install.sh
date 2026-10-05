@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Tidetime installer — one command, nothing to install first.
+# Tidetime installer: one command, nothing to install first.
 #
 # On a fresh server this installs everything it needs (Docker, git, openssl),
 # adds swap on low-memory hosts, opens the firewall, then downloads Tidetime,
@@ -20,8 +20,9 @@ set -euo pipefail
 
 REPO_URL="https://github.com/Sulaiman-Dauda/Tidetime.git"
 REF="${TIDETIME_REF:-main}"
-# The prebuilt image is tagged "latest" on the main branch; a version ref (e.g.
-# v1.2.0) maps to its own image tag.
+# The prebuilt image is tagged "latest" on the main branch. Any other ref is used
+# as the image tag unchanged, but git tags carry a "v" (v0.1.2) and image tags do
+# not (0.1.2), so a version ref finds no prebuilt image and is built from source.
 IMAGE_TAG="latest"
 [ "${REF}" != "main" ] && IMAGE_TAG="${REF}"
 IMAGE="ghcr.io/sulaiman-dauda/tidetime:${IMAGE_TAG}"
@@ -97,7 +98,7 @@ $SUDO docker compose version >/dev/null 2>&1 || die "The Docker Compose plugin i
 # ---- Swap on low-memory hosts ----------------------------------------------
 mem_kb="$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
 if [ "${mem_kb:-0}" -lt 2000000 ] && ! swapon --show 2>/dev/null | grep -q .; then
-  info "Low memory (~$(( mem_kb / 1024 )) MB) — adding a 2G swap file"
+  info "Low memory (~$(( mem_kb / 1024 )) MB), adding a 2G swap file"
   if $SUDO fallocate -l 2G /swapfile 2>/dev/null || $SUDO dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none 2>/dev/null; then
     $SUDO chmod 600 /swapfile
     $SUDO mkswap /swapfile >/dev/null 2>&1
@@ -210,7 +211,7 @@ if [ "${healthy}" -eq 1 ]; then
   echo
   echo "  Finish setup at ${app_url}/setup"
 else
-  info "Containers are up but health hasn't passed yet — give it a moment, then:"
+  info "Containers are up but health hasn't passed yet. Give it a moment, then:"
   echo "    curl ${app_url}/api/health"
 fi
 echo "  Manage the stack from: $(pwd)"

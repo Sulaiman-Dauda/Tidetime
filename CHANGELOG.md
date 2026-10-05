@@ -8,11 +8,31 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-05
+
+Upgrading from 0.1.x: admins see an **Update available** card at the foot of
+the sidebar. If the optional updater is enabled, **Update now** pulls the new
+image and restarts the stack. Otherwise back up the database and run this in
+the install folder:
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+If you build the image from source rather than running the published one,
+`pull` cannot fetch it: run `git pull` and then
+`docker compose -f docker-compose.prod.yml up -d --build`. Two database
+migrations run on start: one adds a nullable column and one widens a column,
+and neither changes existing data. Nothing changes in `.env` or the Compose
+files.
+
 ### Security
 
 - Two-factor codes are now single-use. `verifyTotp` only reported whether a code
-  was valid, so a code stayed usable for the whole ±1-step acceptance window —
-  roughly 90 seconds — and could be replayed to sign in again or to switch 2FA
+  was valid, so a code stayed usable for the whole ±1-step acceptance window
+  (roughly 90 seconds) and could be replayed to sign in again or to switch 2FA
   back off. RFC 6238 §5.2 requires a verifier to reject the second use of an OTP.
   A new `verifyTotpStep` returns the 30-second step a code matched, the step is
   recorded on the user as `totp_last_step`, and a code is only accepted when its
@@ -21,7 +41,45 @@ a stable release. Published releases and their notes are also available on the
   Requires the `0005` migration; the column is nullable, so existing installs
   keep working and simply have no consumed step recorded until the next sign-in.
 
+### Added
+
+- Phone questions on the booking form have a country picker beside the number.
+  Numbers are stored in international format (`+447700900123`) however they
+  were typed, and shown grouped (`+44 7700 900123`) on the confirmation page and
+  in the dashboard. A new **Default phone country** setting (Settings, Brand
+  tab, under Booking form) sets where the picker starts. Numbers saved before
+  upgrading are not converted.
+- Booking webhooks (`booking_created` and `booking_rescheduled`) carry four more
+  fields: `serviceSlug`, `attendee.phone`, `answers` (each custom question as a
+  `label` and `value`) and `description`, whether the customer reschedules or
+  staff move the booking on the dashboard calendar. Existing fields are
+  unchanged, so current Zapier zaps and subscribers keep working.
+- Booking questions can be set to **Half width** in the service editor, so short
+  questions such as name and email share a row on wider screens. Existing
+  questions stay full width.
+- The Terms and Privacy texts support `## headings`, `- bullets` and `**bold**`,
+  and turn email addresses and web addresses starting `http://` or `https://`
+  into links. Text without those markers looks
+  the same as before.
+
 ### Fixed
+
+- Two-factor authentication could not be switched on. The secret is stored
+  encrypted, which is 83 characters, in a column that held 64, so every
+  enrolment failed. Migration `0006` widens the column.
+- Unpublishing a service more than a day old deleted it. Unpublish turned the
+  service back into a draft, and the background job deletes drafts a day after
+  they were created, taking the provider assignments with it and leaving its
+  bookings without a service. Unpublish is gone: to take a service offline
+  without deleting it, turn off **Visible on company booking page** in the
+  service editor, and its public page returns not found until you turn it back
+  on. Publishing is now one way, and the cleanup never deletes a service that
+  has bookings. A service already deleted this way cannot be recovered except
+  from a backup.
+- On Availability, switching to another person or another schedule kept
+  showing the previous schedule's hours, and saving wrote them over the one
+  now selected. The editor now loads the hours of whichever schedule you
+  switch to.
 
 - Webhooks were never delivered on Node 20 or later. Every delivery failed with
   "Invalid IP address: undefined" and was retried until it was marked failed.
@@ -35,7 +93,7 @@ a stable release. Published releases and their notes are also available on the
 
 - The dashboard was unusable on screens narrower than 768px. The mobile header
   was a sibling of the sidebar inside a row-direction flex container, so it took
-  a column of its own and pushed the content area off-screen — every dashboard
+  a column of its own and pushed the content area off-screen, so every dashboard
   page rendered as a blank screen below the header. The header now sits inside
   the content column.
 - Booking times like `10:00 AM` wrapped onto a second line in the overview's
@@ -65,6 +123,11 @@ a stable release. Published releases and their notes are also available on the
 
 ### Changed
 
+- Choosing a time on the public booking page goes straight to the details form.
+  The separate **Next** button is gone.
+- The public booking page shows the company once, in the service panel: the
+  logo if one is set, otherwise the name. The page header no longer repeats it.
+  The chosen date and time appear once, at the top of the details form.
 - Filters on Bookings, Customers, Calendar and Availability now use the app's
   own select control instead of the unstyled browser dropdown.
 - Service rows have a labelled `Preview` and `Edit` action plus an overflow menu
@@ -144,7 +207,8 @@ company with multiple services and multiple providers.
   and are alerted when a newer release is available, with an optional one-click
   updater.
 
-[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.2.0
 [0.1.2]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.0

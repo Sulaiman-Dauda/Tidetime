@@ -6,7 +6,7 @@ Yes. It is open source under the MIT license. There is no hosted plan and no pai
 
 ## Can it schedule for more than one company?
 
-No. Tidetime is designed for a single company per instance, on purpose. One team, one service catalog, one set of settings. If you need to schedule for several unrelated organizations, run a separate instance for each.
+No. Tidetime is designed for a single company per instance, on purpose. One team, one service catalogue, one set of settings. If you need to schedule for several unrelated organisations, run a separate instance for each.
 
 ## What do I need to run it?
 
@@ -26,7 +26,7 @@ With Google Calendar, Tidetime reads your busy times to avoid clashes and writes
 
 ## Which video tools are supported?
 
-Jitsi is built in and needs no account. Google Meet links are created when Google Calendar is connected. Other providers such as Zoom or Teams are not integrated.
+Jitsi is built in and needs no setup in Tidetime. It uses the public meet.jit.si service, where the person who starts the meeting must sign in with a Google, GitHub or Facebook account. Google Meet links are created for services whose location is Google Meet, when the provider has Google Calendar connected. Other providers such as Zoom or Teams are not integrated.
 
 ## Can customers pay when booking?
 
@@ -46,7 +46,7 @@ Yes. Save the domain in Settings, point its DNS at your server, and the bundled 
 
 ## How do I upgrade?
 
-Pull the latest version and restart the containers. The app applies database migrations on startup. Always back up your database first. See the [deployment guide](./DEPLOYMENT.md).
+From the install directory, run `git pull`, pull the latest image, and restart the containers. If you built from source, run `git pull` and rebuild with `--build` instead. The app applies database migrations on startup. Always back up your database first. See the [deployment guide](./DEPLOYMENT.md).
 
 ## How can I help?
 

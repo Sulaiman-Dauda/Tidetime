@@ -97,12 +97,12 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function save(nextDraft = draft) {
+  /** Saving always publishes: a draft becomes live, and a live service stays live. */
+  function save() {
     startTransition(async () => {
       const result = await updateServiceAction({
         id: service.id,
         ...form,
-        draft: nextDraft,
         locations,
         bookingFields: fields,
         providerIds,
@@ -111,11 +111,9 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
         toast({ title: "Couldn't save service", description: result.error, variant: "destructive" });
         return;
       }
-      setDraft(nextDraft);
-      savedSnapshot.current = JSON.stringify({ form, locations, fields, providerIds, draft: nextDraft });
-      toast({
-        title: draft && !nextDraft ? "Service published" : nextDraft ? "Service unpublished" : "Service updated",
-      });
+      setDraft(false);
+      savedSnapshot.current = JSON.stringify({ form, locations, fields, providerIds, draft: false });
+      toast({ title: draft ? "Service published" : "Service updated" });
       router.refresh();
     });
   }
@@ -148,21 +146,9 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
           </a>
         }
         action={
-          <>
-            {!draft ? (
-              <Button
-                variant="outline"
-                onClick={() => save(true)}
-                disabled={pending}
-                title="Take the service off the public booking page while you edit"
-              >
-                Unpublish
-              </Button>
-            ) : null}
-            <Button onClick={() => save(false)} disabled={pending || providerIds.length === 0 || locations.length === 0}>
-              <Check /> {pending ? "Saving…" : draft ? "Publish service" : "Save"}
-            </Button>
-          </>
+          <Button onClick={() => save()} disabled={pending || providerIds.length === 0 || locations.length === 0}>
+            <Check /> {pending ? "Saving…" : draft ? "Publish service" : "Save"}
+          </Button>
         }
       />
 
@@ -366,7 +352,11 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
                       value={field.label}
                       onChange={(e) => update({ label: e.target.value })}
                     />
-                    <Select value={field.type} disabled={field.system} onValueChange={(value) => update({ type: value as BookingField["type"] })}>
+                    <Select value={field.type} disabled={field.system} onValueChange={(value) => {
+                        const type = value as BookingField["type"];
+                        // Long text is always full width and has no Half width toggle to undo it.
+                        update(type === "textarea" ? { type, width: undefined } : { type });
+                      }}>
                       <SelectTrigger aria-label="Answer type" className="flex-1 sm:w-40 sm:flex-none">
                         <SelectValue />
                       </SelectTrigger>

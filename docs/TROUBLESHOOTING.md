@@ -10,13 +10,13 @@ The app validates its configuration on boot and exits if something required is m
 docker compose -f docker-compose.prod.yml logs app
 ```
 
-Make sure `APP_URL`, `DATABASE_URL`, `AUTH_SECRET`, and `CRON_SECRET` are set, and that `AUTH_SECRET` and `CRON_SECRET` are at least 32 characters. The production Compose file also refuses to start with a default database password.
+Make sure `APP_URL`, `DATABASE_URL`, `AUTH_SECRET`, and `CRON_SECRET` are set, and that `AUTH_SECRET` and `CRON_SECRET` are at least 32 characters. The production Compose file also refuses to start when `POSTGRES_PASSWORD` is empty.
 
 ## The setup page redirects to login
 
-Setup is only available while the instance has no users. Once the first owner account exists, `/setup` sends you to the login page. This is expected. If you need to start over, reset the database, then migrate and seed again. This deletes all data.
+Setup is only available while the instance has no users. Once the first owner account exists, `/setup` sends you to the login page. This is expected. To start over on a local development database, reset it and migrate again (see [Resetting a local development database](#resetting-a-local-development-database)), then open `/setup`. Do not run `db:seed` if you want `/setup`: the seed creates demo accounts, which keeps setup closed. On a Docker install, starting over means removing the PostgreSQL volume. Either way, this deletes all data.
 
-## Customers see "not reachable yet" for the custom domain
+## Check status says "Not reachable yet" for the custom domain
 
 The HTTPS certificate is issued on the first request after DNS resolves. Check that:
 
@@ -45,7 +45,9 @@ Check that:
 - You selected the events to send.
 - Your endpoint responds within ten seconds.
 
-Failed deliveries retry with backoff, so a temporary outage recovers on its own. Verify the `X-Tidetime-Signature-256` signature on your side using the shared secret.
+A failed delivery is retried up to four more times over about the next half hour. After that it is marked failed and not sent again, so a longer outage loses those events.
+
+To verify the `X-Tidetime-Signature-256` signature on your side, use the webhook's signing secret. Each webhook gets a random one when you add it. The dashboard does not show it yet; read it from the `secret` column of the `webhooks` table.
 
 ## Rate limited on login or booking
 

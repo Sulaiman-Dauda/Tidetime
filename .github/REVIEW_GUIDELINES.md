@@ -35,12 +35,14 @@ the businesses that run it. That is the reason for the care below.
   them in a log line, an error message or an analytics event.
 - Calendar tokens (Google, Microsoft) are credentials. They are never logged,
   never returned by an API response, and never committed.
-- New queries are scoped to the tenant. A missing `where` is a data leak here,
-  not a bug.
+- Tidetime is single-company, so scope is by role and ownership, not tenant.
+  New queries keep that scope (a member sees only their own bookings). A
+  missing `where` on such a query is a data leak, not a bug.
 
 ### Auth
 
-- Sessions are opaque tokens in `httpOnly`/`secure` cookies, revocable as rows.
+- Sessions are opaque tokens in `httpOnly` cookies, marked `secure` whenever the
+  request is HTTPS, and revocable as rows.
   A change that moves toward a JWT needs a very good argument.
 - Passwords are hashed in application code with scrypt, never by the database.
 - Anything touching sessions, roles or TOTP gets a second pass and a test.

@@ -114,6 +114,8 @@ const bookingFieldSchema = z
     options: z.array(z.string().trim().min(1).max(128)).max(50).optional(),
     /** helper text shown under the input on the public form */
     hint: z.string().trim().max(200).optional(),
+    /** half lets two short questions share a row; absent means full */
+    width: z.enum(["full", "half"]).optional(),
   })
   .superRefine((field, ctx) => {
     if (field.type === "select" && (!field.options || field.options.length === 0)) {
