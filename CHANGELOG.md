@@ -11,9 +11,10 @@ a stable release. Published releases and their notes are also available on the
 ## [0.2.0] - 2026-10-05
 
 Upgrading from 0.1.x: pull the new image and restart, using the command the
-dashboard shows or **Update now** if the optional updater is enabled. One
-database migration runs on start and only adds a nullable column. Nothing
-changes in `.env` or the Compose files.
+dashboard shows or **Update now** if the optional updater is enabled. Two
+database migrations run on start: one adds a nullable column and one widens a
+column, and neither changes existing data. Nothing changes in `.env` or the
+Compose files.
 
 ### Security
 
@@ -48,6 +49,19 @@ changes in `.env` or the Compose files.
   the same as before.
 
 ### Fixed
+
+- Two-factor authentication could not be switched on. The secret is stored
+  encrypted, which is 83 characters, in a column that held 64, so every
+  enrolment failed. Migration `0006` widens the column.
+- Unpublishing a service more than a day old deleted it. Unpublish turned the
+  service back into a draft, and the background job deletes drafts a day after
+  they were created, taking the provider assignments with it and leaving its
+  bookings without a service. Unpublish is gone: to take a service offline
+  without deleting it, turn off **Visible on company booking page** in the
+  service editor, and its public page returns not found until you turn it back
+  on. Publishing is now one way, and the cleanup never deletes a service that
+  has bookings. A service already deleted this way cannot be recovered except
+  from a backup.
 
 - Webhooks were never delivered on Node 20 or later. Every delivery failed with
   "Invalid IP address: undefined" and was retried until it was marked failed.
