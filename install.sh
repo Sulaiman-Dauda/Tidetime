@@ -20,8 +20,9 @@ set -euo pipefail
 
 REPO_URL="https://github.com/Sulaiman-Dauda/Tidetime.git"
 REF="${TIDETIME_REF:-main}"
-# The prebuilt image is tagged "latest" on the main branch; a version ref (e.g.
-# v1.2.0) maps to its own image tag.
+# The prebuilt image is tagged "latest" on the main branch. Any other ref is used
+# as the image tag unchanged, but git tags carry a "v" (v0.1.2) and image tags do
+# not (0.1.2), so a version ref finds no prebuilt image and is built from source.
 IMAGE_TAG="latest"
 [ "${REF}" != "main" ] && IMAGE_TAG="${REF}"
 IMAGE="ghcr.io/sulaiman-dauda/tidetime:${IMAGE_TAG}"
