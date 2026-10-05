@@ -352,7 +352,11 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
                       value={field.label}
                       onChange={(e) => update({ label: e.target.value })}
                     />
-                    <Select value={field.type} disabled={field.system} onValueChange={(value) => update({ type: value as BookingField["type"] })}>
+                    <Select value={field.type} disabled={field.system} onValueChange={(value) => {
+                        const type = value as BookingField["type"];
+                        // Long text is always full width and has no Half width toggle to undo it.
+                        update(type === "textarea" ? { type, width: undefined } : { type });
+                      }}>
                       <SelectTrigger aria-label="Answer type" className="flex-1 sm:w-40 sm:flex-none">
                         <SelectValue />
                       </SelectTrigger>
