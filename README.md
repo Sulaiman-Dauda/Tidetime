@@ -19,7 +19,7 @@ Tidetime is open source and runs on your own server. There is no hosted plan, no
 - **Email delivery.** Send through any SMTP server or a Microsoft 365 mailbox. Administrators configure both and choose the active one.
 - **Customers.** A directory of everyone who has booked, with per-customer history and CSV export.
 - **Webhooks.** Signed, Zapier-compatible webhooks fire on booking events, with retries and backoff.
-- **Branding and custom domain.** Set your company name, logo, and brand color. Point your own domain at the server and Tidetime obtains and renews an HTTPS certificate for it automatically.
+- **Branding and custom domain.** Set your company name, logo, and brand colour. Point your own domain at the server and Tidetime obtains and renews an HTTPS certificate for it automatically.
 - **Security.** Password login with optional two-factor authentication, session management, spam protection on public forms, rate limiting, and a configurable data-retention window.
 
 ## Tech stack

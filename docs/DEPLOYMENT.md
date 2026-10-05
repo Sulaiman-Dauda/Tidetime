@@ -10,7 +10,7 @@ On a fresh Linux server (as root, or a user with sudo):
 curl -fsSL https://raw.githubusercontent.com/Sulaiman-Dauda/Tidetime/main/install.sh | bash
 ```
 
-The script installs everything it needs — Docker, git, and openssl if missing — adds a swap file on low-memory hosts, opens firewall ports 80 and 443, then downloads the project, generates the required secrets, writes a `.env` file, starts the stack, and waits until it is healthy. It uses a prebuilt image published to the GitHub Container Registry (`ghcr.io/sulaiman-dauda/tidetime`) and only builds from source when a pull is not possible. It prints the address to open when done, for example `http://<your-server-ip>`. Review the script before running it if you prefer.
+The script installs everything it needs (Docker, git, and openssl if missing), adds a swap file on low-memory hosts, opens firewall ports 80 and 443, then downloads the project, generates the required secrets, writes a `.env` file, starts the stack, and waits until it is healthy. It uses a prebuilt image published to the GitHub Container Registry (`ghcr.io/sulaiman-dauda/tidetime`) and only builds from source when a pull is not possible. It prints the address to open when done, for example `http://<your-server-ip>`. Review the script before running it if you prefer.
 
 The instance is reachable on port 80 through Caddy (`http://<your-server-ip>`, no port suffix); the application's own port stays bound to localhost. Attach a domain for HTTPS (see [Custom domain and HTTPS](./ADMIN_GUIDE.md#custom-domain-and-https)); a bare IP cannot be issued a certificate.
 
@@ -64,7 +64,7 @@ client secret before it expires, and reconnect after changing the app
 registration or public domain.
 
 Do not expose PostgreSQL publicly. The production Compose file binds the application port to
-localhost so remote traffic passes through Caddy, which normalizes client-address headers before
+localhost so remote traffic passes through Caddy, which normalises client-address headers before
 the application applies rate limits. Terminate TLS at Caddy or another trusted reverse proxy and
 back up the PostgreSQL volume before upgrades.
 

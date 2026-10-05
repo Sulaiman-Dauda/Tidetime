@@ -6,7 +6,7 @@ Yes. It is open source under the MIT license. There is no hosted plan and no pai
 
 ## Can it schedule for more than one company?
 
-No. Tidetime is designed for a single company per instance, on purpose. One team, one service catalog, one set of settings. If you need to schedule for several unrelated organizations, run a separate instance for each.
+No. Tidetime is designed for a single company per instance, on purpose. One team, one service catalog, one set of settings. If you need to schedule for several unrelated organisations, run a separate instance for each.
 
 ## What do I need to run it?
 

@@ -36,7 +36,7 @@ Under **Settings**, set the company name, logo, and brand colour. These appear o
 
 The brand colour is used for buttons, links, the selected date and time, and focus rings on those pages. On light pages a colour that would be hard to read, such as a pale yellow, is deepened just enough to reach 3:1 contrast, and any other colour is used as entered. Dark mode lightens the colour to at least 62% lightness, and further if it still falls short of 3:1, so it reads on a dark page. The dashboard keeps Tidetime's own colours.
 
-The same page sets the **default phone country**. Phone questions on the booking form show a country picker next to the number box, and this is the country it starts on — so most customers just type their number without a dialling code. They can still change it. Numbers are stored in international format (`+447700900123`) whichever way they were entered.
+The same page sets the **default phone country**. Phone questions on the booking form show a country picker next to the number box, and this is the country it starts on, so most customers just type their number without a dialling code. They can still change it. Numbers are stored in international format (`+447700900123`) whichever way they were entered.
 
 ## Legal pages
 

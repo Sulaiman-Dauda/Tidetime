@@ -177,18 +177,18 @@ Relevant docs live in [`docs/`](./docs).
 Tidetime is maintained by one person alongside other work. Being honest about
 that is better than leaving you guessing:
 
-- **Issues** — usually looked at within a few days. A bug with clear steps to
+- **Issues**: usually looked at within a few days. A bug with clear steps to
   reproduce gets attention fastest.
-- **Pull requests** — a first response within about a week. Large changes take
+- **Pull requests**: a first response within about a week. Large changes take
   longer, which is why it is worth opening an issue before building one.
-- **Security reports** — prioritised over everything else. Report privately via
+- **Security reports**: prioritised over everything else. Report privately via
   [Security → Report a vulnerability](../../security/advisories/new).
 
 If something has gone quiet for longer, a comment on the thread is welcome.
 
 There is **no CLA and no DCO sign-off**. The bar a PR is held to is written down
-in [`.github/REVIEW_GUIDELINES.md`](./.github/REVIEW_GUIDELINES.md) — worth two
-minutes before you start, so nothing in review is a surprise.
+in [`.github/REVIEW_GUIDELINES.md`](./.github/REVIEW_GUIDELINES.md). Reading it takes
+two minutes and means nothing in review is a surprise.
 
 ## Security issues
 
