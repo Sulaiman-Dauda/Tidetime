@@ -102,8 +102,6 @@ const updateSchema = z.object({
   maxBookingsPerDay: z.number().int().min(1).max(500).nullable(),
   requiresConfirmation: z.boolean(),
   disableGuests: z.boolean(),
-  /** explicit status — saving no longer force-publishes */
-  draft: z.boolean(),
   locations: eventLocationsSchema.min(1, "Add at least one location").max(3),
   bookingFields: bookingFieldsSchema,
   providerIds: z.array(z.number().int().positive()).min(1, "Assign at least one provider"),
@@ -118,7 +116,7 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid service" };
   const data = parsed.data;
-  const [owned] = await db.select({ id: services.id, draft: services.draft }).from(services)
+  const [owned] = await db.select({ id: services.id }).from(services)
     .where(and(eq(services.id, data.id), eq(services.teamId, company.teamId))).limit(1);
   if (!owned) return { ok: false, error: "Service not found" };
 
@@ -148,10 +146,11 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
       bookingFields: data.bookingFields,
       requiresConfirmation: data.requiresConfirmation,
       disableGuests: data.disableGuests,
-      // Publishing is one way. Draft cleanup deletes drafts a day after they
-      // were created, so turning a live service back into a draft would delete
-      // it. Hiding it ("Visible on company booking page") takes it offline.
-      draft: owned.draft && data.draft,
+      // Saving publishes, and nothing turns a live service back into a draft.
+      // Draft cleanup deletes drafts a day after they were created, so a
+      // re-drafted service would be deleted. Hiding it ("Visible on company
+      // booking page") is how a service goes offline.
+      draft: false,
       updatedAt: new Date(),
     }).where(eq(services.id, data.id));
     await tx.delete(serviceProviders).where(eq(serviceProviders.serviceId, data.id));

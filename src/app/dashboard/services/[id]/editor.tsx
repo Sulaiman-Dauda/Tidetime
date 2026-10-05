@@ -103,7 +103,6 @@ export function ServiceEditor({ service, teamSlug, appUrl, providers, selectedPr
       const result = await updateServiceAction({
         id: service.id,
         ...form,
-        draft: false,
         locations,
         bookingFields: fields,
         providerIds,
