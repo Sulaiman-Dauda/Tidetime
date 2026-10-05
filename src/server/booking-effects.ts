@@ -133,6 +133,47 @@ function bookingAnswers(ctx: LoadedBookingContext): { label: string; value: stri
   );
 }
 
+/**
+ * The webhook body for booking_created and booking_rescheduled. One builder
+ * for both, so a booking staff move on the dashboard calendar carries the same
+ * fields as one the customer made or rescheduled.
+ */
+function bookingWebhookPayload(
+  ctx: LoadedBookingContext,
+  primary: LoadedBookingContext["attendees"][number],
+  title: string,
+): Record<string, unknown> {
+  return {
+    uid: ctx.booking.uid,
+    serviceId: ctx.booking.serviceId,
+    // The slug as well as the id, because a subscriber that branches on
+    // which service was booked should not break when ids are renumbered.
+    serviceSlug: ctx.service?.slug ?? null,
+    title,
+    startTime: ctx.booking.startTime.toISOString(),
+    endTime: ctx.booking.endTime.toISOString(),
+    attendee: {
+      name: primary.name,
+      email: primary.email,
+      timeZone: primary.timeZone,
+      // Collected on every service and previously kept to ourselves,
+      // which left a subscriber with no way to ring the customer back.
+      phone: primary.phoneNumber ?? null,
+    },
+    // The custom questions, already resolved to their labels.
+    //
+    // Resolved here rather than sent raw because the field names are
+    // per-service timestamps: "Site Postcode" is question_1785008013680
+    // on one service and question_1786457497496 on another. Only this
+    // side knows which is which, so sending the raw responses would push
+    // that problem onto every subscriber.
+    answers: bookingAnswers(ctx),
+    // The notes answer, which the booking form stores as the description.
+    description: ctx.booking.description ?? null,
+    status: ctx.booking.status,
+  };
+}
+
 async function buildEmailView(ctx: LoadedBookingContext): Promise<EmailBookingView | null> {
   const primary = ctx.attendees.find((a) => a.isPrimary) ?? ctx.attendees[0];
   if (!primary) return null;
@@ -254,35 +295,7 @@ export async function runAcceptedBookingEffects(bookingId: number): Promise<void
       dispatchWebhook(
         ctx.host.id,
         ctx.booking.rescheduledFromUid ? "booking_rescheduled" : "booking_created",
-        {
-          uid: ctx.booking.uid,
-          serviceId: ctx.booking.serviceId,
-          // The slug as well as the id, because a subscriber that branches on
-          // which service was booked should not break when ids are renumbered.
-          serviceSlug: ctx.service?.slug ?? null,
-          title,
-          startTime: ctx.booking.startTime.toISOString(),
-          endTime: ctx.booking.endTime.toISOString(),
-          attendee: {
-            name: primary.name,
-            email: primary.email,
-            timeZone: primary.timeZone,
-            // Collected on every service and previously kept to ourselves,
-            // which left a subscriber with no way to ring the customer back.
-            phone: primary.phoneNumber ?? null,
-          },
-          // The custom questions, already resolved to their labels.
-          //
-          // Resolved here rather than sent raw because the field names are
-          // per-service timestamps: "Site Postcode" is question_1785008013680
-          // on one service and question_1786457497496 on another. Only this
-          // side knows which is which, so sending the raw responses would push
-          // that problem onto every subscriber.
-          answers: bookingAnswers(ctx),
-          // The notes answer, which the booking form stores as the description.
-          description: ctx.booking.description ?? null,
-          status: ctx.booking.status,
-        },
+        bookingWebhookPayload(ctx, primary, title),
       ),
     );
 
@@ -448,15 +461,7 @@ export async function runBookingMovedEffects(bookingId: number): Promise<void> {
     );
 
     tasks.push(
-      dispatchWebhook(ctx.host.id, "booking_rescheduled", {
-        uid: ctx.booking.uid,
-        serviceId: ctx.booking.serviceId,
-        title,
-        startTime: ctx.booking.startTime.toISOString(),
-        endTime: ctx.booking.endTime.toISOString(),
-        attendee: { name: primary.name, email: primary.email, timeZone: primary.timeZone },
-        status: ctx.booking.status,
-      }),
+      dispatchWebhook(ctx.host.id, "booking_rescheduled", bookingWebhookPayload(ctx, primary, title)),
     );
   }
 
