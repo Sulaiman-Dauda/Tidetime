@@ -8,11 +8,18 @@ a stable release. Published releases and their notes are also available on the
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-05
+
+Upgrading from 0.1.x: pull the new image and restart, using the command the
+dashboard shows or **Update now** if the optional updater is enabled. One
+database migration runs on start and only adds a nullable column. Nothing
+changes in `.env` or the Compose files.
+
 ### Security
 
 - Two-factor codes are now single-use. `verifyTotp` only reported whether a code
-  was valid, so a code stayed usable for the whole ±1-step acceptance window —
-  roughly 90 seconds — and could be replayed to sign in again or to switch 2FA
+  was valid, so a code stayed usable for the whole ±1-step acceptance window
+  (roughly 90 seconds) and could be replayed to sign in again or to switch 2FA
   back off. RFC 6238 §5.2 requires a verifier to reject the second use of an OTP.
   A new `verifyTotpStep` returns the 30-second step a code matched, the step is
   recorded on the user as `totp_last_step`, and a code is only accepted when its
@@ -20,6 +27,25 @@ a stable release. Published releases and their notes are also available on the
   value so the setup code cannot be turned straight around against a login.
   Requires the `0005` migration; the column is nullable, so existing installs
   keep working and simply have no consumed step recorded until the next sign-in.
+
+### Added
+
+- Phone questions on the booking form have a country picker beside the number.
+  Numbers are stored in international format (`+447700900123`) however they
+  were typed, and shown grouped (`+44 7700 900123`) on the confirmation page and
+  in the dashboard. A new **Default phone country** setting (Settings, Brand
+  tab, under Booking form) sets where the picker starts. Numbers saved before
+  upgrading are not converted.
+- Booking webhooks (`booking_created` and `booking_rescheduled`) carry four more
+  fields: `serviceSlug`, `attendee.phone`, `answers` (each custom question as a
+  `label` and `value`) and `description`. Existing fields are unchanged, so
+  current Zapier zaps and subscribers keep working.
+- Booking questions can be set to **Half width** in the service editor, so short
+  questions such as name and email share a row on wider screens. Existing
+  questions stay full width.
+- The Terms and Privacy texts support `## headings`, `- bullets` and `**bold**`,
+  and turn web and email addresses into links. Text without those markers looks
+  the same as before.
 
 ### Fixed
 
@@ -35,7 +61,7 @@ a stable release. Published releases and their notes are also available on the
 
 - The dashboard was unusable on screens narrower than 768px. The mobile header
   was a sibling of the sidebar inside a row-direction flex container, so it took
-  a column of its own and pushed the content area off-screen — every dashboard
+  a column of its own and pushed the content area off-screen, so every dashboard
   page rendered as a blank screen below the header. The header now sits inside
   the content column.
 - Booking times like `10:00 AM` wrapped onto a second line in the overview's
@@ -65,6 +91,12 @@ a stable release. Published releases and their notes are also available on the
 
 ### Changed
 
+- Choosing a time on the public booking page goes straight to the details form.
+  The separate **Next** button is gone.
+- The public booking page shows the company logo once, in the service panel,
+  rather than in the page header as well. A wide wordmark stands alone; a
+  square or tall logo appears with the company name beside it. The chosen date
+  and time sit in that panel instead of being repeated above the form.
 - Filters on Bookings, Customers, Calendar and Availability now use the app's
   own select control instead of the unstyled browser dropdown.
 - Service rows have a labelled `Preview` and `Edit` action plus an overflow menu
@@ -144,7 +176,8 @@ company with multiple services and multiple providers.
   and are alerted when a newer release is available, with an optional one-click
   updater.
 
-[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Sulaiman-Dauda/Tidetime/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.2.0
 [0.1.2]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Sulaiman-Dauda/Tidetime/releases/tag/v0.1.0
