@@ -63,8 +63,8 @@ export const users = pgTable(
     locale: varchar("locale", { length: 16 }).notNull().default("en"),
     /** Instance administrator. */
     isAdmin: boolean("is_admin").notNull().default(false),
-    /** TOTP secret (base32) — non-null means two-factor auth is enabled. */
-    totpSecret: varchar("totp_secret", { length: 64 }),
+    /** Encrypted TOTP secret; non-null means two-factor auth is enabled. */
+    totpSecret: text("totp_secret"),
     /**
      * Highest 30-second TOTP step already consumed. A code is only accepted if
      * its step is strictly greater, so the same code cannot be replayed inside

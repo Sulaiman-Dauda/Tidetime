@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { getTableColumns } from "drizzle-orm";
+import { users } from "@/db/schema";
+import { encrypt } from "./crypto";
 import {
   base32Decode,
   base32Encode,
@@ -70,5 +73,16 @@ describe("totp", () => {
     expect(uri).toContain("otpauth://totp/Tidetime%3Auser%40example.com");
     expect(uri).toContain("secret=ABC234");
     expect(uri).toContain("issuer=Tidetime");
+  });
+});
+
+describe("two-factor secret storage", () => {
+  // Enrolment stores the secret encrypted, which is far longer than the
+  // 32-character base32 secret. A column sized for the raw secret made every
+  // enrolment fail with "value too long".
+  it("fits an encrypted secret in users.totp_secret", () => {
+    const stored = encrypt(generateTotpSecret());
+    const { length } = getTableColumns(users).totpSecret as { length?: number };
+    expect(length ?? Infinity).toBeGreaterThanOrEqual(stored.length);
   });
 });
