@@ -100,7 +100,11 @@ export default async function AvailabilityPage({ searchParams }: Props) {
   const overrides = Array.from(overridesMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
   return (
+    // Keyed by schedule: switching person or schedule re-renders this page
+    // with new props, and the editor's state would otherwise keep the previous
+    // schedule's hours and save them over the new one.
     <AvailabilityEditor
+      key={active.id}
       schedule={{ id: active.id, name: active.name, timeZone: active.timeZone ?? target.timeZone }}
       schedules={all.map((s) => ({ id: s.id, name: s.name, isDefault: s.id === target.defaultScheduleId }))}
       initialWeekly={weekly}
