@@ -62,6 +62,10 @@ Compose files.
   on. Publishing is now one way, and the cleanup never deletes a service that
   has bookings. A service already deleted this way cannot be recovered except
   from a backup.
+- On Availability, switching to another person or another schedule kept
+  showing the previous schedule's hours, and saving wrote them over the one
+  now selected. The editor now loads the hours of whichever schedule you
+  switch to.
 
 - Webhooks were never delivered on Node 20 or later. Every delivery failed with
   "Invalid IP address: undefined" and was retried until it was marked failed.
