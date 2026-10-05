@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, lt, notExists } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bookings,
@@ -79,7 +79,12 @@ export async function runRetentionCleanup(now = new Date()): Promise<RetentionSu
     await db
       .delete(services)
       .where(
-        and(eq(services.draft, true), lt(services.createdAt, new Date(now.getTime() - DRAFT_TTL_MS))),
+        and(
+          eq(services.draft, true),
+          lt(services.createdAt, new Date(now.getTime() - DRAFT_TTL_MS)),
+          // A service anyone has booked is never an abandoned draft.
+          notExists(db.select({ id: bookings.id }).from(bookings).where(eq(bookings.serviceId, services.id))),
+        ),
       )
       .returning({ id: services.id })
   ).length;

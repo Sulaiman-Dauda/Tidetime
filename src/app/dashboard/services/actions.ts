@@ -118,7 +118,7 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid service" };
   const data = parsed.data;
-  const [owned] = await db.select({ id: services.id }).from(services)
+  const [owned] = await db.select({ id: services.id, draft: services.draft }).from(services)
     .where(and(eq(services.id, data.id), eq(services.teamId, company.teamId))).limit(1);
   if (!owned) return { ok: false, error: "Service not found" };
 
@@ -148,7 +148,10 @@ export async function updateServiceAction(input: UpdateServiceInput): Promise<Up
       bookingFields: data.bookingFields,
       requiresConfirmation: data.requiresConfirmation,
       disableGuests: data.disableGuests,
-      draft: data.draft,
+      // Publishing is one way. Draft cleanup deletes drafts a day after they
+      // were created, so turning a live service back into a draft would delete
+      // it. Hiding it ("Visible on company booking page") takes it offline.
+      draft: owned.draft && data.draft,
       updatedAt: new Date(),
     }).where(eq(services.id, data.id));
     await tx.delete(serviceProviders).where(eq(serviceProviders.serviceId, data.id));
