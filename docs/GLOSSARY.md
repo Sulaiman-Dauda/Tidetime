@@ -4,13 +4,13 @@ Terms used across the Tidetime documentation.
 
 **Instance.** One running copy of Tidetime, serving one company.
 
-**Company.** The single organisation that owns the instance. Its name, logo, and brand colour appear on the public booking, confirmation, and legal pages. Emails show the `APP_NAME` value in their header.
+**Company.** The single organisation that owns the instance. Its name, logo, and brand colour appear on the public booking, confirmation, and legal pages. Emails carry the `APP_NAME` value rather than the company name.
 
 **Owner.** The account with full control of the instance, including settings, integrations, and transferring ownership.
 
-**Admin.** A role that can do everything except transfer ownership: the service catalog, everyone's availability, all bookings, and settings. Admins can invite, change, and remove schedulers and members, but not other admins.
+**Admin.** A role that can do everything except transfer ownership: the service catalogue, everyone's availability, all bookings, and settings. Admins can invite, change, and remove schedulers and members, but not other admins.
 
-**Scheduler.** A front-desk role that manages all bookings and customers and books on behalf of customers, but cannot change the catalog, members, or settings. Not meant to take bookings, though a scheduler assigned to a service as a provider becomes bookable.
+**Scheduler.** A front-desk role that manages all bookings and customers and books on behalf of customers, but cannot change the catalogue, members, or settings. Not meant to take bookings, though a scheduler assigned to a service as a provider becomes bookable.
 
 **Member.** A regular team member and bookable provider, managing their own availability, bookings, and calendar connection. The default role for invited teammates.
 

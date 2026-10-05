@@ -10,11 +10,23 @@ a stable release. Published releases and their notes are also available on the
 
 ## [0.2.0] - 2026-10-05
 
-Upgrading from 0.1.x: pull the new image and restart, using the command the
-dashboard shows or **Update now** if the optional updater is enabled. Two
-database migrations run on start: one adds a nullable column and one widens a
-column, and neither changes existing data. Nothing changes in `.env` or the
-Compose files.
+Upgrading from 0.1.x: admins see an **Update available** card at the foot of
+the sidebar. If the optional updater is enabled, **Update now** pulls the new
+image and restarts the stack. Otherwise back up the database and run this in
+the install folder:
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+If you build the image from source rather than running the published one,
+`pull` cannot fetch it: run `git pull` and then
+`docker compose -f docker-compose.prod.yml up -d --build`. Two database
+migrations run on start: one adds a nullable column and one widens a column,
+and neither changes existing data. Nothing changes in `.env` or the Compose
+files.
 
 ### Security
 
@@ -39,13 +51,15 @@ Compose files.
   upgrading are not converted.
 - Booking webhooks (`booking_created` and `booking_rescheduled`) carry four more
   fields: `serviceSlug`, `attendee.phone`, `answers` (each custom question as a
-  `label` and `value`) and `description`. Existing fields are unchanged, so
-  current Zapier zaps and subscribers keep working.
+  `label` and `value`) and `description`, whether the customer reschedules or
+  staff move the booking on the dashboard calendar. Existing fields are
+  unchanged, so current Zapier zaps and subscribers keep working.
 - Booking questions can be set to **Half width** in the service editor, so short
   questions such as name and email share a row on wider screens. Existing
   questions stay full width.
 - The Terms and Privacy texts support `## headings`, `- bullets` and `**bold**`,
-  and turn web and email addresses into links. Text without those markers looks
+  and turn email addresses and web addresses starting `http://` or `https://`
+  into links. Text without those markers looks
   the same as before.
 
 ### Fixed
@@ -111,10 +125,9 @@ Compose files.
 
 - Choosing a time on the public booking page goes straight to the details form.
   The separate **Next** button is gone.
-- The public booking page shows the company logo once, in the service panel,
-  rather than in the page header as well. A wide wordmark stands alone; a
-  square or tall logo appears with the company name beside it. The chosen date
-  and time sit in that panel instead of being repeated above the form.
+- The public booking page shows the company once, in the service panel: the
+  logo if one is set, otherwise the name. The page header no longer repeats it.
+  The chosen date and time appear once, at the top of the details form.
 - Filters on Bookings, Customers, Calendar and Availability now use the app's
   own select control instead of the unstyled browser dropdown.
 - Service rows have a labelled `Preview` and `Edit` action plus an overflow menu

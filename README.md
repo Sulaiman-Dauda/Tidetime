@@ -64,7 +64,7 @@ Copy `.env.example` to `.env` and fill in the values. The essentials:
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `APP_URL` | Yes | Public URL of the instance, used in links and emails. |
-| `APP_NAME` | No | Product name used in browser titles, the header of every email, and authenticator apps. The company name set in Settings does not replace it there. Defaults to Tidetime. |
+| `APP_NAME` | No | Product name used in browser titles, in emails, and in authenticator apps. The company name set in Settings does not replace it there. Defaults to Tidetime. |
 | `DATABASE_URL` | Yes | PostgreSQL connection string. |
 | `AUTH_SECRET` | Yes | Random value of at least 32 characters. Encrypts stored credentials and two-factor secrets, and signs OAuth state, RSVP links and spam-check tokens. Sessions do not depend on it. |
 | `CRON_SECRET` | Yes | Random value of at least 32 characters. Protects the background jobs endpoint. |
@@ -103,8 +103,8 @@ For domain setup, backups, Microsoft 365 email, and upgrade notes, see [docs/DEP
 Team members are managed under **Members**, each with one of four roles:
 
 - **Owner** (full control, including settings, integrations, and transferring ownership).
-- **Admin** (everything except transferring ownership, including the service catalog, availability, all bookings, and settings; can invite, change, and remove schedulers and members, but not other admins).
-- **Scheduler** (a front-desk role for managing all bookings and customers, with no access to the catalog, members, or settings; not meant to take bookings, but the service editor does not stop you assigning one as a provider, and an assigned scheduler becomes bookable).
+- **Admin** (everything except transferring ownership, including the service catalogue, availability, all bookings, and settings; can invite, change, and remove schedulers and members, but not other admins).
+- **Scheduler** (a front-desk role for managing all bookings and customers, with no access to the catalogue, members, or settings; not meant to take bookings, but the service editor does not stop you assigning one as a provider, and an assigned scheduler becomes bookable).
 - **Member** (a bookable provider who manages their own availability, bookings, and calendar connection).
 
 A provider is a member assigned to a service. These boundaries are enforced in the server queries and mutations, not only in the interface.

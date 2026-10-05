@@ -7,8 +7,8 @@ This guide covers the company-wide settings that owners and admins control: the 
 Tidetime runs one company per instance. Team members are managed under **Members**, and each has one of four roles:
 
 - **Owner** has full control, including company settings, integrations, and transferring ownership.
-- **Admin** can do everything except transfer ownership: manage the service catalog, everyone's availability, all bookings, and company settings. Admins can invite, change, and remove schedulers and members, but not other admins.
-- **Scheduler** is a front-desk role. They view and manage every booking and customer and can book on behalf of customers, but cannot change the service catalog, members, or settings. Schedulers are not meant to take bookings themselves. The service editor does not stop you assigning one as a provider, though, and a scheduler assigned to a service becomes bookable.
+- **Admin** can do everything except transfer ownership: manage the service catalogue, everyone's availability, all bookings, and company settings. Admins can invite, change, and remove schedulers and members, but not other admins.
+- **Scheduler** is a front-desk role. They view and manage every booking and customer and can book on behalf of customers, but cannot change the service catalogue, members, or settings. Schedulers are not meant to take bookings themselves. The service editor does not stop you assigning one as a provider, though, and a scheduler assigned to a service becomes bookable.
 - **Member** is a regular team member and bookable provider. They take appointments and manage their own availability, bookings, and calendar connection.
 
 A **provider** is a member assigned to a service to take its bookings; owners and admins can be assigned as providers too. These limits are enforced in the server, not only hidden in the interface.
