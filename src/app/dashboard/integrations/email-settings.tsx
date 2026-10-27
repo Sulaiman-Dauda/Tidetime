@@ -241,6 +241,7 @@ export function EmailSettings() {
       setConnecting(true);
       const saved = await saveMicrosoft();
       if (saved) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bar: an API route that redirects to the provider's sign-in needs a full page load
         window.location.assign("/api/microsoft-email/auth");
         return;
       }

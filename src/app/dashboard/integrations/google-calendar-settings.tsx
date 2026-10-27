@@ -102,6 +102,7 @@ export function GoogleCalendarSettings() {
     // If the redirect fails (or the user navigates back), don't leave the
     // button stuck on "Redirecting…" forever.
     setTimeout(() => setConnecting(false), 8000);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bar: an API route that redirects to the provider's sign-in needs a full page load
     window.location.href = "/api/google-calendar/auth";
   }
 
