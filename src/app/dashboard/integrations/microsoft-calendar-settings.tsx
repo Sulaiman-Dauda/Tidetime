@@ -79,6 +79,7 @@ export function MicrosoftCalendarSettings() {
   function connect() {
     setConnecting(true);
     setTimeout(() => setConnecting(false), 8000);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- an API route that redirects to the provider's sign-in needs a full page load
     window.location.href = "/api/microsoft-calendar/auth";
   }
 
