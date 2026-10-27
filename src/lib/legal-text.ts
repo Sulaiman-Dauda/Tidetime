@@ -34,7 +34,7 @@ const TRAILING = /[.,;:!?)\]]+$/;
 
 /**
  * Bare URLs and email addresses. Deliberately conservative: it requires a
- * scheme for a URL so "e.g." and "17-19 Smeaton Close" are never mistaken for
+ * scheme for a URL so "e.g." and "17-19 High Street" are never mistaken for
  * one, and it stops at whitespace.
  */
 const LINKABLE = /(https?:\/\/[^\s<]+|[^\s<@]+@[^\s<@]+\.[^\s<@.]+)/g;

@@ -18,10 +18,10 @@ describe("parseLegalText", () => {
 
   it("preserves a single newline inside a paragraph, as the old renderer did", () => {
     // An address block typed by an existing admin must not reflow.
-    const [block] = parseLegalText("Sportsafe UK Ltd\n17-19 Smeaton Close\nColchester");
+    const [block] = parseLegalText("Example Ltd\n17-19 High Street\nAnytown");
     expect(block.kind).toBe("paragraph");
     expect(textOf(block.kind === "paragraph" ? block.spans : [])).toBe(
-      "Sportsafe UK Ltd\n17-19 Smeaton Close\nColchester",
+      "Example Ltd\n17-19 High Street\nAnytown",
     );
   });
 
@@ -47,7 +47,7 @@ describe("parseLegalText", () => {
   });
 
   it("does not treat a hyphenated line as a list", () => {
-    const [block] = parseLegalText("17-19 Smeaton Close, Colchester");
+    const [block] = parseLegalText("17-19 High Street, Anytown");
     expect(block.kind).toBe("paragraph");
   });
 
@@ -59,10 +59,10 @@ describe("parseLegalText", () => {
   });
 
   it("links a bare URL", () => {
-    const [block] = parseLegalText("See https://sportsafeuk.com/policies/ for more.");
+    const [block] = parseLegalText("See https://example.com/policies/ for more.");
     const spans = block.kind === "paragraph" ? block.spans : [];
-    expect(linksIn(spans)).toEqual(["https://sportsafeuk.com/policies/"]);
-    expect(textOf(spans)).toBe("See https://sportsafeuk.com/policies/ for more.");
+    expect(linksIn(spans)).toEqual(["https://example.com/policies/"]);
+    expect(textOf(spans)).toBe("See https://example.com/policies/ for more.");
   });
 
   it("leaves sentence punctuation outside the link", () => {
@@ -74,9 +74,9 @@ describe("parseLegalText", () => {
   });
 
   it("turns an email address into a mailto link", () => {
-    const [block] = parseLegalText("Write to marketing@sportsafeuk.com and we will reply.");
+    const [block] = parseLegalText("Write to hello@example.com and we will reply.");
     const spans = block.kind === "paragraph" ? block.spans : [];
-    expect(linksIn(spans)).toEqual(["mailto:marketing@sportsafeuk.com"]);
+    expect(linksIn(spans)).toEqual(["mailto:hello@example.com"]);
   });
 
   it("does not invent links from ordinary prose", () => {
@@ -86,10 +86,10 @@ describe("parseLegalText", () => {
   });
 
   it("links inside a list item and inside bold", () => {
-    const [list] = parseLegalText("- **Our CRM**, at https://sportsafe.sugaropencloud.uk");
+    const [list] = parseLegalText("- **Our CRM**, at https://crm.example.com");
     const item = list.kind === "list" ? list.items[0] : [];
     expect(item.find((s) => s.bold)?.text).toBe("Our CRM");
-    expect(linksIn(item)).toEqual(["https://sportsafe.sugaropencloud.uk"]);
+    expect(linksIn(item)).toEqual(["https://crm.example.com"]);
   });
 
   it("handles Windows line endings", () => {

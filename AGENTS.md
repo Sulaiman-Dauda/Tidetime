@@ -4,10 +4,6 @@ Self-hosted appointment scheduling for a single company with multiple services a
 Open source, self-hosted only: no hosted plan, no per-seat pricing, no third-party analytics.
 Next.js + Drizzle ORM + PostgreSQL + Tailwind. npm, **Node >= 20**. Package version `0.2.0`.
 
-> **This folder is the canonical Tidetime checkout.** Remote is
-> `github.com/Sulaiman-Dauda/Tidetime`. Two stale clones (`Saas Porfolio/tidetime` and
-> `~/Videos/tidetime`) were deleted on 2026-07-25. If either reappears, it's a duplicate.
-
 ## Status: launched, public and open source since 2026-07-25
 
 Launched on 2026-07-25. It's public on GitHub and people can read every commit. That means:

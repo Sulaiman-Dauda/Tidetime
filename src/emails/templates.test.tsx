@@ -34,8 +34,8 @@ describe("react-email rendering", () => {
       start: new Date("2026-07-23T13:00:00Z"),
       end: new Date("2026-07-23T13:30:00Z"),
       timeZone: "Europe/London",
-      hostName: "Pablo",
-      attendeeName: "Sulaiman",
+      hostName: "Morgan",
+      attendeeName: "Priya",
       attendeeEmail: "attendee@example.com",
       location: "Phone call",
       meetingUrl: null,
@@ -48,8 +48,8 @@ describe("react-email rendering", () => {
       hour12: true,
     });
     expect(a.html).toContain("Host");
-    expect(a.html).toContain("Pablo");
-    expect(a.html).toContain("Sulaiman");
+    expect(a.html).toContain("Morgan");
+    expect(a.html).toContain("Priya");
     expect(a.html).toContain("attendee@example.com");
     expect(a.html).toContain("Phone Number");
     expect(a.html).toContain("076897656678");
