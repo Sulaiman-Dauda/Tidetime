@@ -18,6 +18,19 @@ updates:
       major:
         update-types:
           - major
+    # Majors that need a planned migration, not a bump. TypeScript 7 is not yet
+    # supported by typescript-eslint, Tailwind 4 moves its config into CSS and
+    # tailwind-merge 3 needs Tailwind 4, and @types/node follows the Node the
+    # Dockerfile runs (22). Remove an entry when that upgrade is planned.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+      - dependency-name: tailwind-merge
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"
